@@ -1,6 +1,5 @@
 import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerFileOps } from './fileOps'
 import { registerSettings } from './settings'
 
@@ -30,7 +29,7 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+  if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
@@ -38,11 +37,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.agent.electron-app')
-
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
+  app.setAppUserModelId('com.agent.electron-app')
 
   const { get: getSettings } = registerSettings()
   registerFileOps(() => getSettings().workspacePath)
