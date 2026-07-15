@@ -222,8 +222,8 @@ export type ServerEvent =
       step: number
       reasoning?: string
     }
-  | { type: 'build.step_confirmed'; seq: number; step: number; tool_name: string }
-  | { type: 'build.step_skipped'; seq: number; step: number; tool_name: string }
+  | { type: 'build.step_confirmed'; seq: number; step: number; tool_name: string; tool_call_id: string }
+  | { type: 'build.step_skipped'; seq: number; step: number; tool_name: string; tool_call_id: string }
   | { type: 'build.aborted'; seq: number; message_id: string }
   // Queue & Lifecycle
   | {

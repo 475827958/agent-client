@@ -141,12 +141,10 @@ function createEventHandler(
         break
 
       case 'build.step_confirmed':
-        // NOTE: build.step_confirmed currently lacks tool_call_id in the type,
-        // so we match by tool_name on the most recent pending tool.
         taskStore.updateLastAssistantMessage((m) => ({
           ...m,
           tools: m.tools?.map((t) =>
-            t.name === event.tool_name && t.status === 'pending'
+            t.id === event.tool_call_id
               ? { ...t, status: 'running' as const }
               : t
           )
@@ -154,11 +152,9 @@ function createEventHandler(
         break
 
       case 'build.step_skipped':
-        // NOTE: build.step_skipped currently lacks tool_call_id in the type,
-        // so we match by tool_name on the pending tool.
         taskStore.updateLastAssistantMessage((m) => ({
           ...m,
-          tools: m.tools?.filter((t) => !(t.name === event.tool_name && t.status === 'pending'))
+          tools: m.tools?.filter((t) => t.id !== event.tool_call_id)
         }))
         break
 
