@@ -6,11 +6,95 @@ const DEFAULT_BASE_URL = '/api'
 
 // ===== Session management =====
 
+export interface CreateSessionRequest {
+  id: string
+  scene_mode: string
+  workspace: string
+  model: string
+  mode: string
+  client_tools: {
+    name: string
+    description: string
+    input_schema: {
+      type: 'object'
+      properties: Record<string, unknown>
+      required?: string[]
+    }
+  }[]
+  mcp_servers?: {
+    server_id: string
+    server_name: string
+    enabled_tools?: string[]
+  }[]
+}
+
 export interface CreateSessionResponse {
   session_id: string
 }
 
-export async function createSession(): Promise<string> {
+export const CLIENT_TOOLS = [
+  {
+    name: 'read_file',
+    description: 'Read the contents of a file at the given path',
+    input_schema: {
+      type: 'object' as const,
+      properties: { path: { type: 'string', description: 'Absolute path to the file' } },
+      required: ['path']
+    }
+  },
+  {
+    name: 'write_file',
+    description: 'Write content to a file, creating it if it does not exist',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        path: { type: 'string', description: 'Absolute path to the file' },
+        content: { type: 'string', description: 'Content to write' }
+      },
+      required: ['path', 'content']
+    }
+  },
+  {
+    name: 'edit_file',
+    description: 'Perform exact string replacements in a file',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        path: { type: 'string', description: 'Absolute path to the file' },
+        old_string: { type: 'string', description: 'Text to replace' },
+        new_string: { type: 'string', description: 'Replacement text' }
+      },
+      required: ['path', 'old_string', 'new_string']
+    }
+  },
+  {
+    name: 'glob',
+    description: 'Find files matching a glob pattern',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        pattern: { type: 'string', description: 'Glob pattern to match, e.g. **/*.ts' },
+        path: { type: 'string', description: 'Directory to search in' }
+      },
+      required: ['pattern']
+    }
+  },
+  {
+    name: 'grep',
+    description: 'Search file contents using regex patterns',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        pattern: { type: 'string', description: 'Regular expression to search for' },
+        path: { type: 'string', description: 'File or directory to search in' },
+        glob: { type: 'string', description: 'Glob pattern to filter files' }
+      },
+      required: ['pattern']
+    }
+  }
+]
+
+export async function createSession(req: CreateSessionRequest): Promise<string> {
   const settings = useSettingsStore.getState().settings
   const baseUrl = settings.apiBaseUrl || DEFAULT_BASE_URL
   const url = `${baseUrl}/sessions`
@@ -20,7 +104,8 @@ export async function createSession(): Promise<string> {
     headers: {
       'Content-Type': 'application/json',
       Authorization: settings.apiKey ? `Bearer ${settings.apiKey}` : ''
-    }
+    },
+    body: JSON.stringify(req)
   })
 
   if (!response.ok) {

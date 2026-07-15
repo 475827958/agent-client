@@ -1,10 +1,11 @@
 import { create } from 'zustand'
 import type { Task, Message } from '../types'
-import { createSession } from '../services/api'
+import { createSession, CLIENT_TOOLS } from '../services/api'
+import { useModeStore } from './modeStore'
+import { useSettingsStore } from './settingsStore'
 
-let nextId = 1
-function genId(): string {
-  return `task-${Date.now()}-${nextId++}`
+function genUUID(): string {
+  return crypto.randomUUID()
 }
 
 function formatTime(ts: number): string {
@@ -16,7 +17,7 @@ function formatTime(ts: number): string {
 
 const DEMO_TASKS: Task[] = [
   {
-    id: 'task-1',
+    id: genUUID(),
     sessionId: '',
     title: '新建任务',
     time: '刚才',
@@ -25,7 +26,7 @@ const DEMO_TASKS: Task[] = [
     lastSeq: 0
   },
   {
-    id: 'task-2',
+    id: genUUID(),
     sessionId: '',
     title: '分析 data-report 项目',
     time: '2小时前',
@@ -48,7 +49,7 @@ const DEMO_TASKS: Task[] = [
     ]
   },
   {
-    id: 'task-3',
+    id: genUUID(),
     sessionId: '',
     title: '编写数据分析脚本',
     time: '2小时前',
@@ -57,7 +58,7 @@ const DEMO_TASKS: Task[] = [
     messages: []
   },
   {
-    id: 'task-4',
+    id: genUUID(),
     sessionId: '',
     title: '修复支付模块 Bug',
     time: '昨天',
@@ -84,7 +85,7 @@ interface TaskState {
 
 export const useTaskStore = create<TaskState>((set, get) => ({
   tasks: DEMO_TASKS,
-  currentTaskId: 'task-1',
+  currentTaskId: DEMO_TASKS[0].id,
 
   create: async () => {
     const state = get()
@@ -100,7 +101,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       return existing.id
     }
 
-    const id = genId()
+    const id = genUUID()
     // Create local task placeholder first
     set((s) => ({
       tasks: [
@@ -112,7 +113,17 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
     // Call API to create server-side session
     try {
-      const sessionId = await createSession()
+      const modeStore = useModeStore.getState()
+      const settings = useSettingsStore.getState().settings
+
+      const sessionId = await createSession({
+        id,
+        scene_mode: modeStore.sceneMode,
+        workspace: settings.workspacePath,
+        model: settings.model,
+        mode: modeStore.inputMode,
+        client_tools: CLIENT_TOOLS
+      })
       set((s) => ({
         tasks: s.tasks.map((t) =>
           t.id === id ? { ...t, sessionId } : t
@@ -156,7 +167,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   duplicate: (id: string) => {
     const task = get().tasks.find((t) => t.id === id)
     if (!task) return
-    const newId = genId()
+    const newId = genUUID()
     set((s) => ({
       tasks: [
         {
