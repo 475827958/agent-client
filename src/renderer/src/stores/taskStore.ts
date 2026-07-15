@@ -73,6 +73,7 @@ interface TaskState {
   duplicate: (id: string) => void
   addMessage: (message: Message) => void
   updateLastAssistantMessage: (updater: (msg: Message) => Message) => void
+  updateTaskSeq: (seq: number) => void
   getCurrentTask: () => Task | undefined
 }
 
@@ -81,6 +82,19 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   currentTaskId: 'task-1',
 
   create: () => {
+    const state = get()
+    // Dedup: if an empty "新建任务" already exists, just select it
+    const existing = state.tasks.find(
+      t => t.title === '新建任务' && t.messages.length === 0
+    )
+    if (existing) {
+      set((s) => ({
+        currentTaskId: existing.id,
+        tasks: s.tasks.map((t) => ({ ...t, active: t.id === existing.id }))
+      }))
+      return existing.id
+    }
+
     const id = genId()
     set((s) => ({
       tasks: [
@@ -89,8 +103,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       ],
       currentTaskId: id
     }))
-    const current = get().tasks.find((t) => t.id === id)
-    if (current) current.active = true
     return id
   },
 
@@ -169,6 +181,14 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         }
         return { ...t, messages, time: formatTime(Date.now()) }
       })
+    }))
+  },
+
+  updateTaskSeq: (seq: number) => {
+    set((s) => ({
+      tasks: s.tasks.map((t) =>
+        t.id === s.currentTaskId ? { ...t, lastSeq: seq } : t
+      )
     }))
   },
 
