@@ -1,128 +1,299 @@
-### Task 6: Conversation Store
+### Task 6: Reconnection support
 
 **Files:**
-- Create: `src/renderer/src/stores/conversationStore.ts`
+- Modify: `src/renderer/src/stores/chatStore.ts`
 
 **Interfaces:**
-- Produces: `useConversationStore` with `create`, `delete`, `select`, `updateTitle`, `addMessage`, `getCurrentConversation`
+- Consumes: `reconnectStream` from `../services/api`, `Task.lastSeq`
+- Produces: `reconnect()` method that replays missed events
 
-- [ ] **Step 1: Create conversation store**
+- [ ] **Step 1: Add `reconnect` method to ChatState interface and implementation**
 
-`src/renderer/src/stores/conversationStore.ts`:
+```ts
+// In ChatState interface, add:
+reconnect: () => void
 
-```typescript
-import { create } from 'zustand'
-import type { Conversation, Message } from '../types'
+// In create(), add:
+reconnect: () => {
+  const taskStore = useTaskStore.getState()
+  const task = taskStore.getCurrentTask()
+  if (!task) return
 
-let nextId = 1
-function genId(): string {
-  return `conv_${Date.now()}_${nextId++}`
-}
-function msgGenId(): string {
-  return `msg_${Date.now()}_${nextId++}`
-}
+  const sinceSeq = task.lastSeq + 1
 
-interface ConversationState {
-  conversations: Conversation[]
-  currentConversationId: string | null
+  const handleEvent = (event: ServerEvent) => {
+    // Same event handler pattern as sendMessage
+    // (extract to a shared helper — see Step 2)
 
-  create: () => string
-  delete: (id: string) => void
-  select: (id: string) => void
-  updateTitle: (id: string, title: string) => void
-  addMessage: (message: Message) => void
-  updateLastAssistantMessage: (updater: (msg: Message) => Message) => void
-  getCurrentConversation: () => Conversation | undefined
-}
+    taskStore.updateTaskSeq(event.seq)
 
-export const useConversationStore = create<ConversationState>((set, get) => ({
-  conversations: [],
-  currentConversationId: null,
-
-  create: () => {
-    const id = genId()
-    const conv: Conversation = {
-      id,
-      title: '新对话',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      messages: []
+    switch (event.type) {
+      case 'agent.thinking':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m, thinking: (m.thinking || '') + event.delta
+        }))
+        break
+      case 'agent.text':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m, content: m.content + event.delta
+        }))
+        break
+      case 'agent.tool_call':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m,
+          tools: [...(m.tools || []), {
+            id: event.tool_call_id,
+            name: event.tool_name,
+            status: 'running' as const,
+            detail: typeof event.input === 'object'
+              ? JSON.stringify(event.input).slice(0, 120)
+              : undefined
+          }]
+        }))
+        break
+      case 'agent.tool_result':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m,
+          tools: m.tools?.map((t) =>
+            t.id === event.tool_call_id
+              ? { ...t, status: 'done' as const, result: event.result.output || event.result.error || 'Done' }
+              : t
+          )
+        }))
+        break
+      case 'message.complete':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m, processCollapsed: true, isStreaming: false
+        }))
+        set({ isProcessing: false })
+        break
+      case 'message.error':
+        if (event.fatal) {
+          taskStore.updateLastAssistantMessage((m) => ({
+            ...m,
+            content: m.content || `**Error:** ${event.error}`,
+            isStreaming: false,
+            processCollapsed: true
+          }))
+          set({ isProcessing: false })
+        }
+        break
+      default:
+        break
     }
-    set((s) => ({
-      conversations: [conv, ...s.conversations],
-      currentConversationId: id
-    }))
-    return id
-  },
-
-  delete: (id: string) => {
-    set((s) => {
-      const filtered = s.conversations.filter((c) => c.id !== id)
-      const currentId =
-        s.currentConversationId === id
-          ? filtered[0]?.id ?? null
-          : s.currentConversationId
-      return { conversations: filtered, currentConversationId: currentId }
-    })
-  },
-
-  select: (id: string) => set({ currentConversationId: id }),
-
-  updateTitle: (id: string, title: string) => {
-    set((s) => ({
-      conversations: s.conversations.map((c) =>
-        c.id === id ? { ...c, title } : c
-      )
-    }))
-  },
-
-  addMessage: (message: Message) => {
-    set((s) => ({
-      conversations: s.conversations.map((c) => {
-        if (c.id === s.currentConversationId) {
-          // Auto-title from first user message
-          const title =
-            c.title === '新对话' && message.role === 'user'
-              ? message.content.slice(0, 40)
-              : c.title
-          return {
-            ...c,
-            title,
-            updatedAt: Date.now(),
-            messages: [...c.messages, message]
-          }
-        }
-        return c
-      })
-    }))
-  },
-
-  updateLastAssistantMessage: (updater: (msg: Message) => Message) => {
-    set((s) => ({
-      conversations: s.conversations.map((c) => {
-        if (c.id !== s.currentConversationId) return c
-        const messages = [...c.messages]
-        const lastIdx = messages.length - 1
-        if (lastIdx >= 0 && messages[lastIdx].role === 'assistant') {
-          messages[lastIdx] = updater(messages[lastIdx])
-        }
-        return { ...c, messages, updatedAt: Date.now() }
-      })
-    }))
-  },
-
-  getCurrentConversation: () => {
-    const state = get()
-    return state.conversations.find((c) => c.id === state.currentConversationId)
   }
-}))
+
+  reconnectStream(
+    task.id,
+    sinceSeq,
+    handleEvent,
+    (err) => console.error('Reconnect error:', err),
+    () => set({ isProcessing: false })
+  )
+},
 ```
 
-- [ ] **Step 2: Commit**
+- [ ] **Step 2: Extract shared `createEventHandler` helper**
+
+To avoid duplicating the event handler between `sendMessage` and `reconnect`, extract a helper function. Add this above the `create()` call:
+
+```ts
+function createEventHandler(
+  taskStore: ReturnType<typeof useTaskStore.getState>,
+  set: (partial: Partial<ChatState>) => void,
+  lastSeqRef: { current: number }
+) {
+  return (event: ServerEvent) => {
+    lastSeqRef.current = event.seq
+
+    switch (event.type) {
+      case 'agent.thinking':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m, thinking: (m.thinking || '') + event.delta
+        }))
+        break
+      case 'agent.text':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m, content: m.content + event.delta
+        }))
+        break
+      case 'agent.tool_call':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m,
+          tools: [...(m.tools || []), {
+            id: event.tool_call_id,
+            name: event.tool_name,
+            status: 'running' as const,
+            detail: typeof event.input === 'object'
+              ? JSON.stringify(event.input).slice(0, 120)
+              : undefined
+          }]
+        }))
+        break
+      case 'agent.tool_result':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m,
+          tools: m.tools?.map((t) =>
+            t.id === event.tool_call_id
+              ? { ...t, status: 'done' as const, result: event.result.output || event.result.error || 'Done' }
+              : t
+          )
+        }))
+        break
+      case 'client.tool_request':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m,
+          tools: [...(m.tools || []), {
+            id: event.request_id,
+            name: event.tool_name,
+            status: 'pending' as const,
+            detail: typeof event.input === 'object'
+              ? JSON.stringify(event.input).slice(0, 120)
+              : undefined
+          }]
+        }))
+        break
+      case 'plan.generated':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m, planGenerated: event.plan_text, planStatus: 'pending'
+        }))
+        break
+      case 'plan.confirmed':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m, planStatus: 'confirmed'
+        }))
+        break
+      case 'plan.rejected':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m, planStatus: 'rejected', processCollapsed: true
+        }))
+        break
+      case 'plan.edited':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m, planGenerated: event.new_plan_text
+        }))
+        break
+      case 'build.step_pending':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m,
+          tools: [...(m.tools || []), {
+            id: event.tool_call_id,
+            name: event.tool_name,
+            status: 'pending' as const,
+            detail: event.reasoning || JSON.stringify(event.input).slice(0, 120)
+          }]
+        }))
+        break
+      case 'build.step_confirmed':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m,
+          tools: m.tools?.map((t) =>
+            t.id === event.tool_call_id
+              ? { ...t, status: 'running' as const }
+              : t
+          )
+        }))
+        break
+      case 'build.step_skipped':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m,
+          tools: m.tools?.filter((t) => t.id !== event.tool_call_id)
+        }))
+        break
+      case 'build.aborted':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m, processCollapsed: true
+        }))
+        set({ isProcessing: false })
+        break
+      case 'message.complete':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m, processCollapsed: true, isStreaming: false
+        }))
+        taskStore.updateTaskSeq(lastSeqRef.current)
+        set({ isProcessing: false })
+        break
+      case 'message.error':
+        if (event.fatal) {
+          taskStore.updateLastAssistantMessage((m) => ({
+            ...m,
+            content: m.content || `**Error:** ${event.error}`,
+            isStreaming: false,
+            processCollapsed: true
+          }))
+          taskStore.updateTaskSeq(lastSeqRef.current)
+          set({ isProcessing: false })
+        }
+        break
+      default:
+        break
+    }
+  }
+}
+```
+
+Then update `sendMessage` to use `createEventHandler`:
+
+```ts
+sendMessage: (text: string) => {
+  // ... initial setup (add messages, set isProcessing) ...
+
+  const lastSeqRef = { current: 0 }
+  const taskStore = useTaskStore.getState()
+  const handleEvent = createEventHandler(taskStore, set, lastSeqRef)
+
+  sendChatMessage({
+    // ... options ...
+    onEvent: handleEvent,
+    onError: (err) => {
+      taskStore.updateLastAssistantMessage((m) => ({
+        ...m,
+        content: `**Error:** ${err.message}`,
+        isStreaming: false,
+        processCollapsed: true
+      }))
+      taskStore.updateTaskSeq(lastSeqRef.current)
+      set({ isProcessing: false })
+    },
+    onDone: () => {
+      const queueStore = useQueueStore.getState()
+      if (queueStore.queue.length > 0) {
+        setTimeout(() => {
+          const next = queueStore.shiftQueue()
+          if (next) useChatStore.getState().sendMessage(next)
+        }, 300)
+      }
+    }
+  })
+},
+```
+
+And update `reconnect`:
+
+```ts
+reconnect: () => {
+  const taskStore = useTaskStore.getState()
+  const task = taskStore.getCurrentTask()
+  if (!task || !task.lastSeq) return
+
+  const lastSeqRef = { current: task.lastSeq }
+  const handleEvent = createEventHandler(taskStore, set, lastSeqRef)
+
+  reconnectStream(
+    task.id,
+    task.lastSeq + 1,
+    handleEvent,
+    (err) => console.error('Reconnect error:', err),
+    () => set({ isProcessing: false })
+  )
+},
+```
+
+- [ ] **Step 3: Commit**
 
 ```bash
-git add src/renderer/src/stores/conversationStore.ts
-git commit -m "feat: add conversation store with multi-session support"
+git add src/renderer/src/stores/chatStore.ts
+git commit -m "feat: add reconnection support with shared event handler"
 ```
 
 ---

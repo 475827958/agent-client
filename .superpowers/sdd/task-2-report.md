@@ -1,27 +1,24 @@
-### Task 2 Report: Type Definitions
+### Task 2 Report: Dedup empty tasks in taskStore
 
-**Date:** 2026-07-14
+**Status:** DONE
 
-**Summary:**
-Created the core TypeScript type definitions file that serves as the foundational types for the entire Electron desktop app. All other source files will import from this module.
+**Date:** 2026-07-15
 
-**What was created:**
-- `src/renderer/src/types/index.ts` — 73 lines, matching the task brief exactly
+**Commit:** `27f43f3` — feat: dedup empty tasks on create, add updateTaskSeq method
 
-**Types exported:**
-| Export | Kind | Purpose |
-|---|---|---|
-| `Conversation` | interface | Chat conversation with messages array |
-| `Message` | interface | Chat message with role, content, tool calls |
-| `ToolType` | type | Union of allowed tool names (`glob`, `read`, `grep`, `write`, `edit`) |
-| `ToolCall` | interface | Tool invocation with status lifecycle |
-| `Settings` | interface | App settings (API URL, key, model, workspace) |
-| `DEFAULT_SETTINGS` | const | Default settings object |
-| `Command` | interface | Slash-command definition |
-| `ElectronAPI` | interface | Shapes `window.electronAPI` (file ops, workspace, settings IPC) |
+**Changes made to `src/renderer/src/stores/taskStore.ts`:**
 
-The `declare global` block augments `Window` with `electronAPI: ElectronAPI`, providing type safety for the renderer-to-main IPC bridge.
+1. **Dedup logic in `create()` (Step 1):** Before creating a new task, the method now checks if an empty "新建任务" (messages.length === 0) already exists. If one is found, it selects/activates that task and returns its ID instead of creating a new one. This prevents accumulating stale empty tasks when the user clicks "new task" multiple times.
 
-**Confirmation:** The file matches the task brief exactly — every type, property, type annotation, and the default settings constant match the specification. No deviations.
+2. **`updateTaskSeq` method:** Added to both the `TaskState` interface and the store implementation. Updates `lastSeq` on the current task only, needed by later tasks for reconnection support.
 
-**Commit:** `2b72c8b76ba5727999daf28d1bf270daabe394c5` — `feat: add core type definitions`
+3. **Removed redundant state mutation:** The old `create()` had a `get().tasks.find(...); current.active = true` side-effect after `set()` which was both unnecessary (the set already handles active state) and a Zustand anti-pattern (direct state mutation outside set).
+
+**TypeScript check:** `npx tsc --noEmit --project tsconfig.web.json` passed with zero errors.
+
+**Self-review notes:**
+- Steps 2 and 3 from the task brief (adding `lastSeq: 0` to DEMO_TASKS and `duplicate`) were already completed by the previous task (commit `15a33af`).
+- Edge case: if multiple empty "新建任务" entries exist, `find()` returns the first one. Acceptable since the dedup logic prevents creating duplicates going forward.
+- `updateTaskSeq` only updates the current task, matching the reconnection scenario where seq comes from the active streaming connection.
+
+**Concerns:** None.

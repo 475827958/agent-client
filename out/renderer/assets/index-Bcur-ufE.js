@@ -15,7 +15,7 @@ var react_production_min = {};
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
-var l$2 = Symbol.for("react.element"), n$1 = Symbol.for("react.portal"), p$2 = Symbol.for("react.fragment"), q$1 = Symbol.for("react.strict_mode"), r = Symbol.for("react.profiler"), t = Symbol.for("react.provider"), u = Symbol.for("react.context"), v$2 = Symbol.for("react.forward_ref"), w = Symbol.for("react.suspense"), x = Symbol.for("react.memo"), y = Symbol.for("react.lazy"), z$1 = Symbol.iterator;
+var l$1 = Symbol.for("react.element"), n$1 = Symbol.for("react.portal"), p$2 = Symbol.for("react.fragment"), q$1 = Symbol.for("react.strict_mode"), r = Symbol.for("react.profiler"), t = Symbol.for("react.provider"), u = Symbol.for("react.context"), v$1 = Symbol.for("react.forward_ref"), w = Symbol.for("react.suspense"), x = Symbol.for("react.memo"), y = Symbol.for("react.lazy"), z$1 = Symbol.iterator;
 function A$1(a) {
   if (null === a || "object" !== typeof a) return null;
   a = z$1 && a[z$1] || a["@@iterator"];
@@ -26,11 +26,11 @@ var B$1 = { isMounted: function() {
 }, enqueueForceUpdate: function() {
 }, enqueueReplaceState: function() {
 }, enqueueSetState: function() {
-} }, C$1 = Object.assign, D$2 = {};
+} }, C$1 = Object.assign, D$1 = {};
 function E$1(a, b, e) {
   this.props = a;
   this.context = b;
-  this.refs = D$2;
+  this.refs = D$1;
   this.updater = e || B$1;
 }
 E$1.prototype.isReactComponent = {};
@@ -47,17 +47,17 @@ F.prototype = E$1.prototype;
 function G$1(a, b, e) {
   this.props = a;
   this.context = b;
-  this.refs = D$2;
+  this.refs = D$1;
   this.updater = e || B$1;
 }
-var H$2 = G$1.prototype = new F();
-H$2.constructor = G$1;
-C$1(H$2, E$1.prototype);
-H$2.isPureReactComponent = true;
+var H$1 = G$1.prototype = new F();
+H$1.constructor = G$1;
+C$1(H$1, E$1.prototype);
+H$1.isPureReactComponent = true;
 var I$1 = Array.isArray, J = Object.prototype.hasOwnProperty, K$1 = { current: null }, L$1 = { key: true, ref: true, __self: true, __source: true };
 function M$1(a, b, e) {
-  var d, c = {}, k2 = null, h2 = null;
-  if (null != b) for (d in void 0 !== b.ref && (h2 = b.ref), void 0 !== b.key && (k2 = "" + b.key), b) J.call(b, d) && !L$1.hasOwnProperty(d) && (c[d] = b[d]);
+  var d, c = {}, k2 = null, h = null;
+  if (null != b) for (d in void 0 !== b.ref && (h = b.ref), void 0 !== b.key && (k2 = "" + b.key), b) J.call(b, d) && !L$1.hasOwnProperty(d) && (c[d] = b[d]);
   var g = arguments.length - 2;
   if (1 === g) c.children = e;
   else if (1 < g) {
@@ -65,13 +65,13 @@ function M$1(a, b, e) {
     c.children = f2;
   }
   if (a && a.defaultProps) for (d in g = a.defaultProps, g) void 0 === c[d] && (c[d] = g[d]);
-  return { $$typeof: l$2, type: a, key: k2, ref: h2, props: c, _owner: K$1.current };
+  return { $$typeof: l$1, type: a, key: k2, ref: h, props: c, _owner: K$1.current };
 }
 function N$1(a, b) {
-  return { $$typeof: l$2, type: a.type, key: b, ref: a.ref, props: a.props, _owner: a._owner };
+  return { $$typeof: l$1, type: a.type, key: b, ref: a.ref, props: a.props, _owner: a._owner };
 }
 function O$1(a) {
-  return "object" === typeof a && null !== a && a.$$typeof === l$2;
+  return "object" === typeof a && null !== a && a.$$typeof === l$1;
 }
 function escape(a) {
   var b = { "=": "=0", ":": "=2" };
@@ -86,33 +86,33 @@ function Q$1(a, b) {
 function R$1(a, b, e, d, c) {
   var k2 = typeof a;
   if ("undefined" === k2 || "boolean" === k2) a = null;
-  var h2 = false;
-  if (null === a) h2 = true;
+  var h = false;
+  if (null === a) h = true;
   else switch (k2) {
     case "string":
     case "number":
-      h2 = true;
+      h = true;
       break;
     case "object":
       switch (a.$$typeof) {
-        case l$2:
+        case l$1:
         case n$1:
-          h2 = true;
+          h = true;
       }
   }
-  if (h2) return h2 = a, c = c(h2), a = "" === d ? "." + Q$1(h2, 0) : d, I$1(c) ? (e = "", null != a && (e = a.replace(P$1, "$&/") + "/"), R$1(c, b, e, "", function(a2) {
+  if (h) return h = a, c = c(h), a = "" === d ? "." + Q$1(h, 0) : d, I$1(c) ? (e = "", null != a && (e = a.replace(P$1, "$&/") + "/"), R$1(c, b, e, "", function(a2) {
     return a2;
-  })) : null != c && (O$1(c) && (c = N$1(c, e + (!c.key || h2 && h2.key === c.key ? "" : ("" + c.key).replace(P$1, "$&/") + "/") + a)), b.push(c)), 1;
-  h2 = 0;
+  })) : null != c && (O$1(c) && (c = N$1(c, e + (!c.key || h && h.key === c.key ? "" : ("" + c.key).replace(P$1, "$&/") + "/") + a)), b.push(c)), 1;
+  h = 0;
   d = "" === d ? "." : d + ":";
   if (I$1(a)) for (var g = 0; g < a.length; g++) {
     k2 = a[g];
     var f2 = d + Q$1(k2, g);
-    h2 += R$1(k2, b, e, f2, c);
+    h += R$1(k2, b, e, f2, c);
   }
-  else if (f2 = A$1(a), "function" === typeof f2) for (a = f2.call(a), g = 0; !(k2 = a.next()).done; ) k2 = k2.value, f2 = d + Q$1(k2, g++), h2 += R$1(k2, b, e, f2, c);
+  else if (f2 = A$1(a), "function" === typeof f2) for (a = f2.call(a), g = 0; !(k2 = a.next()).done; ) k2 = k2.value, f2 = d + Q$1(k2, g++), h += R$1(k2, b, e, f2, c);
   else if ("object" === k2) throw b = String(a), Error("Objects are not valid as a React child (found: " + ("[object Object]" === b ? "object with keys {" + Object.keys(a).join(", ") + "}" : b) + "). If you meant to render a collection of children, use an array instead.");
-  return h2;
+  return h;
 }
 function S$1(a, b, e) {
   if (null == a) return a;
@@ -168,9 +168,9 @@ react_production_min.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED = W$1;
 react_production_min.act = X$1;
 react_production_min.cloneElement = function(a, b, e) {
   if (null === a || void 0 === a) throw Error("React.cloneElement(...): The argument must be a React element, but you passed " + a + ".");
-  var d = C$1({}, a.props), c = a.key, k2 = a.ref, h2 = a._owner;
+  var d = C$1({}, a.props), c = a.key, k2 = a.ref, h = a._owner;
   if (null != b) {
-    void 0 !== b.ref && (k2 = b.ref, h2 = K$1.current);
+    void 0 !== b.ref && (k2 = b.ref, h = K$1.current);
     void 0 !== b.key && (c = "" + b.key);
     if (a.type && a.type.defaultProps) var g = a.type.defaultProps;
     for (f2 in b) J.call(b, f2) && !L$1.hasOwnProperty(f2) && (d[f2] = void 0 === b[f2] && void 0 !== g ? g[f2] : b[f2]);
@@ -182,7 +182,7 @@ react_production_min.cloneElement = function(a, b, e) {
     for (var m2 = 0; m2 < f2; m2++) g[m2] = arguments[m2 + 2];
     d.children = g;
   }
-  return { $$typeof: l$2, type: a.type, key: c, ref: k2, props: d, _owner: h2 };
+  return { $$typeof: l$1, type: a.type, key: c, ref: k2, props: d, _owner: h };
 };
 react_production_min.createContext = function(a) {
   a = { $$typeof: u, _currentValue: a, _currentValue2: a, _threadCount: 0, Provider: null, Consumer: null, _defaultValue: null, _globalName: null };
@@ -199,7 +199,7 @@ react_production_min.createRef = function() {
   return { current: null };
 };
 react_production_min.forwardRef = function(a) {
-  return { $$typeof: v$2, render: a };
+  return { $$typeof: v$1, render: a };
 };
 react_production_min.isValidElement = O$1;
 react_production_min.lazy = function(a) {
@@ -277,17 +277,17 @@ const React$2 = /* @__PURE__ */ getDefaultExportFromCjs(reactExports);
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
-var f = reactExports, k$1 = Symbol.for("react.element"), l$1 = Symbol.for("react.fragment"), m$1 = Object.prototype.hasOwnProperty, n = f.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentOwner, p$1 = { key: true, ref: true, __self: true, __source: true };
+var f = reactExports, k = Symbol.for("react.element"), l = Symbol.for("react.fragment"), m$1 = Object.prototype.hasOwnProperty, n = f.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentOwner, p$1 = { key: true, ref: true, __self: true, __source: true };
 function q(c, a, g) {
-  var b, d = {}, e = null, h2 = null;
+  var b, d = {}, e = null, h = null;
   void 0 !== g && (e = "" + g);
   void 0 !== a.key && (e = "" + a.key);
-  void 0 !== a.ref && (h2 = a.ref);
+  void 0 !== a.ref && (h = a.ref);
   for (b in a) m$1.call(a, b) && !p$1.hasOwnProperty(b) && (d[b] = a[b]);
   if (c && c.defaultProps) for (b in a = c.defaultProps, a) void 0 === d[b] && (d[b] = a[b]);
-  return { $$typeof: k$1, type: c, key: e, ref: h2, props: d, _owner: n.current };
+  return { $$typeof: k, type: c, key: e, ref: h, props: d, _owner: n.current };
 }
-reactJsxRuntime_production_min.Fragment = l$1;
+reactJsxRuntime_production_min.Fragment = l;
 reactJsxRuntime_production_min.jsx = q;
 reactJsxRuntime_production_min.jsxs = q;
 {
@@ -318,7 +318,7 @@ var scheduler_production_min = {};
       else break a;
     }
   }
-  function h2(a) {
+  function h(a) {
     return 0 === a.length ? null : a[0];
   }
   function k2(a) {
@@ -353,19 +353,19 @@ var scheduler_production_min = {};
   var r2 = [], t2 = [], u2 = 1, v2 = null, y2 = 3, z2 = false, A2 = false, B2 = false, D2 = "function" === typeof setTimeout ? setTimeout : null, E2 = "function" === typeof clearTimeout ? clearTimeout : null, F2 = "undefined" !== typeof setImmediate ? setImmediate : null;
   "undefined" !== typeof navigator && void 0 !== navigator.scheduling && void 0 !== navigator.scheduling.isInputPending && navigator.scheduling.isInputPending.bind(navigator.scheduling);
   function G2(a) {
-    for (var b = h2(t2); null !== b; ) {
+    for (var b = h(t2); null !== b; ) {
       if (null === b.callback) k2(t2);
       else if (b.startTime <= a) k2(t2), b.sortIndex = b.expirationTime, f2(r2, b);
       else break;
-      b = h2(t2);
+      b = h(t2);
     }
   }
   function H2(a) {
     B2 = false;
     G2(a);
-    if (!A2) if (null !== h2(r2)) A2 = true, I2(J2);
+    if (!A2) if (null !== h(r2)) A2 = true, I2(J2);
     else {
-      var b = h2(t2);
+      var b = h(t2);
       null !== b && K2(H2, b.startTime - a);
     }
   }
@@ -376,21 +376,21 @@ var scheduler_production_min = {};
     var c = y2;
     try {
       G2(b);
-      for (v2 = h2(r2); null !== v2 && (!(v2.expirationTime > b) || a && !M2()); ) {
+      for (v2 = h(r2); null !== v2 && (!(v2.expirationTime > b) || a && !M2()); ) {
         var d = v2.callback;
         if ("function" === typeof d) {
           v2.callback = null;
           y2 = v2.priorityLevel;
           var e = d(v2.expirationTime <= b);
           b = exports.unstable_now();
-          "function" === typeof e ? v2.callback = e : v2 === h2(r2) && k2(r2);
+          "function" === typeof e ? v2.callback = e : v2 === h(r2) && k2(r2);
           G2(b);
         } else k2(r2);
-        v2 = h2(r2);
+        v2 = h(r2);
       }
       if (null !== v2) var w2 = true;
       else {
-        var m2 = h2(t2);
+        var m2 = h(t2);
         null !== m2 && K2(H2, m2.startTime - b);
         w2 = false;
       }
@@ -456,7 +456,7 @@ var scheduler_production_min = {};
     return y2;
   };
   exports.unstable_getFirstCallbackNode = function() {
-    return h2(r2);
+    return h(r2);
   };
   exports.unstable_next = function(a) {
     switch (y2) {
@@ -520,7 +520,7 @@ var scheduler_production_min = {};
     }
     e = c + e;
     a = { id: u2++, callback: b, priorityLevel: a, startTime: c, expirationTime: e, sortIndex: -1 };
-    c > d ? (a.sortIndex = c, f2(t2, a), null === h2(r2) && a === h2(t2) && (B2 ? (E2(L2), L2 = -1) : B2 = true, K2(H2, c - d))) : (a.sortIndex = e, f2(r2, a), A2 || z2 || (A2 = true, I2(J2)));
+    c > d ? (a.sortIndex = c, f2(t2, a), null === h(r2) && a === h(t2) && (B2 ? (E2(L2), L2 = -1) : B2 = true, K2(H2, c - d))) : (a.sortIndex = e, f2(r2, a), A2 || z2 || (A2 = true, I2(J2)));
     return a;
   };
   exports.unstable_shouldYield = M2;
@@ -602,7 +602,7 @@ function qa(a, b, c, d) {
   }
   return false;
 }
-function v$1(a, b, c, d, e, f2, g) {
+function v(a, b, c, d, e, f2, g) {
   this.acceptsBooleans = 2 === b || 3 === b || 4 === b;
   this.attributeName = d;
   this.attributeNamespace = e;
@@ -614,32 +614,32 @@ function v$1(a, b, c, d, e, f2, g) {
 }
 var z = {};
 "children dangerouslySetInnerHTML defaultValue defaultChecked innerHTML suppressContentEditableWarning suppressHydrationWarning style".split(" ").forEach(function(a) {
-  z[a] = new v$1(a, 0, false, a, null, false, false);
+  z[a] = new v(a, 0, false, a, null, false, false);
 });
 [["acceptCharset", "accept-charset"], ["className", "class"], ["htmlFor", "for"], ["httpEquiv", "http-equiv"]].forEach(function(a) {
   var b = a[0];
-  z[b] = new v$1(b, 1, false, a[1], null, false, false);
+  z[b] = new v(b, 1, false, a[1], null, false, false);
 });
 ["contentEditable", "draggable", "spellCheck", "value"].forEach(function(a) {
-  z[a] = new v$1(a, 2, false, a.toLowerCase(), null, false, false);
+  z[a] = new v(a, 2, false, a.toLowerCase(), null, false, false);
 });
 ["autoReverse", "externalResourcesRequired", "focusable", "preserveAlpha"].forEach(function(a) {
-  z[a] = new v$1(a, 2, false, a, null, false, false);
+  z[a] = new v(a, 2, false, a, null, false, false);
 });
 "allowFullScreen async autoFocus autoPlay controls default defer disabled disablePictureInPicture disableRemotePlayback formNoValidate hidden loop noModule noValidate open playsInline readOnly required reversed scoped seamless itemScope".split(" ").forEach(function(a) {
-  z[a] = new v$1(a, 3, false, a.toLowerCase(), null, false, false);
+  z[a] = new v(a, 3, false, a.toLowerCase(), null, false, false);
 });
 ["checked", "multiple", "muted", "selected"].forEach(function(a) {
-  z[a] = new v$1(a, 3, true, a, null, false, false);
+  z[a] = new v(a, 3, true, a, null, false, false);
 });
 ["capture", "download"].forEach(function(a) {
-  z[a] = new v$1(a, 4, false, a, null, false, false);
+  z[a] = new v(a, 4, false, a, null, false, false);
 });
 ["cols", "rows", "size", "span"].forEach(function(a) {
-  z[a] = new v$1(a, 6, false, a, null, false, false);
+  z[a] = new v(a, 6, false, a, null, false, false);
 });
 ["rowSpan", "start"].forEach(function(a) {
-  z[a] = new v$1(a, 5, false, a.toLowerCase(), null, false, false);
+  z[a] = new v(a, 5, false, a.toLowerCase(), null, false, false);
 });
 var ra = /[\-:]([a-z])/g;
 function sa(a) {
@@ -650,22 +650,22 @@ function sa(a) {
     ra,
     sa
   );
-  z[b] = new v$1(b, 1, false, a, null, false, false);
+  z[b] = new v(b, 1, false, a, null, false, false);
 });
 "xlink:actuate xlink:arcrole xlink:role xlink:show xlink:title xlink:type".split(" ").forEach(function(a) {
   var b = a.replace(ra, sa);
-  z[b] = new v$1(b, 1, false, a, "http://www.w3.org/1999/xlink", false, false);
+  z[b] = new v(b, 1, false, a, "http://www.w3.org/1999/xlink", false, false);
 });
 ["xml:base", "xml:lang", "xml:space"].forEach(function(a) {
   var b = a.replace(ra, sa);
-  z[b] = new v$1(b, 1, false, a, "http://www.w3.org/XML/1998/namespace", false, false);
+  z[b] = new v(b, 1, false, a, "http://www.w3.org/XML/1998/namespace", false, false);
 });
 ["tabIndex", "crossOrigin"].forEach(function(a) {
-  z[a] = new v$1(a, 1, false, a.toLowerCase(), null, false, false);
+  z[a] = new v(a, 1, false, a.toLowerCase(), null, false, false);
 });
-z.xlinkHref = new v$1("xlinkHref", 1, false, "xlink:href", "http://www.w3.org/1999/xlink", true, false);
+z.xlinkHref = new v("xlinkHref", 1, false, "xlink:href", "http://www.w3.org/1999/xlink", true, false);
 ["src", "href", "action", "formAction"].forEach(function(a) {
-  z[a] = new v$1(a, 1, false, a.toLowerCase(), null, true, true);
+  z[a] = new v(a, 1, false, a.toLowerCase(), null, true, true);
 });
 function ta(a, b, c, d) {
   var e = z.hasOwnProperty(b) ? z[b] : null;
@@ -725,16 +725,16 @@ function Oa(a, b) {
     }
   } catch (l2) {
     if (l2 && d && "string" === typeof l2.stack) {
-      for (var e = l2.stack.split("\n"), f2 = d.stack.split("\n"), g = e.length - 1, h2 = f2.length - 1; 1 <= g && 0 <= h2 && e[g] !== f2[h2]; ) h2--;
-      for (; 1 <= g && 0 <= h2; g--, h2--) if (e[g] !== f2[h2]) {
-        if (1 !== g || 1 !== h2) {
+      for (var e = l2.stack.split("\n"), f2 = d.stack.split("\n"), g = e.length - 1, h = f2.length - 1; 1 <= g && 0 <= h && e[g] !== f2[h]; ) h--;
+      for (; 1 <= g && 0 <= h; g--, h--) if (e[g] !== f2[h]) {
+        if (1 !== g || 1 !== h) {
           do
-            if (g--, h2--, 0 > h2 || e[g] !== f2[h2]) {
+            if (g--, h--, 0 > h || e[g] !== f2[h]) {
               var k2 = "\n" + e[g].replace(" at new ", " at ");
               a.displayName && k2.includes("<anonymous>") && (k2 = k2.replace("<anonymous>", a.displayName));
               return k2;
             }
-          while (1 <= g && 0 <= h2);
+          while (1 <= g && 0 <= h);
         }
         break;
       }
@@ -1216,7 +1216,7 @@ if (ia) try {
 } catch (a) {
   Lb = false;
 }
-function Nb(a, b, c, d, e, f2, g, h2, k2) {
+function Nb(a, b, c, d, e, f2, g, h, k2) {
   var l2 = Array.prototype.slice.call(arguments, 3);
   try {
     b.apply(c, l2);
@@ -1228,12 +1228,12 @@ var Ob = false, Pb = null, Qb = false, Rb = null, Sb = { onError: function(a) {
   Ob = true;
   Pb = a;
 } };
-function Tb(a, b, c, d, e, f2, g, h2, k2) {
+function Tb(a, b, c, d, e, f2, g, h, k2) {
   Ob = false;
   Pb = null;
   Nb.apply(Sb, arguments);
 }
-function Ub(a, b, c, d, e, f2, g, h2, k2) {
+function Ub(a, b, c, d, e, f2, g, h, k2) {
   Tb.apply(this, arguments);
   if (Ob) {
     if (Ob) {
@@ -1295,36 +1295,36 @@ function Yb(a) {
     }
     if (c.return !== d.return) c = e, d = f2;
     else {
-      for (var g = false, h2 = e.child; h2; ) {
-        if (h2 === c) {
+      for (var g = false, h = e.child; h; ) {
+        if (h === c) {
           g = true;
           c = e;
           d = f2;
           break;
         }
-        if (h2 === d) {
+        if (h === d) {
           g = true;
           d = e;
           c = f2;
           break;
         }
-        h2 = h2.sibling;
+        h = h.sibling;
       }
       if (!g) {
-        for (h2 = f2.child; h2; ) {
-          if (h2 === c) {
+        for (h = f2.child; h; ) {
+          if (h === c) {
             g = true;
             c = f2;
             d = e;
             break;
           }
-          if (h2 === d) {
+          if (h === d) {
             g = true;
             d = f2;
             c = e;
             break;
           }
-          h2 = h2.sibling;
+          h = h.sibling;
         }
         if (!g) throw Error(p(189));
       }
@@ -1414,8 +1414,8 @@ function uc(a, b) {
   if (0 === c) return 0;
   var d = 0, e = a.suspendedLanes, f2 = a.pingedLanes, g = c & 268435455;
   if (0 !== g) {
-    var h2 = g & ~e;
-    0 !== h2 ? d = tc(h2) : (f2 &= g, 0 !== f2 && (d = tc(f2)));
+    var h = g & ~e;
+    0 !== h ? d = tc(h) : (f2 &= g, 0 !== f2 && (d = tc(f2)));
   } else g = c & ~e, 0 !== g ? d = tc(g) : 0 !== f2 && (d = tc(f2));
   if (0 === d) return 0;
   if (0 !== b && b !== d && 0 === (b & e) && (e = d & -d, f2 = b & -b, e >= f2 || 16 === e && 0 !== (f2 & 4194240))) return b;
@@ -1467,11 +1467,11 @@ function vc(a, b) {
 }
 function wc(a, b) {
   for (var c = a.suspendedLanes, d = a.pingedLanes, e = a.expirationTimes, f2 = a.pendingLanes; 0 < f2; ) {
-    var g = 31 - oc(f2), h2 = 1 << g, k2 = e[g];
+    var g = 31 - oc(f2), h = 1 << g, k2 = e[g];
     if (-1 === k2) {
-      if (0 === (h2 & c) || 0 !== (h2 & d)) e[g] = vc(h2, b);
-    } else k2 <= b && (a.expiredLanes |= h2);
-    f2 &= ~h2;
+      if (0 === (h & c) || 0 !== (h & d)) e[g] = vc(h, b);
+    } else k2 <= b && (a.expiredLanes |= h);
+    f2 &= ~h;
   }
 }
 function xc(a) {
@@ -1925,9 +1925,9 @@ var Qd = A({}, ud, { key: function(a) {
   },
   deltaZ: 0,
   deltaMode: 0
-}), Zd = rd(Yd), $d = [9, 13, 27, 32], ae$1 = ia && "CompositionEvent" in window, be$1 = null;
-ia && "documentMode" in document && (be$1 = document.documentMode);
-var ce = ia && "TextEvent" in window && !be$1, de$1 = ia && (!ae$1 || be$1 && 8 < be$1 && 11 >= be$1), ee$1 = String.fromCharCode(32), fe$1 = false;
+}), Zd = rd(Yd), $d = [9, 13, 27, 32], ae = ia && "CompositionEvent" in window, be = null;
+ia && "documentMode" in document && (be = document.documentMode);
+var ce = ia && "TextEvent" in window && !be, de = ia && (!ae || be && 8 < be && 11 >= be), ee = String.fromCharCode(32), fe = false;
 function ge(a, b) {
   switch (a) {
     case "keyup":
@@ -1942,27 +1942,27 @@ function ge(a, b) {
       return false;
   }
 }
-function he$1(a) {
+function he(a) {
   a = a.detail;
   return "object" === typeof a && "data" in a ? a.data : null;
 }
-var ie$1 = false;
+var ie = false;
 function je(a, b) {
   switch (a) {
     case "compositionend":
-      return he$1(b);
+      return he(b);
     case "keypress":
       if (32 !== b.which) return null;
-      fe$1 = true;
-      return ee$1;
+      fe = true;
+      return ee;
     case "textInput":
-      return a = b.data, a === ee$1 && fe$1 ? null : a;
+      return a = b.data, a === ee && fe ? null : a;
     default:
       return null;
   }
 }
 function ke(a, b) {
-  if (ie$1) return "compositionend" === a || !ae$1 && ge(a, b) ? (a = nd(), md = ld = kd = null, ie$1 = false, a) : null;
+  if (ie) return "compositionend" === a || !ae && ge(a, b) ? (a = nd(), md = ld = kd = null, ie = false, a) : null;
   switch (a) {
     case "paste":
       return null;
@@ -1973,15 +1973,15 @@ function ke(a, b) {
       }
       return null;
     case "compositionend":
-      return de$1 && "ko" !== b.locale ? null : b.data;
+      return de && "ko" !== b.locale ? null : b.data;
     default:
       return null;
   }
 }
-var le$1 = { color: true, date: true, datetime: true, "datetime-local": true, email: true, month: true, number: true, password: true, range: true, search: true, tel: true, text: true, time: true, url: true, week: true };
+var le = { color: true, date: true, datetime: true, "datetime-local": true, email: true, month: true, number: true, password: true, range: true, search: true, tel: true, text: true, time: true, url: true, week: true };
 function me(a) {
   var b = a && a.nodeName && a.nodeName.toLowerCase();
-  return "input" === b ? !!le$1[a.type] : "textarea" === b ? true : false;
+  return "input" === b ? !!le[a.type] : "textarea" === b ? true : false;
 }
 function ne(a, b, c, d) {
   Eb(d);
@@ -1990,9 +1990,9 @@ function ne(a, b, c, d) {
 }
 var pe = null, qe = null;
 function re$1(a) {
-  se$1(a, 0);
+  se(a, 0);
 }
-function te$1(a) {
+function te(a) {
   var b = ue(a);
   if (Wa(b)) return a;
 }
@@ -2017,36 +2017,36 @@ function Ae() {
   pe && (pe.detachEvent("onpropertychange", Be), qe = pe = null);
 }
 function Be(a) {
-  if ("value" === a.propertyName && te$1(qe)) {
+  if ("value" === a.propertyName && te(qe)) {
     var b = [];
     ne(b, qe, a, xb(a));
     Jb(re$1, b);
   }
 }
-function Ce$1(a, b, c) {
+function Ce(a, b, c) {
   "focusin" === a ? (Ae(), pe = b, qe = c, pe.attachEvent("onpropertychange", Be)) : "focusout" === a && Ae();
 }
-function De$1(a) {
-  if ("selectionchange" === a || "keyup" === a || "keydown" === a) return te$1(qe);
+function De(a) {
+  if ("selectionchange" === a || "keyup" === a || "keydown" === a) return te(qe);
 }
-function Ee$1(a, b) {
-  if ("click" === a) return te$1(b);
+function Ee(a, b) {
+  if ("click" === a) return te(b);
 }
 function Fe(a, b) {
-  if ("input" === a || "change" === a) return te$1(b);
+  if ("input" === a || "change" === a) return te(b);
 }
 function Ge(a, b) {
   return a === b && (0 !== a || 1 / a === 1 / b) || a !== a && b !== b;
 }
-var He$1 = "function" === typeof Object.is ? Object.is : Ge;
+var He = "function" === typeof Object.is ? Object.is : Ge;
 function Ie(a, b) {
-  if (He$1(a, b)) return true;
+  if (He(a, b)) return true;
   if ("object" !== typeof a || null === a || "object" !== typeof b || null === b) return false;
   var c = Object.keys(a), d = Object.keys(b);
   if (c.length !== d.length) return false;
   for (d = 0; d < c.length; d++) {
     var e = c[d];
-    if (!ja.call(b, e) || !He$1(a[e], b[e])) return false;
+    if (!ja.call(b, e) || !He(a[e], b[e])) return false;
   }
   return true;
 }
@@ -2079,7 +2079,7 @@ function Ke(a, b) {
 function Le(a, b) {
   return a && b ? a === b ? true : a && 3 === a.nodeType ? false : b && 3 === b.nodeType ? Le(a, b.parentNode) : "contains" in a ? a.contains(b) : a.compareDocumentPosition ? !!(a.compareDocumentPosition(b) & 16) : false : false;
 }
-function Me$1() {
+function Me() {
   for (var a = window, b = Xa(); b instanceof a.HTMLIFrameElement; ) {
     try {
       var c = "string" === typeof b.contentWindow.location.href;
@@ -2096,8 +2096,8 @@ function Ne(a) {
   var b = a && a.nodeName && a.nodeName.toLowerCase();
   return b && ("input" === b && ("text" === a.type || "search" === a.type || "tel" === a.type || "url" === a.type || "password" === a.type) || "textarea" === b || "true" === a.contentEditable);
 }
-function Oe$1(a) {
-  var b = Me$1(), c = a.focusedElem, d = a.selectionRange;
+function Oe(a) {
+  var b = Me(), c = a.focusedElem, d = a.selectionRange;
   if (b !== c && c && c.ownerDocument && Le(c.ownerDocument.documentElement, c)) {
     if (null !== d && Ne(c)) {
       if (b = d.start, a = d.end, void 0 === a && (a = b), "selectionStart" in c) c.selectionStart = b, c.selectionEnd = Math.min(a, c.value.length);
@@ -2125,14 +2125,14 @@ function Ue(a, b, c) {
   var d = c.window === c ? c.document : 9 === c.nodeType ? c : c.ownerDocument;
   Te || null == Qe || Qe !== Xa(d) || (d = Qe, "selectionStart" in d && Ne(d) ? d = { start: d.selectionStart, end: d.selectionEnd } : (d = (d.ownerDocument && d.ownerDocument.defaultView || window).getSelection(), d = { anchorNode: d.anchorNode, anchorOffset: d.anchorOffset, focusNode: d.focusNode, focusOffset: d.focusOffset }), Se && Ie(Se, d) || (Se = d, d = oe(Re, "onSelect"), 0 < d.length && (b = new td("onSelect", "select", null, b, c), a.push({ event: b, listeners: d }), b.target = Qe)));
 }
-function Ve$1(a, b) {
+function Ve(a, b) {
   var c = {};
   c[a.toLowerCase()] = b.toLowerCase();
   c["Webkit" + a] = "webkit" + b;
   c["Moz" + a] = "moz" + b;
   return c;
 }
-var We = { animationend: Ve$1("Animation", "AnimationEnd"), animationiteration: Ve$1("Animation", "AnimationIteration"), animationstart: Ve$1("Animation", "AnimationStart"), transitionend: Ve$1("Transition", "TransitionEnd") }, Xe = {}, Ye = {};
+var We = { animationend: Ve("Animation", "AnimationEnd"), animationiteration: Ve("Animation", "AnimationIteration"), animationstart: Ve("Animation", "AnimationStart"), transitionend: Ve("Transition", "TransitionEnd") }, Xe = {}, Ye = {};
 ia && (Ye = document.createElement("div").style, "AnimationEvent" in window || (delete We.animationend.animation, delete We.animationiteration.animation, delete We.animationstart.animation), "TransitionEvent" in window || delete We.transitionend.transition);
 function Ze(a) {
   if (Xe[a]) return Xe[a];
@@ -2174,7 +2174,7 @@ function nf(a, b, c) {
   Ub(d, b, void 0, a);
   a.currentTarget = null;
 }
-function se$1(a, b) {
+function se(a, b) {
   b = 0 !== (b & 4);
   for (var c = 0; c < a.length; c++) {
     var d = a[c], e = d.event;
@@ -2182,26 +2182,26 @@ function se$1(a, b) {
     a: {
       var f2 = void 0;
       if (b) for (var g = d.length - 1; 0 <= g; g--) {
-        var h2 = d[g], k2 = h2.instance, l2 = h2.currentTarget;
-        h2 = h2.listener;
+        var h = d[g], k2 = h.instance, l2 = h.currentTarget;
+        h = h.listener;
         if (k2 !== f2 && e.isPropagationStopped()) break a;
-        nf(e, h2, l2);
+        nf(e, h, l2);
         f2 = k2;
       }
       else for (g = 0; g < d.length; g++) {
-        h2 = d[g];
-        k2 = h2.instance;
-        l2 = h2.currentTarget;
-        h2 = h2.listener;
+        h = d[g];
+        k2 = h.instance;
+        l2 = h.currentTarget;
+        h = h.listener;
         if (k2 !== f2 && e.isPropagationStopped()) break a;
-        nf(e, h2, l2);
+        nf(e, h, l2);
         f2 = k2;
       }
     }
   }
   if (Qb) throw a = Rb, Qb = false, Rb = null, a;
 }
-function D$1(a, b) {
+function D(a, b) {
   var c = b[of];
   void 0 === c && (c = b[of] = /* @__PURE__ */ new Set());
   var d = a + "__bubble";
@@ -2245,8 +2245,8 @@ function hd(a, b, c, d, e) {
     if (null === d) return;
     var g = d.tag;
     if (3 === g || 4 === g) {
-      var h2 = d.stateNode.containerInfo;
-      if (h2 === e || 8 === h2.nodeType && h2.parentNode === e) break;
+      var h = d.stateNode.containerInfo;
+      if (h === e || 8 === h.nodeType && h.parentNode === e) break;
       if (4 === g) for (g = d.return; null !== g; ) {
         var k2 = g.tag;
         if (3 === k2 || 4 === k2) {
@@ -2254,15 +2254,15 @@ function hd(a, b, c, d, e) {
         }
         g = g.return;
       }
-      for (; null !== h2; ) {
-        g = Wc(h2);
+      for (; null !== h; ) {
+        g = Wc(h);
         if (null === g) return;
         k2 = g.tag;
         if (5 === k2 || 6 === k2) {
           d = f2 = g;
           continue a;
         }
-        h2 = h2.parentNode;
+        h = h.parentNode;
       }
     }
     d = d.return;
@@ -2270,8 +2270,8 @@ function hd(a, b, c, d, e) {
   Jb(function() {
     var d2 = f2, e2 = xb(c), g2 = [];
     a: {
-      var h3 = df.get(a);
-      if (void 0 !== h3) {
+      var h2 = df.get(a);
+      if (void 0 !== h2) {
         var k3 = td, n2 = a;
         switch (a) {
           case "keypress":
@@ -2349,7 +2349,7 @@ function hd(a, b, c, d, e) {
           case "pointerup":
             k3 = Td;
         }
-        var t2 = 0 !== (b & 4), J2 = !t2 && "scroll" === a, x2 = t2 ? null !== h3 ? h3 + "Capture" : null : h3;
+        var t2 = 0 !== (b & 4), J2 = !t2 && "scroll" === a, x2 = t2 ? null !== h2 ? h2 + "Capture" : null : h2;
         t2 = [];
         for (var w2 = d2, u2; null !== w2; ) {
           u2 = w2;
@@ -2358,16 +2358,16 @@ function hd(a, b, c, d, e) {
           if (J2) break;
           w2 = w2.return;
         }
-        0 < t2.length && (h3 = new k3(h3, n2, null, c, e2), g2.push({ event: h3, listeners: t2 }));
+        0 < t2.length && (h2 = new k3(h2, n2, null, c, e2), g2.push({ event: h2, listeners: t2 }));
       }
     }
     if (0 === (b & 7)) {
       a: {
-        h3 = "mouseover" === a || "pointerover" === a;
+        h2 = "mouseover" === a || "pointerover" === a;
         k3 = "mouseout" === a || "pointerout" === a;
-        if (h3 && c !== wb && (n2 = c.relatedTarget || c.fromElement) && (Wc(n2) || n2[uf])) break a;
-        if (k3 || h3) {
-          h3 = e2.window === e2 ? e2 : (h3 = e2.ownerDocument) ? h3.defaultView || h3.parentWindow : window;
+        if (h2 && c !== wb && (n2 = c.relatedTarget || c.fromElement) && (Wc(n2) || n2[uf])) break a;
+        if (k3 || h2) {
+          h2 = e2.window === e2 ? e2 : (h2 = e2.ownerDocument) ? h2.defaultView || h2.parentWindow : window;
           if (k3) {
             if (n2 = c.relatedTarget || c.toElement, k3 = d2, n2 = n2 ? Wc(n2) : null, null !== n2 && (J2 = Vb(n2), n2 !== J2 || 5 !== n2.tag && 6 !== n2.tag)) n2 = null;
           } else k3 = null, n2 = d2;
@@ -2377,11 +2377,11 @@ function hd(a, b, c, d, e) {
             x2 = "onMouseEnter";
             w2 = "mouse";
             if ("pointerout" === a || "pointerover" === a) t2 = Td, F2 = "onPointerLeave", x2 = "onPointerEnter", w2 = "pointer";
-            J2 = null == k3 ? h3 : ue(k3);
-            u2 = null == n2 ? h3 : ue(n2);
-            h3 = new t2(F2, w2 + "leave", k3, c, e2);
-            h3.target = J2;
-            h3.relatedTarget = u2;
+            J2 = null == k3 ? h2 : ue(k3);
+            u2 = null == n2 ? h2 : ue(n2);
+            h2 = new t2(F2, w2 + "leave", k3, c, e2);
+            h2.target = J2;
+            h2.relatedTarget = u2;
             F2 = null;
             Wc(e2) === d2 && (t2 = new t2(x2, w2 + "enter", n2, c, e2), t2.target = u2, t2.relatedTarget = J2, F2 = t2);
             J2 = F2;
@@ -2402,27 +2402,27 @@ function hd(a, b, c, d, e) {
               t2 = null;
             }
             else t2 = null;
-            null !== k3 && wf(g2, h3, k3, t2, false);
+            null !== k3 && wf(g2, h2, k3, t2, false);
             null !== n2 && null !== J2 && wf(g2, J2, n2, t2, true);
           }
         }
       }
       a: {
-        h3 = d2 ? ue(d2) : window;
-        k3 = h3.nodeName && h3.nodeName.toLowerCase();
-        if ("select" === k3 || "input" === k3 && "file" === h3.type) var na = ve;
-        else if (me(h3)) if (we) na = Fe;
+        h2 = d2 ? ue(d2) : window;
+        k3 = h2.nodeName && h2.nodeName.toLowerCase();
+        if ("select" === k3 || "input" === k3 && "file" === h2.type) var na = ve;
+        else if (me(h2)) if (we) na = Fe;
         else {
-          na = De$1;
-          var xa = Ce$1;
+          na = De;
+          var xa = Ce;
         }
-        else (k3 = h3.nodeName) && "input" === k3.toLowerCase() && ("checkbox" === h3.type || "radio" === h3.type) && (na = Ee$1);
+        else (k3 = h2.nodeName) && "input" === k3.toLowerCase() && ("checkbox" === h2.type || "radio" === h2.type) && (na = Ee);
         if (na && (na = na(a, d2))) {
           ne(g2, na, c, e2);
           break a;
         }
-        xa && xa(a, h3, d2);
-        "focusout" === a && (xa = h3._wrapperState) && xa.controlled && "number" === h3.type && cb(h3, "number", h3.value);
+        xa && xa(a, h2, d2);
+        "focusout" === a && (xa = h2._wrapperState) && xa.controlled && "number" === h2.type && cb(h2, "number", h2.value);
       }
       xa = d2 ? ue(d2) : window;
       switch (a) {
@@ -2448,7 +2448,7 @@ function hd(a, b, c, d, e) {
           Ue(g2, c, e2);
       }
       var $a;
-      if (ae$1) b: {
+      if (ae) b: {
         switch (a) {
           case "compositionstart":
             var ba = "onCompositionStart";
@@ -2462,11 +2462,11 @@ function hd(a, b, c, d, e) {
         }
         ba = void 0;
       }
-      else ie$1 ? ge(a, c) && (ba = "onCompositionEnd") : "keydown" === a && 229 === c.keyCode && (ba = "onCompositionStart");
-      ba && (de$1 && "ko" !== c.locale && (ie$1 || "onCompositionStart" !== ba ? "onCompositionEnd" === ba && ie$1 && ($a = nd()) : (kd = e2, ld = "value" in kd ? kd.value : kd.textContent, ie$1 = true)), xa = oe(d2, ba), 0 < xa.length && (ba = new Ld(ba, a, null, c, e2), g2.push({ event: ba, listeners: xa }), $a ? ba.data = $a : ($a = he$1(c), null !== $a && (ba.data = $a))));
+      else ie ? ge(a, c) && (ba = "onCompositionEnd") : "keydown" === a && 229 === c.keyCode && (ba = "onCompositionStart");
+      ba && (de && "ko" !== c.locale && (ie || "onCompositionStart" !== ba ? "onCompositionEnd" === ba && ie && ($a = nd()) : (kd = e2, ld = "value" in kd ? kd.value : kd.textContent, ie = true)), xa = oe(d2, ba), 0 < xa.length && (ba = new Ld(ba, a, null, c, e2), g2.push({ event: ba, listeners: xa }), $a ? ba.data = $a : ($a = he(c), null !== $a && (ba.data = $a))));
       if ($a = ce ? je(a, c) : ke(a, c)) d2 = oe(d2, "onBeforeInput"), 0 < d2.length && (e2 = new Ld("onBeforeInput", "beforeinput", null, c, e2), g2.push({ event: e2, listeners: d2 }), e2.data = $a);
     }
-    se$1(g2, b);
+    se(g2, b);
   });
 }
 function tf(a, b, c) {
@@ -2489,9 +2489,9 @@ function vf(a) {
 }
 function wf(a, b, c, d, e) {
   for (var f2 = b._reactName, g = []; null !== c && c !== d; ) {
-    var h2 = c, k2 = h2.alternate, l2 = h2.stateNode;
+    var h = c, k2 = h.alternate, l2 = h.stateNode;
     if (null !== k2 && k2 === d) break;
-    5 === h2.tag && null !== l2 && (h2 = l2, e ? (k2 = Kb(c, f2), null != k2 && g.unshift(tf(c, k2, h2))) : e || (k2 = Kb(c, f2), null != k2 && g.push(tf(c, k2, h2))));
+    5 === h.tag && null !== l2 && (h = l2, e ? (k2 = Kb(c, f2), null != k2 && g.unshift(tf(c, k2, h))) : e || (k2 = Kb(c, f2), null != k2 && g.push(tf(c, k2, h))));
     c = c.return;
   }
   0 !== g.length && a.push({ event: b, listeners: g });
@@ -2602,7 +2602,7 @@ function G(a, b) {
   Sf[Tf] = a.current;
   a.current = b;
 }
-var Vf = {}, H$1 = Uf(Vf), Wf = Uf(false), Xf = Vf;
+var Vf = {}, H = Uf(Vf), Wf = Uf(false), Xf = Vf;
 function Yf(a, b) {
   var c = a.type.contextTypes;
   if (!c) return Vf;
@@ -2619,11 +2619,11 @@ function Zf(a) {
 }
 function $f() {
   E(Wf);
-  E(H$1);
+  E(H);
 }
 function ag(a, b, c) {
-  if (H$1.current !== Vf) throw Error(p(168));
-  G(H$1, b);
+  if (H.current !== Vf) throw Error(p(168));
+  G(H, b);
   G(Wf, c);
 }
 function bg(a, b, c) {
@@ -2636,15 +2636,15 @@ function bg(a, b, c) {
 }
 function cg(a) {
   a = (a = a.stateNode) && a.__reactInternalMemoizedMergedChildContext || Vf;
-  Xf = H$1.current;
-  G(H$1, a);
+  Xf = H.current;
+  G(H, a);
   G(Wf, Wf.current);
   return true;
 }
 function dg(a, b, c) {
   var d = a.stateNode;
   if (!d) throw Error(p(169));
-  c ? (a = bg(a, b, Xf), d.__reactInternalMemoizedMergedChildContext = a, E(Wf), E(H$1), G(H$1, a)) : E(Wf);
+  c ? (a = bg(a, b, Xf), d.__reactInternalMemoizedMergedChildContext = a, E(Wf), E(H), G(H, a)) : E(Wf);
   G(Wf, c);
 }
 var eg = null, fg = false, gg = false;
@@ -2871,7 +2871,7 @@ function Og(a) {
     a && null === b2.alternate && (b2.flags |= 2);
     return b2;
   }
-  function h2(a2, b2, c2, d2) {
+  function h(a2, b2, c2, d2) {
     if (null === b2 || 6 !== b2.tag) return b2 = Qg(c2, a2.mode, d2), b2.return = a2, b2;
     b2 = e(b2, c2);
     b2.return = a2;
@@ -2917,7 +2917,7 @@ function Og(a) {
   }
   function r2(a2, b2, c2, d2) {
     var e2 = null !== b2 ? b2.key : null;
-    if ("string" === typeof c2 && "" !== c2 || "number" === typeof c2) return null !== e2 ? null : h2(a2, b2, "" + c2, d2);
+    if ("string" === typeof c2 && "" !== c2 || "number" === typeof c2) return null !== e2 ? null : h(a2, b2, "" + c2, d2);
     if ("object" === typeof c2 && null !== c2) {
       switch (c2.$$typeof) {
         case va:
@@ -2938,7 +2938,7 @@ function Og(a) {
     return null;
   }
   function y2(a2, b2, c2, d2, e2) {
-    if ("string" === typeof d2 && "" !== d2 || "number" === typeof d2) return a2 = a2.get(c2) || null, h2(b2, a2, "" + d2, e2);
+    if ("string" === typeof d2 && "" !== d2 || "number" === typeof d2) return a2 = a2.get(c2) || null, h(b2, a2, "" + d2, e2);
     if ("object" === typeof d2 && null !== d2) {
       switch (d2.$$typeof) {
         case va:
@@ -2954,10 +2954,10 @@ function Og(a) {
     }
     return null;
   }
-  function n2(e2, g2, h3, k3) {
-    for (var l3 = null, m3 = null, u2 = g2, w2 = g2 = 0, x2 = null; null !== u2 && w2 < h3.length; w2++) {
+  function n2(e2, g2, h2, k3) {
+    for (var l3 = null, m3 = null, u2 = g2, w2 = g2 = 0, x2 = null; null !== u2 && w2 < h2.length; w2++) {
       u2.index > w2 ? (x2 = u2, u2 = null) : x2 = u2.sibling;
-      var n3 = r2(e2, u2, h3[w2], k3);
+      var n3 = r2(e2, u2, h2[w2], k3);
       if (null === n3) {
         null === u2 && (u2 = x2);
         break;
@@ -2968,25 +2968,25 @@ function Og(a) {
       m3 = n3;
       u2 = x2;
     }
-    if (w2 === h3.length) return c(e2, u2), I && tg(e2, w2), l3;
+    if (w2 === h2.length) return c(e2, u2), I && tg(e2, w2), l3;
     if (null === u2) {
-      for (; w2 < h3.length; w2++) u2 = q2(e2, h3[w2], k3), null !== u2 && (g2 = f2(u2, g2, w2), null === m3 ? l3 = u2 : m3.sibling = u2, m3 = u2);
+      for (; w2 < h2.length; w2++) u2 = q2(e2, h2[w2], k3), null !== u2 && (g2 = f2(u2, g2, w2), null === m3 ? l3 = u2 : m3.sibling = u2, m3 = u2);
       I && tg(e2, w2);
       return l3;
     }
-    for (u2 = d(e2, u2); w2 < h3.length; w2++) x2 = y2(u2, e2, w2, h3[w2], k3), null !== x2 && (a && null !== x2.alternate && u2.delete(null === x2.key ? w2 : x2.key), g2 = f2(x2, g2, w2), null === m3 ? l3 = x2 : m3.sibling = x2, m3 = x2);
+    for (u2 = d(e2, u2); w2 < h2.length; w2++) x2 = y2(u2, e2, w2, h2[w2], k3), null !== x2 && (a && null !== x2.alternate && u2.delete(null === x2.key ? w2 : x2.key), g2 = f2(x2, g2, w2), null === m3 ? l3 = x2 : m3.sibling = x2, m3 = x2);
     a && u2.forEach(function(a2) {
       return b(e2, a2);
     });
     I && tg(e2, w2);
     return l3;
   }
-  function t2(e2, g2, h3, k3) {
-    var l3 = Ka(h3);
+  function t2(e2, g2, h2, k3) {
+    var l3 = Ka(h2);
     if ("function" !== typeof l3) throw Error(p(150));
-    h3 = l3.call(h3);
-    if (null == h3) throw Error(p(151));
-    for (var u2 = l3 = null, m3 = g2, w2 = g2 = 0, x2 = null, n3 = h3.next(); null !== m3 && !n3.done; w2++, n3 = h3.next()) {
+    h2 = l3.call(h2);
+    if (null == h2) throw Error(p(151));
+    for (var u2 = l3 = null, m3 = g2, w2 = g2 = 0, x2 = null, n3 = h2.next(); null !== m3 && !n3.done; w2++, n3 = h2.next()) {
       m3.index > w2 ? (x2 = m3, m3 = null) : x2 = m3.sibling;
       var t3 = r2(e2, m3, n3.value, k3);
       if (null === t3) {
@@ -3004,18 +3004,18 @@ function Og(a) {
       m3
     ), I && tg(e2, w2), l3;
     if (null === m3) {
-      for (; !n3.done; w2++, n3 = h3.next()) n3 = q2(e2, n3.value, k3), null !== n3 && (g2 = f2(n3, g2, w2), null === u2 ? l3 = n3 : u2.sibling = n3, u2 = n3);
+      for (; !n3.done; w2++, n3 = h2.next()) n3 = q2(e2, n3.value, k3), null !== n3 && (g2 = f2(n3, g2, w2), null === u2 ? l3 = n3 : u2.sibling = n3, u2 = n3);
       I && tg(e2, w2);
       return l3;
     }
-    for (m3 = d(e2, m3); !n3.done; w2++, n3 = h3.next()) n3 = y2(m3, e2, w2, n3.value, k3), null !== n3 && (a && null !== n3.alternate && m3.delete(null === n3.key ? w2 : n3.key), g2 = f2(n3, g2, w2), null === u2 ? l3 = n3 : u2.sibling = n3, u2 = n3);
+    for (m3 = d(e2, m3); !n3.done; w2++, n3 = h2.next()) n3 = y2(m3, e2, w2, n3.value, k3), null !== n3 && (a && null !== n3.alternate && m3.delete(null === n3.key ? w2 : n3.key), g2 = f2(n3, g2, w2), null === u2 ? l3 = n3 : u2.sibling = n3, u2 = n3);
     a && m3.forEach(function(a2) {
       return b(e2, a2);
     });
     I && tg(e2, w2);
     return l3;
   }
-  function J2(a2, d2, f3, h3) {
+  function J2(a2, d2, f3, h2) {
     "object" === typeof f3 && null !== f3 && f3.type === ya && null === f3.key && (f3 = f3.props.children);
     if ("object" === typeof f3 && null !== f3) {
       switch (f3.$$typeof) {
@@ -3045,7 +3045,7 @@ function Og(a) {
               } else b(a2, l3);
               l3 = l3.sibling;
             }
-            f3.type === ya ? (d2 = Tg(f3.props.children, a2.mode, h3, f3.key), d2.return = a2, a2 = d2) : (h3 = Rg(f3.type, f3.key, f3.props, null, a2.mode, h3), h3.ref = Lg(a2, d2, f3), h3.return = a2, a2 = h3);
+            f3.type === ya ? (d2 = Tg(f3.props.children, a2.mode, h2, f3.key), d2.return = a2, a2 = d2) : (h2 = Rg(f3.type, f3.key, f3.props, null, a2.mode, h2), h2.ref = Lg(a2, d2, f3), h2.return = a2, a2 = h2);
           }
           return g(a2);
         case wa:
@@ -3064,19 +3064,19 @@ function Og(a) {
               else b(a2, d2);
               d2 = d2.sibling;
             }
-            d2 = Sg(f3, a2.mode, h3);
+            d2 = Sg(f3, a2.mode, h2);
             d2.return = a2;
             a2 = d2;
           }
           return g(a2);
         case Ha:
-          return l3 = f3._init, J2(a2, d2, l3(f3._payload), h3);
+          return l3 = f3._init, J2(a2, d2, l3(f3._payload), h2);
       }
-      if (eb(f3)) return n2(a2, d2, f3, h3);
-      if (Ka(f3)) return t2(a2, d2, f3, h3);
+      if (eb(f3)) return n2(a2, d2, f3, h2);
+      if (Ka(f3)) return t2(a2, d2, f3, h2);
       Mg(a2, f3);
     }
-    return "string" === typeof f3 && "" !== f3 || "number" === typeof f3 ? (f3 = "" + f3, null !== d2 && 6 === d2.tag ? (c(a2, d2.sibling), d2 = e(d2, f3), d2.return = a2, a2 = d2) : (c(a2, d2), d2 = Qg(f3, a2.mode, h3), d2.return = a2, a2 = d2), g(a2)) : c(a2, d2);
+    return "string" === typeof f3 && "" !== f3 || "number" === typeof f3 ? (f3 = "" + f3, null !== d2 && 6 === d2.tag ? (c(a2, d2.sibling), d2 = e(d2, f3), d2.return = a2, a2 = d2) : (c(a2, d2), d2 = Qg(f3, a2.mode, h2), d2.return = a2, a2 = d2), g(a2)) : c(a2, d2);
   }
   return J2;
 }
@@ -3190,34 +3190,34 @@ function ph(a, b) {
 function qh(a, b, c, d) {
   var e = a.updateQueue;
   jh = false;
-  var f2 = e.firstBaseUpdate, g = e.lastBaseUpdate, h2 = e.shared.pending;
-  if (null !== h2) {
+  var f2 = e.firstBaseUpdate, g = e.lastBaseUpdate, h = e.shared.pending;
+  if (null !== h) {
     e.shared.pending = null;
-    var k2 = h2, l2 = k2.next;
+    var k2 = h, l2 = k2.next;
     k2.next = null;
     null === g ? f2 = l2 : g.next = l2;
     g = k2;
     var m2 = a.alternate;
-    null !== m2 && (m2 = m2.updateQueue, h2 = m2.lastBaseUpdate, h2 !== g && (null === h2 ? m2.firstBaseUpdate = l2 : h2.next = l2, m2.lastBaseUpdate = k2));
+    null !== m2 && (m2 = m2.updateQueue, h = m2.lastBaseUpdate, h !== g && (null === h ? m2.firstBaseUpdate = l2 : h.next = l2, m2.lastBaseUpdate = k2));
   }
   if (null !== f2) {
     var q2 = e.baseState;
     g = 0;
     m2 = l2 = k2 = null;
-    h2 = f2;
+    h = f2;
     do {
-      var r2 = h2.lane, y2 = h2.eventTime;
+      var r2 = h.lane, y2 = h.eventTime;
       if ((d & r2) === r2) {
         null !== m2 && (m2 = m2.next = {
           eventTime: y2,
           lane: 0,
-          tag: h2.tag,
-          payload: h2.payload,
-          callback: h2.callback,
+          tag: h.tag,
+          payload: h.payload,
+          callback: h.callback,
           next: null
         });
         a: {
-          var n2 = a, t2 = h2;
+          var n2 = a, t2 = h;
           r2 = b;
           y2 = c;
           switch (t2.tag) {
@@ -3241,11 +3241,11 @@ function qh(a, b, c, d) {
               jh = true;
           }
         }
-        null !== h2.callback && 0 !== h2.lane && (a.flags |= 64, r2 = e.effects, null === r2 ? e.effects = [h2] : r2.push(h2));
-      } else y2 = { eventTime: y2, lane: r2, tag: h2.tag, payload: h2.payload, callback: h2.callback, next: null }, null === m2 ? (l2 = m2 = y2, k2 = q2) : m2 = m2.next = y2, g |= r2;
-      h2 = h2.next;
-      if (null === h2) if (h2 = e.shared.pending, null === h2) break;
-      else r2 = h2, h2 = r2.next, r2.next = null, e.lastBaseUpdate = r2, e.shared.pending = null;
+        null !== h.callback && 0 !== h.lane && (a.flags |= 64, r2 = e.effects, null === r2 ? e.effects = [h] : r2.push(h));
+      } else y2 = { eventTime: y2, lane: r2, tag: h.tag, payload: h.payload, callback: h.callback, next: null }, null === m2 ? (l2 = m2 = y2, k2 = q2) : m2 = m2.next = y2, g |= r2;
+      h = h.next;
+      if (null === h) if (h = e.shared.pending, null === h) break;
+      else r2 = h, h = r2.next, r2.next = null, e.lastBaseUpdate = r2, e.shared.pending = null;
     } while (1);
     null === m2 && (k2 = q2);
     e.baseState = k2;
@@ -3345,7 +3345,7 @@ function P() {
 }
 function Mh(a, b) {
   if (null === b) return false;
-  for (var c = 0; c < b.length && c < a.length; c++) if (!He$1(a[c], b[c])) return false;
+  for (var c = 0; c < b.length && c < a.length; c++) if (!He(a[c], b[c])) return false;
   return true;
 }
 function Nh(a, b, c, d, e, f2) {
@@ -3422,7 +3422,7 @@ function Wh(a) {
   if (null !== e) {
     f2 = e.next;
     d = d.baseState;
-    var h2 = g = null, k2 = null, l2 = f2;
+    var h = g = null, k2 = null, l2 = f2;
     do {
       var m2 = l2.lane;
       if ((Hh & m2) === m2) null !== k2 && (k2 = k2.next = { lane: 0, action: l2.action, hasEagerState: l2.hasEagerState, eagerState: l2.eagerState, next: null }), d = l2.hasEagerState ? l2.eagerState : a(d, l2.action);
@@ -3434,14 +3434,14 @@ function Wh(a) {
           eagerState: l2.eagerState,
           next: null
         };
-        null === k2 ? (h2 = k2 = q2, g = d) : k2 = k2.next = q2;
+        null === k2 ? (h = k2 = q2, g = d) : k2 = k2.next = q2;
         M.lanes |= m2;
         rh |= m2;
       }
       l2 = l2.next;
     } while (null !== l2 && l2 !== f2);
-    null === k2 ? g = d : k2.next = h2;
-    He$1(d, b.memoizedState) || (dh = true);
+    null === k2 ? g = d : k2.next = h;
+    He(d, b.memoizedState) || (dh = true);
     b.memoizedState = d;
     b.baseState = g;
     b.baseQueue = k2;
@@ -3467,7 +3467,7 @@ function Xh(a) {
     do
       f2 = a(f2, g.action), g = g.next;
     while (g !== e);
-    He$1(f2, b.memoizedState) || (dh = true);
+    He(f2, b.memoizedState) || (dh = true);
     b.memoizedState = f2;
     null === b.baseQueue && (b.baseState = f2);
     c.lastRenderedState = f2;
@@ -3477,7 +3477,7 @@ function Xh(a) {
 function Yh() {
 }
 function Zh(a, b) {
-  var c = M, d = Uh(), e = b(), f2 = !He$1(d.memoizedState, e);
+  var c = M, d = Uh(), e = b(), f2 = !He(d.memoizedState, e);
   f2 && (d.memoizedState = e, dh = true);
   d = d.queue;
   $h(ai.bind(null, c, d, a), [a]);
@@ -3510,7 +3510,7 @@ function ei(a) {
   a = a.value;
   try {
     var c = b();
-    return !He$1(a, c);
+    return !He(a, c);
   } catch (d) {
     return true;
   }
@@ -3602,7 +3602,7 @@ function ti(a, b) {
 }
 function ui(a, b, c) {
   if (0 === (Hh & 21)) return a.baseState && (a.baseState = false, dh = true), a.memoizedState = c;
-  He$1(c, b) || (c = yc(), M.lanes |= c, rh |= c, a.baseState = true);
+  He(c, b) || (c = yc(), M.lanes |= c, rh |= c, a.baseState = true);
   return b;
 }
 function vi(a, b) {
@@ -3636,10 +3636,10 @@ function ii(a, b, c) {
   else {
     var f2 = a.alternate;
     if (0 === a.lanes && (null === f2 || 0 === f2.lanes) && (f2 = b.lastRenderedReducer, null !== f2)) try {
-      var g = b.lastRenderedState, h2 = f2(g, c);
+      var g = b.lastRenderedState, h = f2(g, c);
       e.hasEagerState = true;
-      e.eagerState = h2;
-      if (He$1(h2, g)) {
+      e.eagerState = h;
+      if (He(h, g)) {
         var k2 = b.interleaved;
         null === k2 ? (e.next = e, gh(b)) : (e.next = k2.next, k2.next = e);
         b.interleaved = e;
@@ -3830,7 +3830,7 @@ function Fi(a, b, c, d, e, f2, g) {
 function Gi(a, b, c) {
   var d = false, e = Vf;
   var f2 = b.contextType;
-  "object" === typeof f2 && null !== f2 ? f2 = eh(f2) : (e = Zf(b) ? Xf : H$1.current, d = b.contextTypes, f2 = (d = null !== d && void 0 !== d) ? Yf(a, e) : Vf);
+  "object" === typeof f2 && null !== f2 ? f2 = eh(f2) : (e = Zf(b) ? Xf : H.current, d = b.contextTypes, f2 = (d = null !== d && void 0 !== d) ? Yf(a, e) : Vf);
   b = new b(c, f2);
   a.memoizedState = null !== b.state && void 0 !== b.state ? b.state : null;
   b.updater = Ei;
@@ -3852,7 +3852,7 @@ function Ii(a, b, c, d) {
   e.refs = {};
   kh(a);
   var f2 = b.contextType;
-  "object" === typeof f2 && null !== f2 ? e.context = eh(f2) : (f2 = Zf(b) ? Xf : H$1.current, e.context = Yf(a, f2));
+  "object" === typeof f2 && null !== f2 ? e.context = eh(f2) : (f2 = Zf(b) ? Xf : H.current, e.context = Yf(a, f2));
   e.state = a.memoizedState;
   f2 = b.getDerivedStateFromProps;
   "function" === typeof f2 && (Di(a, b, f2, c), e.state = a.memoizedState);
@@ -4006,7 +4006,7 @@ function gj(a, b) {
   if (null === a && null !== c || null !== a && a.ref !== c) b.flags |= 512, b.flags |= 2097152;
 }
 function cj(a, b, c, d, e) {
-  var f2 = Zf(c) ? Xf : H$1.current;
+  var f2 = Zf(c) ? Xf : H.current;
   f2 = Yf(b, f2);
   ch(b, e);
   c = Nh(a, b, c, d, f2, e);
@@ -4025,36 +4025,36 @@ function hj(a, b, c, d, e) {
   ch(b, e);
   if (null === b.stateNode) ij(a, b), Gi(b, c, d), Ii(b, c, d, e), d = true;
   else if (null === a) {
-    var g = b.stateNode, h2 = b.memoizedProps;
-    g.props = h2;
+    var g = b.stateNode, h = b.memoizedProps;
+    g.props = h;
     var k2 = g.context, l2 = c.contextType;
-    "object" === typeof l2 && null !== l2 ? l2 = eh(l2) : (l2 = Zf(c) ? Xf : H$1.current, l2 = Yf(b, l2));
+    "object" === typeof l2 && null !== l2 ? l2 = eh(l2) : (l2 = Zf(c) ? Xf : H.current, l2 = Yf(b, l2));
     var m2 = c.getDerivedStateFromProps, q2 = "function" === typeof m2 || "function" === typeof g.getSnapshotBeforeUpdate;
-    q2 || "function" !== typeof g.UNSAFE_componentWillReceiveProps && "function" !== typeof g.componentWillReceiveProps || (h2 !== d || k2 !== l2) && Hi(b, g, d, l2);
+    q2 || "function" !== typeof g.UNSAFE_componentWillReceiveProps && "function" !== typeof g.componentWillReceiveProps || (h !== d || k2 !== l2) && Hi(b, g, d, l2);
     jh = false;
     var r2 = b.memoizedState;
     g.state = r2;
     qh(b, d, g, e);
     k2 = b.memoizedState;
-    h2 !== d || r2 !== k2 || Wf.current || jh ? ("function" === typeof m2 && (Di(b, c, m2, d), k2 = b.memoizedState), (h2 = jh || Fi(b, c, h2, d, r2, k2, l2)) ? (q2 || "function" !== typeof g.UNSAFE_componentWillMount && "function" !== typeof g.componentWillMount || ("function" === typeof g.componentWillMount && g.componentWillMount(), "function" === typeof g.UNSAFE_componentWillMount && g.UNSAFE_componentWillMount()), "function" === typeof g.componentDidMount && (b.flags |= 4194308)) : ("function" === typeof g.componentDidMount && (b.flags |= 4194308), b.memoizedProps = d, b.memoizedState = k2), g.props = d, g.state = k2, g.context = l2, d = h2) : ("function" === typeof g.componentDidMount && (b.flags |= 4194308), d = false);
+    h !== d || r2 !== k2 || Wf.current || jh ? ("function" === typeof m2 && (Di(b, c, m2, d), k2 = b.memoizedState), (h = jh || Fi(b, c, h, d, r2, k2, l2)) ? (q2 || "function" !== typeof g.UNSAFE_componentWillMount && "function" !== typeof g.componentWillMount || ("function" === typeof g.componentWillMount && g.componentWillMount(), "function" === typeof g.UNSAFE_componentWillMount && g.UNSAFE_componentWillMount()), "function" === typeof g.componentDidMount && (b.flags |= 4194308)) : ("function" === typeof g.componentDidMount && (b.flags |= 4194308), b.memoizedProps = d, b.memoizedState = k2), g.props = d, g.state = k2, g.context = l2, d = h) : ("function" === typeof g.componentDidMount && (b.flags |= 4194308), d = false);
   } else {
     g = b.stateNode;
     lh(a, b);
-    h2 = b.memoizedProps;
-    l2 = b.type === b.elementType ? h2 : Ci(b.type, h2);
+    h = b.memoizedProps;
+    l2 = b.type === b.elementType ? h : Ci(b.type, h);
     g.props = l2;
     q2 = b.pendingProps;
     r2 = g.context;
     k2 = c.contextType;
-    "object" === typeof k2 && null !== k2 ? k2 = eh(k2) : (k2 = Zf(c) ? Xf : H$1.current, k2 = Yf(b, k2));
+    "object" === typeof k2 && null !== k2 ? k2 = eh(k2) : (k2 = Zf(c) ? Xf : H.current, k2 = Yf(b, k2));
     var y2 = c.getDerivedStateFromProps;
-    (m2 = "function" === typeof y2 || "function" === typeof g.getSnapshotBeforeUpdate) || "function" !== typeof g.UNSAFE_componentWillReceiveProps && "function" !== typeof g.componentWillReceiveProps || (h2 !== q2 || r2 !== k2) && Hi(b, g, d, k2);
+    (m2 = "function" === typeof y2 || "function" === typeof g.getSnapshotBeforeUpdate) || "function" !== typeof g.UNSAFE_componentWillReceiveProps && "function" !== typeof g.componentWillReceiveProps || (h !== q2 || r2 !== k2) && Hi(b, g, d, k2);
     jh = false;
     r2 = b.memoizedState;
     g.state = r2;
     qh(b, d, g, e);
     var n2 = b.memoizedState;
-    h2 !== q2 || r2 !== n2 || Wf.current || jh ? ("function" === typeof y2 && (Di(b, c, y2, d), n2 = b.memoizedState), (l2 = jh || Fi(b, c, l2, d, r2, n2, k2) || false) ? (m2 || "function" !== typeof g.UNSAFE_componentWillUpdate && "function" !== typeof g.componentWillUpdate || ("function" === typeof g.componentWillUpdate && g.componentWillUpdate(d, n2, k2), "function" === typeof g.UNSAFE_componentWillUpdate && g.UNSAFE_componentWillUpdate(d, n2, k2)), "function" === typeof g.componentDidUpdate && (b.flags |= 4), "function" === typeof g.getSnapshotBeforeUpdate && (b.flags |= 1024)) : ("function" !== typeof g.componentDidUpdate || h2 === a.memoizedProps && r2 === a.memoizedState || (b.flags |= 4), "function" !== typeof g.getSnapshotBeforeUpdate || h2 === a.memoizedProps && r2 === a.memoizedState || (b.flags |= 1024), b.memoizedProps = d, b.memoizedState = n2), g.props = d, g.state = n2, g.context = k2, d = l2) : ("function" !== typeof g.componentDidUpdate || h2 === a.memoizedProps && r2 === a.memoizedState || (b.flags |= 4), "function" !== typeof g.getSnapshotBeforeUpdate || h2 === a.memoizedProps && r2 === a.memoizedState || (b.flags |= 1024), d = false);
+    h !== q2 || r2 !== n2 || Wf.current || jh ? ("function" === typeof y2 && (Di(b, c, y2, d), n2 = b.memoizedState), (l2 = jh || Fi(b, c, l2, d, r2, n2, k2) || false) ? (m2 || "function" !== typeof g.UNSAFE_componentWillUpdate && "function" !== typeof g.componentWillUpdate || ("function" === typeof g.componentWillUpdate && g.componentWillUpdate(d, n2, k2), "function" === typeof g.UNSAFE_componentWillUpdate && g.UNSAFE_componentWillUpdate(d, n2, k2)), "function" === typeof g.componentDidUpdate && (b.flags |= 4), "function" === typeof g.getSnapshotBeforeUpdate && (b.flags |= 1024)) : ("function" !== typeof g.componentDidUpdate || h === a.memoizedProps && r2 === a.memoizedState || (b.flags |= 4), "function" !== typeof g.getSnapshotBeforeUpdate || h === a.memoizedProps && r2 === a.memoizedState || (b.flags |= 1024), b.memoizedProps = d, b.memoizedState = n2), g.props = d, g.state = n2, g.context = k2, d = l2) : ("function" !== typeof g.componentDidUpdate || h === a.memoizedProps && r2 === a.memoizedState || (b.flags |= 4), "function" !== typeof g.getSnapshotBeforeUpdate || h === a.memoizedProps && r2 === a.memoizedState || (b.flags |= 1024), d = false);
   }
   return jj(a, b, c, d, f2, e);
 }
@@ -4064,9 +4064,9 @@ function jj(a, b, c, d, e, f2) {
   if (!d && !g) return e && dg(b, c, false), Zi(a, b, f2);
   d = b.stateNode;
   Wi.current = b;
-  var h2 = g && "function" !== typeof c.getDerivedStateFromError ? null : d.render();
+  var h = g && "function" !== typeof c.getDerivedStateFromError ? null : d.render();
   b.flags |= 1;
-  null !== a && g ? (b.child = Ug(b, a.child, null, f2), b.child = Ug(b, null, h2, f2)) : Xi(a, b, h2, f2);
+  null !== a && g ? (b.child = Ug(b, a.child, null, f2), b.child = Ug(b, null, h, f2)) : Xi(a, b, h, f2);
   b.memoizedState = d.state;
   e && dg(b, c, true);
   return b.child;
@@ -4088,9 +4088,9 @@ function nj(a) {
   return { baseLanes: a, cachePool: null, transitions: null };
 }
 function oj(a, b, c) {
-  var d = b.pendingProps, e = L.current, f2 = false, g = 0 !== (b.flags & 128), h2;
-  (h2 = g) || (h2 = null !== a && null === a.memoizedState ? false : 0 !== (e & 2));
-  if (h2) f2 = true, b.flags &= -129;
+  var d = b.pendingProps, e = L.current, f2 = false, g = 0 !== (b.flags & 128), h;
+  (h = g) || (h = null !== a && null === a.memoizedState ? false : 0 !== (e & 2));
+  if (h) f2 = true, b.flags &= -129;
   else if (null === a || null !== a.memoizedState) e |= 1;
   G(L, e & 1);
   if (null === a) {
@@ -4102,15 +4102,15 @@ function oj(a, b, c) {
     return f2 ? (d = b.mode, f2 = b.child, g = { mode: "hidden", children: g }, 0 === (d & 1) && null !== f2 ? (f2.childLanes = 0, f2.pendingProps = g) : f2 = pj(g, d, 0, null), a = Tg(a, d, c, null), f2.return = b, a.return = b, f2.sibling = a, b.child = f2, b.child.memoizedState = nj(c), b.memoizedState = mj, a) : qj(b, g);
   }
   e = a.memoizedState;
-  if (null !== e && (h2 = e.dehydrated, null !== h2)) return rj(a, b, g, d, h2, e, c);
+  if (null !== e && (h = e.dehydrated, null !== h)) return rj(a, b, g, d, h, e, c);
   if (f2) {
     f2 = d.fallback;
     g = b.mode;
     e = a.child;
-    h2 = e.sibling;
+    h = e.sibling;
     var k2 = { mode: "hidden", children: d.children };
     0 === (g & 1) && b.child !== e ? (d = b.child, d.childLanes = 0, d.pendingProps = k2, b.deletions = null) : (d = Pg(e, k2), d.subtreeFlags = e.subtreeFlags & 14680064);
-    null !== h2 ? f2 = Pg(h2, f2) : (f2 = Tg(f2, g, c, null), f2.flags |= 2);
+    null !== h ? f2 = Pg(h, f2) : (f2 = Tg(f2, g, c, null), f2.flags |= 2);
     f2.return = b;
     d.return = b;
     d.sibling = f2;
@@ -4169,14 +4169,14 @@ function rj(a, b, c, d, e, f2, g) {
   if (0 === (b.mode & 1)) return sj(a, b, g, null);
   if ("$!" === e.data) {
     d = e.nextSibling && e.nextSibling.dataset;
-    if (d) var h2 = d.dgst;
-    d = h2;
+    if (d) var h = d.dgst;
+    d = h;
     f2 = Error(p(419));
     d = Ki(f2, d, void 0);
     return sj(a, b, g, d);
   }
-  h2 = 0 !== (g & a.childLanes);
-  if (dh || h2) {
+  h = 0 !== (g & a.childLanes);
+  if (dh || h) {
     d = Q;
     if (null !== d) {
       switch (g & -g) {
@@ -4415,20 +4415,20 @@ Bj = function(a, b, c, d) {
     var g;
     c = null;
     for (l2 in e) if (!d.hasOwnProperty(l2) && e.hasOwnProperty(l2) && null != e[l2]) if ("style" === l2) {
-      var h2 = e[l2];
-      for (g in h2) h2.hasOwnProperty(g) && (c || (c = {}), c[g] = "");
+      var h = e[l2];
+      for (g in h) h.hasOwnProperty(g) && (c || (c = {}), c[g] = "");
     } else "dangerouslySetInnerHTML" !== l2 && "children" !== l2 && "suppressContentEditableWarning" !== l2 && "suppressHydrationWarning" !== l2 && "autoFocus" !== l2 && (ea.hasOwnProperty(l2) ? f2 || (f2 = []) : (f2 = f2 || []).push(l2, null));
     for (l2 in d) {
       var k2 = d[l2];
-      h2 = null != e ? e[l2] : void 0;
-      if (d.hasOwnProperty(l2) && k2 !== h2 && (null != k2 || null != h2)) if ("style" === l2) if (h2) {
-        for (g in h2) !h2.hasOwnProperty(g) || k2 && k2.hasOwnProperty(g) || (c || (c = {}), c[g] = "");
-        for (g in k2) k2.hasOwnProperty(g) && h2[g] !== k2[g] && (c || (c = {}), c[g] = k2[g]);
+      h = null != e ? e[l2] : void 0;
+      if (d.hasOwnProperty(l2) && k2 !== h && (null != k2 || null != h)) if ("style" === l2) if (h) {
+        for (g in h) !h.hasOwnProperty(g) || k2 && k2.hasOwnProperty(g) || (c || (c = {}), c[g] = "");
+        for (g in k2) k2.hasOwnProperty(g) && h[g] !== k2[g] && (c || (c = {}), c[g] = k2[g]);
       } else c || (f2 || (f2 = []), f2.push(
         l2,
         c
       )), c = k2;
-      else "dangerouslySetInnerHTML" === l2 ? (k2 = k2 ? k2.__html : void 0, h2 = h2 ? h2.__html : void 0, null != k2 && h2 !== k2 && (f2 = f2 || []).push(l2, k2)) : "children" === l2 ? "string" !== typeof k2 && "number" !== typeof k2 || (f2 = f2 || []).push(l2, "" + k2) : "suppressContentEditableWarning" !== l2 && "suppressHydrationWarning" !== l2 && (ea.hasOwnProperty(l2) ? (null != k2 && "onScroll" === l2 && D$1("scroll", a), f2 || h2 === k2 || (f2 = [])) : (f2 = f2 || []).push(l2, k2));
+      else "dangerouslySetInnerHTML" === l2 ? (k2 = k2 ? k2.__html : void 0, h = h ? h.__html : void 0, null != k2 && h !== k2 && (f2 = f2 || []).push(l2, k2)) : "children" === l2 ? "string" !== typeof k2 && "number" !== typeof k2 || (f2 = f2 || []).push(l2, "" + k2) : "suppressContentEditableWarning" !== l2 && "suppressHydrationWarning" !== l2 && (ea.hasOwnProperty(l2) ? (null != k2 && "onScroll" === l2 && D("scroll", a), f2 || h === k2 || (f2 = [])) : (f2 = f2 || []).push(l2, k2));
     }
     c && (f2 = f2 || []).push("style", c);
     var l2 = f2;
@@ -4480,7 +4480,7 @@ function Ej(a, b, c) {
       d = b.stateNode;
       zh();
       E(Wf);
-      E(H$1);
+      E(H);
       Eh();
       d.pendingContext && (d.context = d.pendingContext, d.pendingContext = null);
       if (null === a || null === a.child) Gg(b) ? b.flags |= 4 : null === a || a.memoizedState.isDehydrated && 0 === (b.flags & 256) || (b.flags |= 1024, null !== zg && (Fj(zg), zg = null));
@@ -4508,53 +4508,53 @@ function Ej(a, b, c) {
           a = 0 !== (b.mode & 1);
           switch (c) {
             case "dialog":
-              D$1("cancel", d);
-              D$1("close", d);
+              D("cancel", d);
+              D("close", d);
               break;
             case "iframe":
             case "object":
             case "embed":
-              D$1("load", d);
+              D("load", d);
               break;
             case "video":
             case "audio":
-              for (e = 0; e < lf.length; e++) D$1(lf[e], d);
+              for (e = 0; e < lf.length; e++) D(lf[e], d);
               break;
             case "source":
-              D$1("error", d);
+              D("error", d);
               break;
             case "img":
             case "image":
             case "link":
-              D$1(
+              D(
                 "error",
                 d
               );
-              D$1("load", d);
+              D("load", d);
               break;
             case "details":
-              D$1("toggle", d);
+              D("toggle", d);
               break;
             case "input":
               Za(d, f2);
-              D$1("invalid", d);
+              D("invalid", d);
               break;
             case "select":
               d._wrapperState = { wasMultiple: !!f2.multiple };
-              D$1("invalid", d);
+              D("invalid", d);
               break;
             case "textarea":
-              hb(d, f2), D$1("invalid", d);
+              hb(d, f2), D("invalid", d);
           }
           ub(c, f2);
           e = null;
           for (var g in f2) if (f2.hasOwnProperty(g)) {
-            var h2 = f2[g];
-            "children" === g ? "string" === typeof h2 ? d.textContent !== h2 && (true !== f2.suppressHydrationWarning && Af(d.textContent, h2, a), e = ["children", h2]) : "number" === typeof h2 && d.textContent !== "" + h2 && (true !== f2.suppressHydrationWarning && Af(
+            var h = f2[g];
+            "children" === g ? "string" === typeof h ? d.textContent !== h && (true !== f2.suppressHydrationWarning && Af(d.textContent, h, a), e = ["children", h]) : "number" === typeof h && d.textContent !== "" + h && (true !== f2.suppressHydrationWarning && Af(
               d.textContent,
-              h2,
+              h,
               a
-            ), e = ["children", "" + h2]) : ea.hasOwnProperty(g) && null != h2 && "onScroll" === g && D$1("scroll", d);
+            ), e = ["children", "" + h]) : ea.hasOwnProperty(g) && null != h && "onScroll" === g && D("scroll", d);
           }
           switch (c) {
             case "input":
@@ -4586,43 +4586,43 @@ function Ej(a, b, c) {
             g = vb(c, d);
             switch (c) {
               case "dialog":
-                D$1("cancel", a);
-                D$1("close", a);
+                D("cancel", a);
+                D("close", a);
                 e = d;
                 break;
               case "iframe":
               case "object":
               case "embed":
-                D$1("load", a);
+                D("load", a);
                 e = d;
                 break;
               case "video":
               case "audio":
-                for (e = 0; e < lf.length; e++) D$1(lf[e], a);
+                for (e = 0; e < lf.length; e++) D(lf[e], a);
                 e = d;
                 break;
               case "source":
-                D$1("error", a);
+                D("error", a);
                 e = d;
                 break;
               case "img":
               case "image":
               case "link":
-                D$1(
+                D(
                   "error",
                   a
                 );
-                D$1("load", a);
+                D("load", a);
                 e = d;
                 break;
               case "details":
-                D$1("toggle", a);
+                D("toggle", a);
                 e = d;
                 break;
               case "input":
                 Za(a, d);
                 e = Ya(a, d);
-                D$1("invalid", a);
+                D("invalid", a);
                 break;
               case "option":
                 e = d;
@@ -4630,21 +4630,21 @@ function Ej(a, b, c) {
               case "select":
                 a._wrapperState = { wasMultiple: !!d.multiple };
                 e = A({}, d, { value: void 0 });
-                D$1("invalid", a);
+                D("invalid", a);
                 break;
               case "textarea":
                 hb(a, d);
                 e = gb(a, d);
-                D$1("invalid", a);
+                D("invalid", a);
                 break;
               default:
                 e = d;
             }
             ub(c, e);
-            h2 = e;
-            for (f2 in h2) if (h2.hasOwnProperty(f2)) {
-              var k2 = h2[f2];
-              "style" === f2 ? sb(a, k2) : "dangerouslySetInnerHTML" === f2 ? (k2 = k2 ? k2.__html : void 0, null != k2 && nb(a, k2)) : "children" === f2 ? "string" === typeof k2 ? ("textarea" !== c || "" !== k2) && ob(a, k2) : "number" === typeof k2 && ob(a, "" + k2) : "suppressContentEditableWarning" !== f2 && "suppressHydrationWarning" !== f2 && "autoFocus" !== f2 && (ea.hasOwnProperty(f2) ? null != k2 && "onScroll" === f2 && D$1("scroll", a) : null != k2 && ta(a, f2, k2, g));
+            h = e;
+            for (f2 in h) if (h.hasOwnProperty(f2)) {
+              var k2 = h[f2];
+              "style" === f2 ? sb(a, k2) : "dangerouslySetInnerHTML" === f2 ? (k2 = k2 ? k2.__html : void 0, null != k2 && nb(a, k2)) : "children" === f2 ? "string" === typeof k2 ? ("textarea" !== c || "" !== k2) && ob(a, k2) : "number" === typeof k2 && ob(a, "" + k2) : "suppressContentEditableWarning" !== f2 && "suppressHydrationWarning" !== f2 && "autoFocus" !== f2 && (ea.hasOwnProperty(f2) ? null != k2 && "onScroll" === f2 && D("scroll", a) : null != k2 && ta(a, f2, k2, g));
             }
             switch (c) {
               case "input":
@@ -4795,7 +4795,7 @@ function Ij(a, b) {
     case 1:
       return Zf(b.type) && $f(), a = b.flags, a & 65536 ? (b.flags = a & -65537 | 128, b) : null;
     case 3:
-      return zh(), E(Wf), E(H$1), Eh(), a = b.flags, 0 !== (a & 65536) && 0 === (a & 128) ? (b.flags = a & -65537 | 128, b) : null;
+      return zh(), E(Wf), E(H), Eh(), a = b.flags, 0 !== (a & 65536) && 0 === (a & 128) ? (b.flags = a & -65537 | 128, b) : null;
     case 5:
       return Bh(b), null;
     case 13:
@@ -4842,7 +4842,7 @@ function Mj(a, b, c) {
 var Nj = false;
 function Oj(a, b) {
   Cf = dd;
-  a = Me$1();
+  a = Me();
   if (Ne(a)) {
     if ("selectionStart" in a) var c = { start: a.selectionStart, end: a.selectionEnd };
     else a: {
@@ -4858,10 +4858,10 @@ function Oj(a, b) {
           c = null;
           break a;
         }
-        var g = 0, h2 = -1, k2 = -1, l2 = 0, m2 = 0, q2 = a, r2 = null;
+        var g = 0, h = -1, k2 = -1, l2 = 0, m2 = 0, q2 = a, r2 = null;
         b: for (; ; ) {
           for (var y2; ; ) {
-            q2 !== c || 0 !== e && 3 !== q2.nodeType || (h2 = g + e);
+            q2 !== c || 0 !== e && 3 !== q2.nodeType || (h = g + e);
             q2 !== f2 || 0 !== d && 3 !== q2.nodeType || (k2 = g + d);
             3 === q2.nodeType && (g += q2.nodeValue.length);
             if (null === (y2 = q2.firstChild)) break;
@@ -4870,7 +4870,7 @@ function Oj(a, b) {
           }
           for (; ; ) {
             if (q2 === a) break b;
-            r2 === c && ++l2 === e && (h2 = g);
+            r2 === c && ++l2 === e && (h = g);
             r2 === f2 && ++m2 === d && (k2 = g);
             if (null !== (y2 = q2.nextSibling)) break;
             q2 = r2;
@@ -4878,7 +4878,7 @@ function Oj(a, b) {
           }
           q2 = y2;
         }
-        c = -1 === h2 || -1 === k2 ? null : { start: h2, end: k2 };
+        c = -1 === h || -1 === k2 ? null : { start: h, end: k2 };
       } else c = null;
     }
     c = c || { start: 0, end: 0 };
@@ -5022,7 +5022,7 @@ function Yj(a, b, c) {
 function Zj(a, b, c) {
   if (lc && "function" === typeof lc.onCommitFiberUnmount) try {
     lc.onCommitFiberUnmount(kc, c);
-  } catch (h2) {
+  } catch (h) {
   }
   switch (c.tag) {
     case 5:
@@ -5065,8 +5065,8 @@ function Zj(a, b, c) {
     case 1:
       if (!U && (Lj(c, b), d = c.stateNode, "function" === typeof d.componentWillUnmount)) try {
         d.props = c.memoizedProps, d.state = c.memoizedState, d.componentWillUnmount();
-      } catch (h2) {
-        W(c, b, h2);
+      } catch (h) {
+        W(c, b, h);
       }
       Yj(a, b, c);
       break;
@@ -5097,23 +5097,23 @@ function ck(a, b) {
   if (null !== c) for (var d = 0; d < c.length; d++) {
     var e = c[d];
     try {
-      var f2 = a, g = b, h2 = g;
-      a: for (; null !== h2; ) {
-        switch (h2.tag) {
+      var f2 = a, g = b, h = g;
+      a: for (; null !== h; ) {
+        switch (h.tag) {
           case 5:
-            X = h2.stateNode;
+            X = h.stateNode;
             Xj = false;
             break a;
           case 3:
-            X = h2.stateNode.containerInfo;
+            X = h.stateNode.containerInfo;
             Xj = true;
             break a;
           case 4:
-            X = h2.stateNode.containerInfo;
+            X = h.stateNode.containerInfo;
             Xj = true;
             break a;
         }
-        h2 = h2.return;
+        h = h.return;
       }
       if (null === X) throw Error(p(160));
       Zj(f2, g, e);
@@ -5168,17 +5168,17 @@ function dk(a, b) {
         }
       }
       if (d & 4 && (e = a.stateNode, null != e)) {
-        var f2 = a.memoizedProps, g = null !== c ? c.memoizedProps : f2, h2 = a.type, k2 = a.updateQueue;
+        var f2 = a.memoizedProps, g = null !== c ? c.memoizedProps : f2, h = a.type, k2 = a.updateQueue;
         a.updateQueue = null;
         if (null !== k2) try {
-          "input" === h2 && "radio" === f2.type && null != f2.name && ab(e, f2);
-          vb(h2, g);
-          var l2 = vb(h2, f2);
+          "input" === h && "radio" === f2.type && null != f2.name && ab(e, f2);
+          vb(h, g);
+          var l2 = vb(h, f2);
           for (g = 0; g < k2.length; g += 2) {
             var m2 = k2[g], q2 = k2[g + 1];
             "style" === m2 ? sb(e, q2) : "dangerouslySetInnerHTML" === m2 ? nb(e, q2) : "children" === m2 ? ob(e, q2) : ta(e, m2, q2, l2);
           }
-          switch (h2) {
+          switch (h) {
             case "input":
               bb(e, f2);
               break;
@@ -5284,7 +5284,7 @@ function dk(a, b) {
             if (null === m2) {
               m2 = q2;
               try {
-                e = q2.stateNode, l2 ? (f2 = e.style, "function" === typeof f2.setProperty ? f2.setProperty("display", "none", "important") : f2.display = "none") : (h2 = q2.stateNode, k2 = q2.memoizedProps.style, g = void 0 !== k2 && null !== k2 && k2.hasOwnProperty("display") ? k2.display : null, h2.style.display = rb("display", g));
+                e = q2.stateNode, l2 ? (f2 = e.style, "function" === typeof f2.setProperty ? f2.setProperty("display", "none", "important") : f2.display = "none") : (h = q2.stateNode, k2 = q2.memoizedProps.style, g = void 0 !== k2 && null !== k2 && k2.hasOwnProperty("display") ? k2.display : null, h.style.display = rb("display", g));
               } catch (t2) {
                 W(a, a.return, t2);
               }
@@ -5349,8 +5349,8 @@ function ek(a) {
           break;
         case 3:
         case 4:
-          var g = d.stateNode.containerInfo, h2 = Uj(a);
-          Vj(a, h2, g);
+          var g = d.stateNode.containerInfo, h = Uj(a);
+          Vj(a, h, g);
           break;
         default:
           throw Error(p(161));
@@ -5372,14 +5372,14 @@ function ik(a, b, c) {
     if (22 === e.tag && d) {
       var g = null !== e.memoizedState || Jj;
       if (!g) {
-        var h2 = e.alternate, k2 = null !== h2 && null !== h2.memoizedState || U;
-        h2 = Jj;
+        var h = e.alternate, k2 = null !== h && null !== h.memoizedState || U;
+        h = Jj;
         var l2 = U;
         Jj = g;
         if ((U = k2) && !l2) for (V = e; null !== V; ) g = V, k2 = g.child, 22 === g.tag && null !== g.memoizedState ? jk(e) : null !== k2 ? (k2.return = g, V = k2) : jk(e);
         for (; null !== f2; ) V = f2, ik(f2), f2 = f2.sibling;
         V = e;
-        Jj = h2;
+        Jj = h;
         U = l2;
       }
       kk(a);
@@ -5423,9 +5423,9 @@ function kk(a) {
             }
             break;
           case 5:
-            var h2 = b.stateNode;
+            var h = b.stateNode;
             if (null === c && b.flags & 4) {
-              c = h2;
+              c = h;
               var k2 = b.memoizedProps;
               switch (b.type) {
                 case "button":
@@ -5548,22 +5548,22 @@ function jk(a) {
       V = null;
       break;
     }
-    var h2 = b.sibling;
-    if (null !== h2) {
-      h2.return = b.return;
-      V = h2;
+    var h = b.sibling;
+    if (null !== h) {
+      h.return = b.return;
+      V = h;
       break;
     }
     V = b.return;
   }
 }
-var lk = Math.ceil, mk = ua.ReactCurrentDispatcher, nk = ua.ReactCurrentOwner, ok$2 = ua.ReactCurrentBatchConfig, K = 0, Q = null, Y$1 = null, Z$1 = 0, fj = 0, ej = Uf(0), T = 0, pk = null, rh = 0, qk = 0, rk = 0, sk = null, tk = null, fk = 0, Gj = Infinity, uk = null, Oi = false, Pi = null, Ri = null, vk = false, wk = null, xk = 0, yk = 0, zk = null, Ak = -1, Bk = 0;
+var lk = Math.ceil, mk = ua.ReactCurrentDispatcher, nk = ua.ReactCurrentOwner, ok$2 = ua.ReactCurrentBatchConfig, K = 0, Q = null, Y = null, Z = 0, fj = 0, ej = Uf(0), T = 0, pk = null, rh = 0, qk = 0, rk = 0, sk = null, tk = null, fk = 0, Gj = Infinity, uk = null, Oi = false, Pi = null, Ri = null, vk = false, wk = null, xk = 0, yk = 0, zk = null, Ak = -1, Bk = 0;
 function R() {
   return 0 !== (K & 6) ? B() : -1 !== Ak ? Ak : Ak = B();
 }
 function yi(a) {
   if (0 === (a.mode & 1)) return 1;
-  if (0 !== (K & 2) && 0 !== Z$1) return Z$1 & -Z$1;
+  if (0 !== (K & 2) && 0 !== Z) return Z & -Z;
   if (null !== Kg.transition) return 0 === Bk && (Bk = yc()), Bk;
   a = C;
   if (0 !== a) return a;
@@ -5574,12 +5574,12 @@ function yi(a) {
 function gi(a, b, c, d) {
   if (50 < yk) throw yk = 0, zk = null, Error(p(185));
   Ac(a, c, d);
-  if (0 === (K & 2) || a !== Q) a === Q && (0 === (K & 2) && (qk |= c), 4 === T && Ck(a, Z$1)), Dk(a, d), 1 === c && 0 === K && 0 === (b.mode & 1) && (Gj = B() + 500, fg && jg());
+  if (0 === (K & 2) || a !== Q) a === Q && (0 === (K & 2) && (qk |= c), 4 === T && Ck(a, Z)), Dk(a, d), 1 === c && 0 === K && 0 === (b.mode & 1) && (Gj = B() + 500, fg && jg());
 }
 function Dk(a, b) {
   var c = a.callbackNode;
   wc(a, b);
-  var d = uc(a, a === Q ? Z$1 : 0);
+  var d = uc(a, a === Q ? Z : 0);
   if (0 === d) null !== c && bc(c), a.callbackNode = null, a.callbackPriority = 0;
   else if (b = d & -d, a.callbackPriority !== b) {
     null != c && bc(c);
@@ -5615,7 +5615,7 @@ function Gk(a, b) {
   if (0 !== (K & 6)) throw Error(p(327));
   var c = a.callbackNode;
   if (Hk() && a.callbackNode !== c) return null;
-  var d = uc(a, a === Q ? Z$1 : 0);
+  var d = uc(a, a === Q ? Z : 0);
   if (0 === d) return null;
   if (0 !== (d & 30) || 0 !== (d & a.expiredLanes) || b) b = Ik(a, d);
   else {
@@ -5623,19 +5623,19 @@ function Gk(a, b) {
     var e = K;
     K |= 2;
     var f2 = Jk();
-    if (Q !== a || Z$1 !== b) uk = null, Gj = B() + 500, Kk(a, b);
+    if (Q !== a || Z !== b) uk = null, Gj = B() + 500, Kk(a, b);
     do
       try {
         Lk();
         break;
-      } catch (h2) {
-        Mk(a, h2);
+      } catch (h) {
+        Mk(a, h);
       }
     while (1);
     $g();
     mk.current = f2;
     K = e;
-    null !== Y$1 ? b = 0 : (Q = null, Z$1 = 0, b = T);
+    null !== Y ? b = 0 : (Q = null, Z = 0, b = T);
   }
   if (0 !== b) {
     2 === b && (e = xc(a), 0 !== e && (d = e, b = Nk(a, e)));
@@ -5717,7 +5717,7 @@ function Ok(a) {
         var e = c[d], f2 = e.getSnapshot;
         e = e.value;
         try {
-          if (!He$1(f2(), e)) return false;
+          if (!He(f2(), e)) return false;
         } catch (g) {
           return false;
         }
@@ -5795,7 +5795,7 @@ function Kk(a, b) {
   a.finishedLanes = 0;
   var c = a.timeoutHandle;
   -1 !== c && (a.timeoutHandle = -1, Gf(c));
-  if (null !== Y$1) for (c = Y$1.return; null !== c; ) {
+  if (null !== Y) for (c = Y.return; null !== c; ) {
     var d = c;
     wg(d);
     switch (d.tag) {
@@ -5806,7 +5806,7 @@ function Kk(a, b) {
       case 3:
         zh();
         E(Wf);
-        E(H$1);
+        E(H);
         Eh();
         break;
       case 5:
@@ -5831,8 +5831,8 @@ function Kk(a, b) {
     c = c.return;
   }
   Q = a;
-  Y$1 = a = Pg(a.current, null);
-  Z$1 = fj = b;
+  Y = a = Pg(a.current, null);
+  Z = fj = b;
   T = 0;
   pk = null;
   rk = qk = rh = 0;
@@ -5854,7 +5854,7 @@ function Kk(a, b) {
 }
 function Mk(a, b) {
   do {
-    var c = Y$1;
+    var c = Y;
     try {
       $g();
       Fh.current = Rh;
@@ -5874,15 +5874,15 @@ function Mk(a, b) {
       if (null === c || null === c.return) {
         T = 1;
         pk = b;
-        Y$1 = null;
+        Y = null;
         break;
       }
       a: {
-        var f2 = a, g = c.return, h2 = c, k2 = b;
-        b = Z$1;
-        h2.flags |= 32768;
+        var f2 = a, g = c.return, h = c, k2 = b;
+        b = Z;
+        h.flags |= 32768;
         if (null !== k2 && "object" === typeof k2 && "function" === typeof k2.then) {
-          var l2 = k2, m2 = h2, q2 = m2.tag;
+          var l2 = k2, m2 = h, q2 = m2.tag;
           if (0 === (m2.mode & 1) && (0 === q2 || 11 === q2 || 15 === q2)) {
             var r2 = m2.alternate;
             r2 ? (m2.updateQueue = r2.updateQueue, m2.memoizedState = r2.memoizedState, m2.lanes = r2.lanes) : (m2.updateQueue = null, m2.memoizedState = null);
@@ -5890,7 +5890,7 @@ function Mk(a, b) {
           var y2 = Ui(g);
           if (null !== y2) {
             y2.flags &= -257;
-            Vi(y2, g, h2, f2, b);
+            Vi(y2, g, h, f2, b);
             y2.mode & 1 && Si(f2, l2, b);
             b = y2;
             k2 = l2;
@@ -5909,16 +5909,16 @@ function Mk(a, b) {
             }
             k2 = Error(p(426));
           }
-        } else if (I && h2.mode & 1) {
+        } else if (I && h.mode & 1) {
           var J2 = Ui(g);
           if (null !== J2) {
             0 === (J2.flags & 65536) && (J2.flags |= 256);
-            Vi(J2, g, h2, f2, b);
-            Jg(Ji(k2, h2));
+            Vi(J2, g, h, f2, b);
+            Jg(Ji(k2, h));
             break a;
           }
         }
-        f2 = k2 = Ji(k2, h2);
+        f2 = k2 = Ji(k2, h);
         4 !== T && (T = 2);
         null === sk ? sk = [f2] : sk.push(f2);
         f2 = g;
@@ -5932,13 +5932,13 @@ function Mk(a, b) {
               ph(f2, x2);
               break a;
             case 1:
-              h2 = k2;
+              h = k2;
               var w2 = f2.type, u2 = f2.stateNode;
               if (0 === (f2.flags & 128) && ("function" === typeof w2.getDerivedStateFromError || null !== u2 && "function" === typeof u2.componentDidCatch && (null === Ri || !Ri.has(u2)))) {
                 f2.flags |= 65536;
                 b &= -b;
                 f2.lanes |= b;
-                var F2 = Qi(f2, h2, b);
+                var F2 = Qi(f2, h, b);
                 ph(f2, F2);
                 break a;
               }
@@ -5949,7 +5949,7 @@ function Mk(a, b) {
       Sk(c);
     } catch (na) {
       b = na;
-      Y$1 === c && null !== c && (Y$1 = c = c.return);
+      Y === c && null !== c && (Y = c = c.return);
       continue;
     }
     break;
@@ -5962,13 +5962,13 @@ function Jk() {
 }
 function tj() {
   if (0 === T || 3 === T || 2 === T) T = 4;
-  null === Q || 0 === (rh & 268435455) && 0 === (qk & 268435455) || Ck(Q, Z$1);
+  null === Q || 0 === (rh & 268435455) && 0 === (qk & 268435455) || Ck(Q, Z);
 }
 function Ik(a, b) {
   var c = K;
   K |= 2;
   var d = Jk();
-  if (Q !== a || Z$1 !== b) uk = null, Kk(a, b);
+  if (Q !== a || Z !== b) uk = null, Kk(a, b);
   do
     try {
       Tk();
@@ -5980,21 +5980,21 @@ function Ik(a, b) {
   $g();
   K = c;
   mk.current = d;
-  if (null !== Y$1) throw Error(p(261));
+  if (null !== Y) throw Error(p(261));
   Q = null;
-  Z$1 = 0;
+  Z = 0;
   return T;
 }
 function Tk() {
-  for (; null !== Y$1; ) Uk(Y$1);
+  for (; null !== Y; ) Uk(Y);
 }
 function Lk() {
-  for (; null !== Y$1 && !cc(); ) Uk(Y$1);
+  for (; null !== Y && !cc(); ) Uk(Y);
 }
 function Uk(a) {
   var b = Vk(a.alternate, a, fj);
   a.memoizedProps = a.pendingProps;
-  null === b ? Sk(a) : Y$1 = b;
+  null === b ? Sk(a) : Y = b;
   nk.current = null;
 }
 function Sk(a) {
@@ -6004,29 +6004,29 @@ function Sk(a) {
     a = b.return;
     if (0 === (b.flags & 32768)) {
       if (c = Ej(c, b, fj), null !== c) {
-        Y$1 = c;
+        Y = c;
         return;
       }
     } else {
       c = Ij(c, b);
       if (null !== c) {
         c.flags &= 32767;
-        Y$1 = c;
+        Y = c;
         return;
       }
       if (null !== a) a.flags |= 32768, a.subtreeFlags = 0, a.deletions = null;
       else {
         T = 6;
-        Y$1 = null;
+        Y = null;
         return;
       }
     }
     b = b.sibling;
     if (null !== b) {
-      Y$1 = b;
+      Y = b;
       return;
     }
-    Y$1 = b = a;
+    Y = b = a;
   } while (null !== b);
   0 === T && (T = 5);
 }
@@ -6054,7 +6054,7 @@ function Wk(a, b, c, d) {
   a.callbackPriority = 0;
   var f2 = c.lanes | c.childLanes;
   Bc(a, f2);
-  a === Q && (Y$1 = Q = null, Z$1 = 0);
+  a === Q && (Y = Q = null, Z = 0);
   0 === (c.subtreeFlags & 2064) && 0 === (c.flags & 2064) || vk || (vk = true, Fk(hc, function() {
     Hk();
     return null;
@@ -6065,18 +6065,18 @@ function Wk(a, b, c, d) {
     ok$2.transition = null;
     var g = C;
     C = 1;
-    var h2 = K;
+    var h = K;
     K |= 4;
     nk.current = null;
     Oj(a, c);
     dk(c, a);
-    Oe$1(Df);
+    Oe(Df);
     dd = !!Cf;
     Df = Cf = null;
     a.current = c;
     hk(c);
     dc();
-    K = h2;
+    K = h;
     C = g;
     ok$2.transition = f2;
   } else a.current = c;
@@ -6110,10 +6110,10 @@ function Hk() {
         for (V = a.current; null !== V; ) {
           var f2 = V, g = f2.child;
           if (0 !== (V.flags & 16)) {
-            var h2 = f2.deletions;
-            if (null !== h2) {
-              for (var k2 = 0; k2 < h2.length; k2++) {
-                var l2 = h2[k2];
+            var h = f2.deletions;
+            if (null !== h) {
+              for (var k2 = 0; k2 < h.length; k2++) {
+                var l2 = h[k2];
                 for (V = l2; null !== V; ) {
                   var m2 = V;
                   switch (m2.tag) {
@@ -6180,28 +6180,28 @@ function Hk() {
           var u2 = g.child;
           if (0 !== (g.subtreeFlags & 2064) && null !== u2) u2.return = g, V = u2;
           else b: for (g = w2; null !== V; ) {
-            h2 = V;
-            if (0 !== (h2.flags & 2048)) try {
-              switch (h2.tag) {
+            h = V;
+            if (0 !== (h.flags & 2048)) try {
+              switch (h.tag) {
                 case 0:
                 case 11:
                 case 15:
-                  Qj(9, h2);
+                  Qj(9, h);
               }
             } catch (na) {
-              W(h2, h2.return, na);
+              W(h, h.return, na);
             }
-            if (h2 === g) {
+            if (h === g) {
               V = null;
               break b;
             }
-            var F2 = h2.sibling;
+            var F2 = h.sibling;
             if (null !== F2) {
-              F2.return = h2.return;
+              F2.return = h.return;
               V = F2;
               break b;
             }
-            V = h2.return;
+            V = h.return;
           }
         }
         K = e;
@@ -6251,7 +6251,7 @@ function Ti(a, b, c) {
   null !== d && d.delete(b);
   b = R();
   a.pingedLanes |= a.suspendedLanes & c;
-  Q === a && (Z$1 & c) === c && (4 === T || 3 === T && (Z$1 & 130023424) === Z$1 && 500 > B() - fk ? Kk(a, 0) : rk |= c);
+  Q === a && (Z & c) === c && (4 === T || 3 === T && (Z & 130023424) === Z && 500 > B() - fk ? Kk(a, 0) : rk |= c);
   Dk(a, b);
 }
 function Yk(a, b) {
@@ -6296,7 +6296,7 @@ Vk = function(a, b, c) {
       var d = b.type;
       ij(a, b);
       a = b.pendingProps;
-      var e = Yf(b, H$1.current);
+      var e = Yf(b, H.current);
       ch(b, c);
       e = Nh(null, b, d, a, e, c);
       var f2 = Sh();
@@ -6393,16 +6393,16 @@ Vk = function(a, b, c) {
         g = e.value;
         G(Wg, d._currentValue);
         d._currentValue = g;
-        if (null !== f2) if (He$1(f2.value, g)) {
+        if (null !== f2) if (He(f2.value, g)) {
           if (f2.children === e.children && !Wf.current) {
             b = Zi(a, b, c);
             break a;
           }
         } else for (f2 = b.child, null !== f2 && (f2.return = b); null !== f2; ) {
-          var h2 = f2.dependencies;
-          if (null !== h2) {
+          var h = f2.dependencies;
+          if (null !== h) {
             g = f2.child;
-            for (var k2 = h2.firstContext; null !== k2; ) {
+            for (var k2 = h.firstContext; null !== k2; ) {
               if (k2.context === d) {
                 if (1 === f2.tag) {
                   k2 = mh(-1, c & -c);
@@ -6423,7 +6423,7 @@ Vk = function(a, b, c) {
                   c,
                   b
                 );
-                h2.lanes |= c;
+                h.lanes |= c;
                 break;
               }
               k2 = k2.next;
@@ -6433,8 +6433,8 @@ Vk = function(a, b, c) {
             g = f2.return;
             if (null === g) throw Error(p(341));
             g.lanes |= c;
-            h2 = g.alternate;
-            null !== h2 && (h2.lanes |= c);
+            h = g.alternate;
+            null !== h && (h.lanes |= c);
             bh(g, c, b);
             g = f2.sibling;
           } else g = f2.child;
@@ -6608,8 +6608,8 @@ function al(a, b, c, d, e) {
   this.onRecoverableError = e;
   this.mutableSourceEagerHydrationData = null;
 }
-function bl(a, b, c, d, e, f2, g, h2, k2) {
-  a = new al(a, b, c, h2, k2);
+function bl(a, b, c, d, e, f2, g, h, k2) {
+  a = new al(a, b, c, h, k2);
   1 === b ? (b = 1, true === f2 && (b |= 8)) : b = 0;
   f2 = Bg(3, null, null, b);
   a.current = f2;
@@ -6649,8 +6649,8 @@ function dl(a) {
   }
   return b;
 }
-function el(a, b, c, d, e, f2, g, h2, k2) {
-  a = bl(c, d, true, a, e, f2, g, h2, k2);
+function el(a, b, c, d, e, f2, g, h, k2) {
+  a = bl(c, d, true, a, e, f2, g, h, k2);
   a.context = dl(null);
   c = a.current;
   d = R();
@@ -6759,10 +6759,10 @@ function ql(a, b, c, d, e) {
   }
   for (; e = a.lastChild; ) a.removeChild(e);
   if ("function" === typeof d) {
-    var h2 = d;
+    var h = d;
     d = function() {
       var a2 = gl(k2);
-      h2.call(a2);
+      h.call(a2);
     };
   }
   var k2 = bl(a, 0, false, null, null, false, false, "", pl);
@@ -6779,10 +6779,10 @@ function rl(a, b, c, d, e) {
   if (f2) {
     var g = f2;
     if ("function" === typeof e) {
-      var h2 = e;
+      var h = e;
       e = function() {
         var a2 = gl(g);
-        h2.call(a2);
+        h.call(a2);
       };
     }
     fl(b, g, a, e);
@@ -6971,7 +6971,7 @@ const __vite_import_meta_env__$1 = {};
 const createStoreImpl = (createState2) => {
   let state;
   const listeners = /* @__PURE__ */ new Set();
-  const setState2 = (partial, replace) => {
+  const setState = (partial, replace) => {
     const nextState = typeof partial === "function" ? partial(state) : partial;
     if (!Object.is(nextState, state)) {
       const previousState = state;
@@ -6979,7 +6979,7 @@ const createStoreImpl = (createState2) => {
       listeners.forEach((listener) => listener(state, previousState));
     }
   };
-  const getState2 = () => state;
+  const getState = () => state;
   const getInitialState = () => initialState;
   const subscribe = (listener) => {
     listeners.add(listener);
@@ -6993,8 +6993,8 @@ const createStoreImpl = (createState2) => {
     }
     listeners.clear();
   };
-  const api = { setState: setState2, getState: getState2, getInitialState, subscribe, destroy };
-  const initialState = state = createState2(setState2, getState2, api);
+  const api = { setState, getState, getInitialState, subscribe, destroy };
+  const initialState = state = createState2(setState, getState, api);
   return api;
 };
 const createStore = (createState2) => createState2 ? createStoreImpl(createState2) : createStoreImpl;
@@ -7160,12 +7160,12 @@ const createImpl = (createState2) => {
   Object.assign(useBoundStore, api);
   return useBoundStore;
 };
-const create$2 = (createState2) => createState2 ? createImpl(createState2) : createImpl;
+const create$1 = (createState2) => createState2 ? createImpl(createState2) : createImpl;
 const DEFAULT_SETTINGS = {
-  apiBaseUrl: "http://localhost:8080",
+  apiBaseUrl: "",
   apiKey: "",
-  model: "gpt-4",
-  workspacePath: "",
+  model: "claude-opus-4-7",
+  workspacePath: "/projects/data-report",
   fullAccess: false
 };
 function getAPI() {
@@ -7199,7 +7199,7 @@ function getAPI() {
   return window.electronAPI;
 }
 const ipcClient = getAPI();
-const useSettingsStore = create$2((set, get) => ({
+const useSettingsStore = create$1((set, get) => ({
   settings: DEFAULT_SETTINGS,
   isLoaded: false,
   load: async () => {
@@ -7216,511 +7216,964 @@ const useSettingsStore = create$2((set, get) => ({
     await ipcClient.settings.save(updated);
   }
 }));
-let nextId = 1;
-function genId() {
-  return `conv_${Date.now()}_${nextId++}`;
+async function* parseNDJSONStream(reader) {
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const event = JSON.parse(trimmed);
+        yield event;
+      } catch {
+      }
+    }
+  }
+  if (buffer.trim()) {
+    try {
+      const event = JSON.parse(buffer.trim());
+      yield event;
+    } catch {
+    }
+  }
 }
-const useConversationStore = create$2((set, get) => ({
-  conversations: [],
-  currentConversationId: null,
-  create: () => {
-    const id2 = genId();
-    const conv = {
-      id: id2,
-      title: "新对话",
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      messages: []
-    };
+const DEFAULT_BASE_URL = "/api";
+const CLIENT_TOOLS = [
+  {
+    name: "read_file",
+    description: "Read the contents of a file at the given path",
+    input_schema: {
+      type: "object",
+      properties: { path: { type: "string", description: "Absolute path to the file" } },
+      required: ["path"]
+    }
+  },
+  {
+    name: "write_file",
+    description: "Write content to a file, creating it if it does not exist",
+    input_schema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Absolute path to the file" },
+        content: { type: "string", description: "Content to write" }
+      },
+      required: ["path", "content"]
+    }
+  },
+  {
+    name: "edit_file",
+    description: "Perform exact string replacements in a file",
+    input_schema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Absolute path to the file" },
+        old_string: { type: "string", description: "Text to replace" },
+        new_string: { type: "string", description: "Replacement text" }
+      },
+      required: ["path", "old_string", "new_string"]
+    }
+  },
+  {
+    name: "glob",
+    description: "Find files matching a glob pattern",
+    input_schema: {
+      type: "object",
+      properties: {
+        pattern: { type: "string", description: "Glob pattern to match, e.g. **/*.ts" },
+        path: { type: "string", description: "Directory to search in" }
+      },
+      required: ["pattern"]
+    }
+  },
+  {
+    name: "grep",
+    description: "Search file contents using regex patterns",
+    input_schema: {
+      type: "object",
+      properties: {
+        pattern: { type: "string", description: "Regular expression to search for" },
+        path: { type: "string", description: "File or directory to search in" },
+        glob: { type: "string", description: "Glob pattern to filter files" }
+      },
+      required: ["pattern"]
+    }
+  }
+];
+async function createSession(req) {
+  const settings = useSettingsStore.getState().settings;
+  const baseUrl = settings.apiBaseUrl || DEFAULT_BASE_URL;
+  const url = `${baseUrl}/sessions`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: settings.apiKey ? `Bearer ${settings.apiKey}` : ""
+    },
+    body: JSON.stringify(req)
+  });
+  if (!response.ok) {
+    const errBody = await response.text().catch(() => "");
+    let msg = `Create session error: ${response.status} ${response.statusText}`;
+    try {
+      const parsed = JSON.parse(errBody);
+      if (parsed.message) msg = parsed.message;
+      if (parsed.error) msg = parsed.error;
+    } catch {
+    }
+    throw new Error(msg);
+  }
+  const data = await response.json();
+  return data.session_id;
+}
+async function sendChatMessage(opts) {
+  const settings = useSettingsStore.getState().settings;
+  const baseUrl = settings.apiBaseUrl || DEFAULT_BASE_URL;
+  const url = `${baseUrl}/sessions/${opts.sessionId}/messages`;
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: settings.apiKey ? `Bearer ${settings.apiKey}` : ""
+      },
+      body: JSON.stringify({
+        content: opts.content,
+        scene_mode: opts.sceneMode,
+        workspace: opts.workspace,
+        model: opts.model,
+        mode: opts.mode,
+        files: opts.files,
+        skill_invocations: opts.skillInvocations,
+        mcp_servers: opts.mcpServers
+      })
+    });
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => "");
+      let msg = `API error: ${response.status} ${response.statusText}`;
+      try {
+        const parsed = JSON.parse(errBody);
+        if (parsed.message) msg = parsed.message;
+        if (parsed.error) msg = parsed.error;
+      } catch {
+      }
+      throw new Error(msg);
+    }
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("Response body is not readable");
+    for await (const event of parseNDJSONStream(reader)) {
+      opts.onEvent(event);
+      if (event.type === "message.complete" || event.type === "message.error" && event.fatal) {
+        opts.onDone();
+        return;
+      }
+    }
+    opts.onDone();
+  } catch (err) {
+    opts.onError(err instanceof Error ? err : new Error(String(err)));
+  }
+}
+async function reconnectStream(sessionId, sinceSeq, onEvent, onError, onDone) {
+  const settings = useSettingsStore.getState().settings;
+  const baseUrl = settings.apiBaseUrl || DEFAULT_BASE_URL;
+  const url = `${baseUrl}/sessions/${sessionId}/stream?since_seq=${sinceSeq}`;
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Authorization: settings.apiKey ? `Bearer ${settings.apiKey}` : ""
+      }
+    });
+    if (!response.ok) throw new Error(`Reconnect error: ${response.status}`);
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("Response body is not readable");
+    for await (const event of parseNDJSONStream(reader)) {
+      onEvent(event);
+      if (event.type === "message.complete" || event.type === "message.error" && event.fatal) {
+        onDone();
+        return;
+      }
+    }
+    onDone();
+  } catch (err) {
+    onError(err instanceof Error ? err : new Error(String(err)));
+  }
+}
+async function planAction(sessionId, action, body) {
+  const settings = useSettingsStore.getState().settings;
+  const baseUrl = settings.apiBaseUrl || DEFAULT_BASE_URL;
+  const url = `${baseUrl}/sessions/${sessionId}/plan/${action}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: settings.apiKey ? `Bearer ${settings.apiKey}` : ""
+    },
+    body: body ? JSON.stringify(body) : void 0
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ message: "Unknown error" }));
+    throw new Error(err.message || `Plan ${action} failed`);
+  }
+}
+const planApi = {
+  confirm: (sessionId) => planAction(sessionId, "confirm"),
+  edit: (sessionId, planText) => planAction(sessionId, "edit", { plan_text: planText }),
+  reject: (sessionId) => planAction(sessionId, "reject")
+};
+async function buildAction(sessionId, action) {
+  const settings = useSettingsStore.getState().settings;
+  const baseUrl = settings.apiBaseUrl || DEFAULT_BASE_URL;
+  const url = `${baseUrl}/sessions/${sessionId}/build/${action}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: settings.apiKey ? `Bearer ${settings.apiKey}` : ""
+    }
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ message: "Unknown error" }));
+    throw new Error(err.message || `Build ${action} failed`);
+  }
+}
+const buildApi = {
+  confirm: (sessionId) => buildAction(sessionId, "confirm"),
+  skip: (sessionId) => buildAction(sessionId, "skip"),
+  abort: (sessionId) => buildAction(sessionId, "abort")
+};
+const useModeStore = create$1((set) => ({
+  inputMode: "build",
+  sceneMode: "office",
+  setInputMode: (mode) => set({ inputMode: mode }),
+  setSceneMode: (mode) => set({ sceneMode: mode })
+}));
+function genUUID() {
+  return crypto.randomUUID();
+}
+function formatTime(ts) {
+  const d = /* @__PURE__ */ new Date();
+  const h = d.getHours().toString().padStart(2, "0");
+  const m2 = d.getMinutes().toString().padStart(2, "0");
+  return `${h}:${m2}`;
+}
+const DEMO_TASKS = [
+  {
+    id: genUUID(),
+    sessionId: "",
+    title: "新建任务",
+    time: "刚才",
+    active: true,
+    messages: [],
+    lastSeq: 0
+  },
+  {
+    id: genUUID(),
+    sessionId: "",
+    title: "分析 data-report 项目",
+    time: "2小时前",
+    active: false,
+    lastSeq: 0,
+    messages: [
+      {
+        id: "msg-1",
+        role: "user",
+        content: "帮我分析 /projects/data-report 目录下的代码结构，然后写一份 README",
+        timestamp: Date.now() - 72e5
+      },
+      {
+        id: "msg-2",
+        role: "assistant",
+        content: "分析完成。该项目是一个数据分析工具：\n\n- **main.py** — 入口文件，加载配置并启动分析器\n- **analyzer.py** — 核心数据分析模块\n- **config.yaml** — 项目配置\n- **utils.py** — 工具函数\n\n需要我继续生成 README 吗？",
+        thinking: "用户想要分析项目目录结构并生成 README。需要先列出目录了解文件结构，再读取关键文件理解代码逻辑，最后总结分析结果。",
+        processCollapsed: true,
+        tools: [
+          { id: "t1", name: "列出目录", command: "ls -laR /projects/data-report/", detail: "/projects/data-report/", result: "data-report/\n├── main.py\n├── analyzer.py\n├── config.yaml\n└── utils.py", status: "done" },
+          { id: "t2", name: "读取文件", command: "cat /projects/data-report/main.py", detail: "main.py", result: 'def main():\n    config = load_config("config.yaml")\n    analyzer = DataAnalyzer(config)\n    analyzer.run()', status: "done" }
+        ],
+        timestamp: Date.now() - 72e5
+      }
+    ]
+  },
+  {
+    id: genUUID(),
+    sessionId: "",
+    title: "编写数据分析脚本",
+    time: "2小时前",
+    active: false,
+    lastSeq: 0,
+    messages: []
+  },
+  {
+    id: genUUID(),
+    sessionId: "",
+    title: "修复支付模块 Bug",
+    time: "昨天",
+    active: false,
+    lastSeq: 0,
+    messages: []
+  }
+];
+const useTaskStore = create$1((set, get) => ({
+  tasks: DEMO_TASKS,
+  currentTaskId: DEMO_TASKS[0].id,
+  create: async () => {
+    const state = get();
+    const existing = state.tasks.find(
+      (t2) => t2.title === "新建任务" && t2.messages.length === 0 && t2.sessionId
+    );
+    if (existing) {
+      set((s) => ({
+        currentTaskId: existing.id,
+        tasks: s.tasks.map((t2) => ({ ...t2, active: t2.id === existing.id }))
+      }));
+      return existing.id;
+    }
+    const id2 = genUUID();
     set((s) => ({
-      conversations: [conv, ...s.conversations],
-      currentConversationId: id2
+      tasks: [
+        { id: id2, sessionId: "", title: "新建任务", time: "刚才", active: false, messages: [], lastSeq: 0 },
+        ...s.tasks.map((t2) => ({ ...t2, active: false }))
+      ],
+      currentTaskId: id2
     }));
+    try {
+      const modeStore = useModeStore.getState();
+      const settings = useSettingsStore.getState().settings;
+      const sessionId = await createSession({
+        id: id2,
+        scene_mode: modeStore.sceneMode,
+        workspace: settings.workspacePath,
+        model: settings.model,
+        mode: modeStore.inputMode,
+        client_tools: CLIENT_TOOLS
+      });
+      set((s) => ({
+        tasks: s.tasks.map(
+          (t2) => t2.id === id2 ? { ...t2, sessionId } : t2
+        )
+      }));
+    } catch (err) {
+      console.error("Failed to create session:", err);
+    }
     return id2;
   },
   delete: (id2) => {
     set((s) => {
-      const filtered = s.conversations.filter((c) => c.id !== id2);
-      const currentId = s.currentConversationId === id2 ? filtered[0]?.id ?? null : s.currentConversationId;
-      return { conversations: filtered, currentConversationId: currentId };
+      const filtered = s.tasks.filter((t2) => t2.id !== id2);
+      let currentId = s.currentTaskId;
+      if (s.currentTaskId === id2) {
+        currentId = filtered.length > 0 ? filtered[0].id : null;
+        if (currentId) {
+          filtered[0] = { ...filtered[0], active: true };
+        }
+      }
+      return { tasks: filtered, currentTaskId: currentId };
     });
   },
-  select: (id2) => set({ currentConversationId: id2 }),
-  updateTitle: (id2, title) => {
+  select: (id2) => {
     set((s) => ({
-      conversations: s.conversations.map(
-        (c) => c.id === id2 ? { ...c, title } : c
-      )
+      currentTaskId: id2,
+      tasks: s.tasks.map((t2) => ({ ...t2, active: t2.id === id2 }))
+    }));
+  },
+  rename: (id2, title) => {
+    set((s) => ({
+      tasks: s.tasks.map((t2) => t2.id === id2 ? { ...t2, title } : t2)
+    }));
+  },
+  duplicate: (id2) => {
+    const task = get().tasks.find((t2) => t2.id === id2);
+    if (!task) return;
+    const newId = genUUID();
+    set((s) => ({
+      tasks: [
+        {
+          id: newId,
+          sessionId: "",
+          title: task.title + " (副本)",
+          time: "刚才",
+          active: false,
+          lastSeq: 0,
+          messages: task.messages ? JSON.parse(JSON.stringify(task.messages)) : []
+        },
+        ...s.tasks
+      ]
     }));
   },
   addMessage: (message) => {
     set((s) => ({
-      conversations: s.conversations.map((c) => {
-        if (c.id === s.currentConversationId) {
-          const title = c.title === "新对话" && message.role === "user" ? message.content.slice(0, 40) : c.title;
-          return {
-            ...c,
-            title,
-            updatedAt: Date.now(),
-            messages: [...c.messages, message]
-          };
-        }
-        return c;
+      tasks: s.tasks.map((t2) => {
+        if (t2.id !== s.currentTaskId) return t2;
+        const title = t2.title === "新建任务" && message.role === "user" ? message.content.slice(0, 40) : t2.title;
+        return {
+          ...t2,
+          title,
+          time: formatTime(),
+          messages: [...t2.messages, message]
+        };
       })
     }));
   },
   updateLastAssistantMessage: (updater) => {
     set((s) => ({
-      conversations: s.conversations.map((c) => {
-        if (c.id !== s.currentConversationId) return c;
-        const messages = [...c.messages];
+      tasks: s.tasks.map((t2) => {
+        if (t2.id !== s.currentTaskId) return t2;
+        const messages = [...t2.messages];
         const lastIdx = messages.length - 1;
         if (lastIdx >= 0 && messages[lastIdx].role === "assistant") {
           messages[lastIdx] = updater(messages[lastIdx]);
         }
-        return { ...c, messages, updatedAt: Date.now() };
+        return { ...t2, messages, time: formatTime() };
       })
     }));
   },
-  getCurrentConversation: () => {
+  updateTaskSeq: (seq) => {
+    set((s) => ({
+      tasks: s.tasks.map(
+        (t2) => t2.id === s.currentTaskId ? { ...t2, lastSeq: seq } : t2
+      )
+    }));
+  },
+  getCurrentTask: () => {
     const state = get();
-    return state.conversations.find((c) => c.id === state.currentConversationId);
+    return state.tasks.find((t2) => t2.id === state.currentTaskId);
   }
 }));
-/**
- * @license lucide-react v0.312.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-var defaultAttributes = {
-  xmlns: "http://www.w3.org/2000/svg",
-  width: 24,
-  height: 24,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 2,
-  strokeLinecap: "round",
-  strokeLinejoin: "round"
-};
-/**
- * @license lucide-react v0.312.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-const toKebabCase = (string2) => string2.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase().trim();
-const createLucideIcon = (iconName, iconNode) => {
-  const Component = reactExports.forwardRef(
-    ({ color: color2 = "currentColor", size = 24, strokeWidth = 2, absoluteStrokeWidth, className = "", children, ...rest }, ref) => {
-      return reactExports.createElement(
-        "svg",
-        {
-          ref,
-          ...defaultAttributes,
-          width: size,
-          height: size,
-          stroke: color2,
-          strokeWidth: absoluteStrokeWidth ? Number(strokeWidth) * 24 / Number(size) : strokeWidth,
-          className: ["lucide", `lucide-${toKebabCase(iconName)}`, className].join(" "),
-          ...rest
-        },
-        [
-          ...iconNode.map(([tag, attrs]) => reactExports.createElement(tag, attrs)),
-          ...Array.isArray(children) ? children : [children]
-        ]
-      );
-    }
-  );
-  Component.displayName = `${iconName}`;
-  return Component;
-};
-/**
- * @license lucide-react v0.312.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-const AlertCircle = createLucideIcon("AlertCircle", [
-  ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
-  ["line", { x1: "12", x2: "12", y1: "8", y2: "12", key: "1pkeuh" }],
-  ["line", { x1: "12", x2: "12.01", y1: "16", y2: "16", key: "4dfq90" }]
-]);
-/**
- * @license lucide-react v0.312.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-const Bot = createLucideIcon("Bot", [
-  ["path", { d: "M12 8V4H8", key: "hb8ula" }],
-  ["rect", { width: "16", height: "12", x: "4", y: "8", rx: "2", key: "enze0r" }],
-  ["path", { d: "M2 14h2", key: "vft8re" }],
-  ["path", { d: "M20 14h2", key: "4cs60a" }],
-  ["path", { d: "M15 13v2", key: "1xurst" }],
-  ["path", { d: "M9 13v2", key: "rq6x2g" }]
-]);
-/**
- * @license lucide-react v0.312.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-const CheckCircle = createLucideIcon("CheckCircle", [
-  ["path", { d: "M22 11.08V12a10 10 0 1 1-5.93-9.14", key: "g774vq" }],
-  ["path", { d: "m9 11 3 3L22 4", key: "1pflzl" }]
-]);
-/**
- * @license lucide-react v0.312.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-const CornerDownLeft = createLucideIcon("CornerDownLeft", [
-  ["polyline", { points: "9 10 4 15 9 20", key: "r3jprv" }],
-  ["path", { d: "M20 4v7a4 4 0 0 1-4 4H4", key: "6o5b7l" }]
-]);
-/**
- * @license lucide-react v0.312.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-const EyeOff = createLucideIcon("EyeOff", [
-  ["path", { d: "M9.88 9.88a3 3 0 1 0 4.24 4.24", key: "1jxqfv" }],
-  [
-    "path",
-    {
-      d: "M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68",
-      key: "9wicm4"
-    }
-  ],
-  [
-    "path",
-    { d: "M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61", key: "1jreej" }
-  ],
-  ["line", { x1: "2", x2: "22", y1: "2", y2: "22", key: "a6p6uj" }]
-]);
-/**
- * @license lucide-react v0.312.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-const Eye = createLucideIcon("Eye", [
-  ["path", { d: "M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z", key: "rwhkz3" }],
-  ["circle", { cx: "12", cy: "12", r: "3", key: "1v7zrd" }]
-]);
-/**
- * @license lucide-react v0.312.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-const FolderOpen = createLucideIcon("FolderOpen", [
-  [
-    "path",
-    {
-      d: "m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2",
-      key: "usdka0"
-    }
-  ]
-]);
-/**
- * @license lucide-react v0.312.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-const Loader2 = createLucideIcon("Loader2", [
-  ["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]
-]);
-/**
- * @license lucide-react v0.312.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-const MessageSquare = createLucideIcon("MessageSquare", [
-  ["path", { d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z", key: "1lielz" }]
-]);
-/**
- * @license lucide-react v0.312.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-const Plus = createLucideIcon("Plus", [
-  ["path", { d: "M5 12h14", key: "1ays0h" }],
-  ["path", { d: "M12 5v14", key: "s699le" }]
-]);
-/**
- * @license lucide-react v0.312.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-const Send = createLucideIcon("Send", [
-  ["path", { d: "m22 2-7 20-4-9-9-4Z", key: "1q3vgg" }],
-  ["path", { d: "M22 2 11 13", key: "nzbqef" }]
-]);
-/**
- * @license lucide-react v0.312.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-const Settings = createLucideIcon("Settings", [
-  [
-    "path",
-    {
-      d: "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z",
-      key: "1qme2f"
-    }
-  ],
-  ["circle", { cx: "12", cy: "12", r: "3", key: "1v7zrd" }]
-]);
-/**
- * @license lucide-react v0.312.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-const Trash2 = createLucideIcon("Trash2", [
-  ["path", { d: "M3 6h18", key: "d0wm0j" }],
-  ["path", { d: "M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6", key: "4alrt4" }],
-  ["path", { d: "M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2", key: "v07s0e" }],
-  ["line", { x1: "10", x2: "10", y1: "11", y2: "17", key: "1uufr5" }],
-  ["line", { x1: "14", x2: "14", y1: "11", y2: "17", key: "xtxkd" }]
-]);
-/**
- * @license lucide-react v0.312.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-const User = createLucideIcon("User", [
-  ["path", { d: "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2", key: "975kel" }],
-  ["circle", { cx: "12", cy: "7", r: "4", key: "17ys0d" }]
-]);
-/**
- * @license lucide-react v0.312.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-const Wrench = createLucideIcon("Wrench", [
-  [
-    "path",
-    {
-      d: "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z",
-      key: "cbrjhi"
-    }
-  ]
-]);
-/**
- * @license lucide-react v0.312.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-const XCircle = createLucideIcon("XCircle", [
-  ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
-  ["path", { d: "m15 9-6 6", key: "1uzhvr" }],
-  ["path", { d: "m9 9 6 6", key: "z0biqf" }]
-]);
-function ConversationList() {
-  const conversations = useConversationStore((s) => s.conversations);
-  const currentId = useConversationStore((s) => s.currentConversationId);
-  const create2 = useConversationStore((s) => s.create);
-  const select = useConversationStore((s) => s.select);
-  const del = useConversationStore((s) => s.delete);
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col h-full", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+function Sidebar({ onOpenConfig, activeConfig }) {
+  const tasks = useTaskStore((s) => s.tasks);
+  const currentId = useTaskStore((s) => s.currentTaskId);
+  const create2 = useTaskStore((s) => s.create);
+  const select = useTaskStore((s) => s.select);
+  const del = useTaskStore((s) => s.delete);
+  const rename = useTaskStore((s) => s.rename);
+  const duplicate = useTaskStore((s) => s.duplicate);
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("aside", { className: "w-[252px] min-w-[252px] bg-sidebar-bg text-sidebar-text flex flex-col p-5 gap-0.5 border-r border-sidebar-border", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2.5 px-2.5 pb-6 text-lg font-bold text-[#0f172a] tracking-[-0.4px]", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "30", height: "30", viewBox: "0 0 30 30", fill: "none", className: "flex-shrink-0", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { width: "30", height: "30", rx: "8", fill: "#a7f3d0" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M7 15L13 21L23 9", stroke: "#fff", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" })
+      ] }),
+      "iWork"
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs(
       "button",
       {
         onClick: () => create2(),
-        className: "w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed border-gray-500 text-gray-400 hover:text-gray-200 hover:border-gray-400 transition-colors text-sm",
+        className: "flex items-center justify-center gap-2.5 py-2.5 mb-1 rounded-md bg-[#0f172a] text-white text-[13px] font-medium hover:bg-[#334155] transition-colors w-full",
         children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(Plus, { size: 16 }),
-          "新对话"
+          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 3v10M3 8h10" }) }),
+          "新建任务"
         ]
       }
-    ) }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 overflow-y-auto px-2", children: [
-      conversations.map((conv) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
-        "div",
-        {
-          onClick: () => select(conv.id),
-          className: `group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer mb-1 transition-colors ${conv.id === currentId ? "bg-sidebar-active text-gray-100" : "text-gray-400 hover:bg-sidebar-hover hover:text-gray-200"}`,
-          children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm truncate", children: conv.title }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-gray-500 mt-0.5", children: formatTime(conv.updatedAt) })
-            ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "button",
-              {
-                onClick: (e) => {
-                  e.stopPropagation();
-                  del(conv.id);
-                },
-                className: "opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-all",
-                children: /* @__PURE__ */ jsxRuntimeExports.jsx(Trash2, { size: 14 })
-              }
-            )
-          ]
-        },
-        conv.id
-      )),
-      conversations.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-center text-gray-500 text-sm mt-8", children: "暂无对话" })
-    ] })
-  ] });
-}
-function formatTime(ts) {
-  const d = new Date(ts);
-  const now = /* @__PURE__ */ new Date();
-  const isToday = d.toDateString() === now.toDateString();
-  if (isToday) {
-    return d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
-  }
-  return d.toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
-}
-function SettingsPanel() {
-  const settings = useSettingsStore((s) => s.settings);
-  const save = useSettingsStore((s) => s.save);
-  const [showKey, setShowKey] = reactExports.useState(false);
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-4 space-y-5 overflow-y-auto h-full", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-medium text-gray-300", children: "API 配置" }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-gray-500 mb-1.5 block", children: "Base URL" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx(
-        "input",
-        {
-          type: "text",
-          value: settings.apiBaseUrl,
-          onChange: (e) => save({ apiBaseUrl: e.target.value }),
-          placeholder: "http://localhost:8080",
-          className: "w-full px-3 py-2 rounded-lg bg-chat-bg border border-sidebar-border text-gray-200 text-sm focus:outline-none focus:border-accent transition-colors"
+    ),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] font-semibold uppercase tracking-[0.6px] text-sidebar-text-dim pt-4 pb-1 px-2.5", children: "配置" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(
+      SidebarBtn,
+      {
+        icon: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "1.5", y: "1.5", width: "5", height: "5", rx: "1" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "9.5", y: "1.5", width: "5", height: "5", rx: "1" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "1.5", y: "9.5", width: "5", height: "5", rx: "1" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "9.5", y: "9.5", width: "5", height: "5", rx: "1" })
+        ] }),
+        label: "Skills 配置",
+        active: activeConfig === "skills",
+        onClick: () => onOpenConfig("skills")
+      }
+    ),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(
+      SidebarBtn,
+      {
+        icon: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "5", cy: "5", r: "2" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "11", cy: "11", r: "2" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "6.3", y1: "6.3", x2: "9.7", y2: "9.7" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "5", y1: "13", x2: "5", y2: "7" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "11", y1: "9", x2: "11", y2: "3" })
+        ] }),
+        label: "MCP 配置",
+        active: activeConfig === "mcp",
+        onClick: () => onOpenConfig("mcp")
+      }
+    ),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(
+      SidebarBtn,
+      {
+        icon: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "8", cy: "8", r: "6" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 6v3M8 11v.01" })
+        ] }),
+        label: "记忆配置",
+        active: activeConfig === "memory",
+        onClick: () => onOpenConfig("memory")
+      }
+    ),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(
+      SidebarBtn,
+      {
+        icon: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "6", cy: "5", r: "2" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "11", cy: "6", r: "2" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "4", cy: "11", r: "2" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "10", cy: "11", r: "2" })
+        ] }),
+        label: "专家和专家团",
+        onClick: () => {
         }
-      )
-    ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-gray-500 mb-1.5 block", children: "API Key" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "input",
-          {
-            type: showKey ? "text" : "password",
-            value: settings.apiKey,
-            onChange: (e) => save({ apiKey: e.target.value }),
-            placeholder: "sk-...",
-            className: "w-full px-3 py-2 pr-10 rounded-lg bg-chat-bg border border-sidebar-border text-gray-200 text-sm focus:outline-none focus:border-accent transition-colors"
-          }
-        ),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "button",
-          {
-            onClick: () => setShowKey(!showKey),
-            className: "absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300",
-            children: showKey ? /* @__PURE__ */ jsxRuntimeExports.jsx(EyeOff, { size: 16 }) : /* @__PURE__ */ jsxRuntimeExports.jsx(Eye, { size: 16 })
-          }
-        )
-      ] })
-    ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-gray-500 mb-1.5 block", children: "Model" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx(
-        "input",
-        {
-          type: "text",
-          value: settings.model,
-          onChange: (e) => save({ model: e.target.value }),
-          placeholder: "gpt-4",
-          className: "w-full px-3 py-2 rounded-lg bg-chat-bg border border-sidebar-border text-gray-200 text-sm focus:outline-none focus:border-accent transition-colors"
+      }
+    ),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(
+      SidebarBtn,
+      {
+        icon: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "8", cy: "8", r: "2" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 8a6 6 0 0112 0" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M5 3a6 6 0 015 10" })
+        ] }),
+        label: "自动化",
+        onClick: () => {
         }
-      )
-    ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("hr", { className: "border-sidebar-border" }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-medium text-gray-300", children: "工作空间" }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-gray-500 mb-1.5 block", children: "文件夹路径" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "input",
-          {
-            type: "text",
-            value: settings.workspacePath,
-            readOnly: true,
-            placeholder: "未选择",
-            className: "flex-1 px-3 py-2 rounded-lg bg-chat-bg border border-sidebar-border text-gray-200 text-sm focus:outline-none cursor-default"
-          }
-        ),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "button",
-          {
-            onClick: async () => {
-              const path = await ipcClient.workspace.select();
-              if (path) save({ workspacePath: path });
-            },
-            className: "px-3 py-2 rounded-lg bg-sidebar-hover text-gray-300 hover:text-gray-100 hover:bg-sidebar-active transition-colors",
-            children: /* @__PURE__ */ jsxRuntimeExports.jsx(FolderOpen, { size: 16 })
-          }
-        )
-      ] })
-    ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-sm text-gray-300", children: "完全访问权限" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-gray-500 mt-0.5", children: "允许 Agent 读写工作空间文件" })
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx(
-        "button",
-        {
-          onClick: () => save({ fullAccess: !settings.fullAccess }),
-          className: `relative w-10 h-5 rounded-full transition-colors ${settings.fullAccess ? "bg-accent" : "bg-gray-600"}`,
-          children: /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "div",
-            {
-              className: `absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${settings.fullAccess ? "translate-x-5" : "translate-x-0.5"}`
+      }
+    ),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] font-semibold uppercase tracking-[0.6px] text-sidebar-text-dim pt-4 pb-1 px-2.5", children: "工作任务" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-col gap-px max-h-[320px] overflow-y-auto flex-1", children: tasks.map((t2) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "div",
+      {
+        onClick: () => select(t2.id),
+        onContextMenu: (e) => {
+          e.preventDefault();
+          const menu = document.getElementById("ctxMenu");
+          if (!menu) return;
+          menu.innerHTML = [
+            { label: "重命名", action: () => rename(t2.id, prompt("重命名任务:", t2.title) || t2.title) },
+            { label: "复制任务", action: () => duplicate(t2.id) },
+            { label: "删除任务", cls: "text-red-500", action: () => del(t2.id) }
+          ].map(
+            (item) => `<div class="ctx-menu-item${item.cls ? " " + item.cls : ""}" data-action="${item.label}">${item.label}</div>`
+          ).join("");
+          menu.style.left = e.clientX + "px";
+          menu.style.top = e.clientY + "px";
+          menu.classList.add("show");
+          menu.querySelectorAll(".ctx-menu-item").forEach((el2, i) => {
+            el2.addEventListener("click", () => {
+              menu.classList.remove("show");
+              [
+                () => rename(t2.id, prompt("重命名任务:", t2.title) || t2.title),
+                () => duplicate(t2.id),
+                () => del(t2.id)
+              ][i]();
+            });
+          });
+          const closeCtx = (ev) => {
+            if (!ev.target.closest(".ctx-menu")) {
+              menu.classList.remove("show");
+              document.removeEventListener("click", closeCtx);
             }
-          )
-        }
-      )
+          };
+          setTimeout(() => document.addEventListener("click", closeCtx), 10);
+        },
+        className: `task-item py-2 px-2.5 rounded-md text-[13px] cursor-pointer flex items-center gap-2 transition-colors ${t2.id === currentId ? "bg-[rgba(167,243,208,0.4)] text-[#047857] font-medium" : "text-sidebar-text hover:bg-sidebar-hover"}`,
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "flex-1 overflow-hidden text-ellipsis whitespace-nowrap", children: t2.title }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[11px] text-sidebar-text-dim flex-shrink-0", children: t2.time })
+        ]
+      },
+      t2.id
+    )) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "border-t border-sidebar-divider pt-3 mt-1 flex items-center gap-2.5 text-xs text-sidebar-text-dim", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[26px] h-[26px] rounded-full bg-[#a7f3d0] flex items-center justify-center flex-shrink-0 text-[#047857] text-xs font-semibold", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "14", height: "14", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "8", cy: "5", r: "3" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6" })
+      ] }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "ZLL" })
     ] })
   ] });
 }
-function Sidebar() {
-  const [tab2, setTab] = reactExports.useState("conversations");
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "h-full bg-sidebar-bg border-r border-sidebar-border flex flex-col", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex border-b border-sidebar-border", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs(
-        "button",
-        {
-          onClick: () => setTab("conversations"),
-          className: `flex-1 flex items-center justify-center gap-2 py-3 text-sm transition-colors ${tab2 === "conversations" ? "text-accent border-b-2 border-accent" : "text-gray-400 hover:text-gray-200"}`,
-          children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(MessageSquare, { size: 16 }),
-            "对话"
-          ]
-        }
-      ),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs(
-        "button",
-        {
-          onClick: () => setTab("settings"),
-          className: `flex-1 flex items-center justify-center gap-2 py-3 text-sm transition-colors ${tab2 === "settings" ? "text-accent border-b-2 border-accent" : "text-gray-400 hover:text-gray-200"}`,
-          children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(Settings, { size: 16 }),
-            "设置"
-          ]
-        }
-      )
-    ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-1 overflow-hidden", children: tab2 === "conversations" ? /* @__PURE__ */ jsxRuntimeExports.jsx(ConversationList, {}) : /* @__PURE__ */ jsxRuntimeExports.jsx(SettingsPanel, {}) })
-  ] });
+function SidebarBtn({ icon, label, active, onClick }) {
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+    "button",
+    {
+      onClick,
+      className: `flex items-center gap-2.5 py-[9px] px-2.5 rounded-md cursor-pointer text-[13px] transition-colors w-full text-left border-none bg-none font-sans tracking-[-0.1px] ${active ? "bg-[rgba(167,243,208,0.4)] text-[#047857] font-medium" : "text-sidebar-text hover:bg-sidebar-hover hover:text-[#0f172a]"}`,
+      children: [
+        icon,
+        label
+      ]
+    }
+  );
 }
+const useQueueStore = create$1((set, get) => ({
+  queue: [],
+  addToQueue: (text2) => set((s) => ({ queue: [...s.queue, text2] })),
+  removeFromQueue: (index2) => set((s) => ({ queue: s.queue.filter((_, i) => i !== index2) })),
+  shiftQueue: () => {
+    const q2 = get().queue;
+    if (q2.length === 0) return void 0;
+    const first = q2[0];
+    set({ queue: q2.slice(1) });
+    return first;
+  },
+  clearQueue: () => set({ queue: [] })
+}));
+let msgIdCounter = 100;
+function genMsgId() {
+  return `msg-${Date.now()}-${msgIdCounter++}`;
+}
+function createEventHandler(taskStore, set, lastSeqRef) {
+  return (event) => {
+    lastSeqRef.current = event.seq;
+    switch (event.type) {
+      case "agent.thinking":
+        taskStore.updateLastAssistantMessage((m2) => ({
+          ...m2,
+          thinking: (m2.thinking || "") + event.delta
+        }));
+        break;
+      case "agent.text":
+        taskStore.updateLastAssistantMessage((m2) => ({
+          ...m2,
+          content: m2.content + event.delta
+        }));
+        break;
+      case "agent.tool_call":
+        taskStore.updateLastAssistantMessage((m2) => ({
+          ...m2,
+          tools: [
+            ...m2.tools || [],
+            {
+              id: event.tool_call_id,
+              name: event.tool_name,
+              status: "running",
+              detail: typeof event.input === "object" ? JSON.stringify(event.input).slice(0, 120) : void 0
+            }
+          ]
+        }));
+        break;
+      case "agent.tool_result":
+        taskStore.updateLastAssistantMessage((m2) => ({
+          ...m2,
+          tools: m2.tools?.map(
+            (t2) => t2.id === event.tool_call_id ? {
+              ...t2,
+              status: "done",
+              result: event.result.output || event.result.error || "Done"
+            } : t2
+          )
+        }));
+        break;
+      case "client.tool_request":
+        taskStore.updateLastAssistantMessage((m2) => ({
+          ...m2,
+          tools: [
+            ...m2.tools || [],
+            {
+              id: event.request_id,
+              name: event.tool_name,
+              status: "pending",
+              detail: typeof event.input === "object" ? JSON.stringify(event.input).slice(0, 120) : void 0
+            }
+          ]
+        }));
+        break;
+      case "client.tool_timeout":
+        break;
+      case "plan.generated":
+        taskStore.updateLastAssistantMessage((m2) => ({
+          ...m2,
+          planGenerated: event.plan_text,
+          planStatus: "pending"
+        }));
+        break;
+      case "plan.confirmed":
+        taskStore.updateLastAssistantMessage((m2) => ({
+          ...m2,
+          planStatus: "confirmed"
+        }));
+        break;
+      case "plan.rejected":
+        taskStore.updateLastAssistantMessage((m2) => ({
+          ...m2,
+          planStatus: "rejected",
+          processCollapsed: true
+        }));
+        break;
+      case "plan.edited":
+        taskStore.updateLastAssistantMessage((m2) => ({
+          ...m2,
+          planGenerated: event.new_plan_text
+        }));
+        break;
+      case "build.step_pending":
+        taskStore.updateLastAssistantMessage((m2) => ({
+          ...m2,
+          tools: [
+            ...m2.tools || [],
+            {
+              id: event.tool_call_id,
+              name: event.tool_name,
+              status: "pending",
+              detail: event.reasoning || JSON.stringify(event.input).slice(0, 120)
+            }
+          ]
+        }));
+        break;
+      case "build.step_confirmed":
+        taskStore.updateLastAssistantMessage((m2) => ({
+          ...m2,
+          tools: m2.tools?.map(
+            (t2) => t2.id === event.tool_call_id ? { ...t2, status: "running" } : t2
+          )
+        }));
+        break;
+      case "build.step_skipped":
+        taskStore.updateLastAssistantMessage((m2) => ({
+          ...m2,
+          tools: m2.tools?.filter((t2) => t2.id !== event.tool_call_id)
+        }));
+        break;
+      case "build.aborted":
+        taskStore.updateLastAssistantMessage((m2) => ({
+          ...m2,
+          processCollapsed: true
+        }));
+        set({ isProcessing: false });
+        break;
+      case "message.complete":
+        taskStore.updateLastAssistantMessage((m2) => ({
+          ...m2,
+          processCollapsed: true,
+          isStreaming: false
+        }));
+        taskStore.updateTaskSeq(lastSeqRef.current);
+        set({ isProcessing: false });
+        break;
+      case "message.error":
+        if (event.fatal) {
+          taskStore.updateLastAssistantMessage((m2) => ({
+            ...m2,
+            content: m2.content || `**Error:** ${event.error}`,
+            isStreaming: false,
+            processCollapsed: true
+          }));
+          taskStore.updateTaskSeq(lastSeqRef.current);
+          set({ isProcessing: false });
+        }
+        break;
+    }
+  };
+}
+const useChatStore = create$1((set, get) => ({
+  isProcessing: false,
+  currentEditingPlanMsgIdx: null,
+  // ===== SEND =====
+  sendMessage: (text2) => {
+    if (!text2) return;
+    if (get().isProcessing) {
+      useQueueStore.getState().addToQueue(text2);
+      return;
+    }
+    const taskStore = useTaskStore.getState();
+    const task = taskStore.getCurrentTask();
+    if (!task) return;
+    if (!task.sessionId) {
+      taskStore.addMessage({
+        id: genMsgId(),
+        role: "assistant",
+        content: "**Error:** 会话未创建，请重新创建任务",
+        timestamp: Date.now()
+      });
+      return;
+    }
+    const modeStore = useModeStore.getState();
+    const inputMode = modeStore.inputMode;
+    const sceneMode = modeStore.sceneMode;
+    const userMsg = {
+      id: genMsgId(),
+      role: "user",
+      content: text2,
+      timestamp: Date.now()
+    };
+    taskStore.addMessage(userMsg);
+    set({ isProcessing: true });
+    const assistantMsg = {
+      id: genMsgId(),
+      role: "assistant",
+      content: "",
+      thinking: "",
+      tools: [],
+      processCollapsed: false,
+      isStreaming: true,
+      timestamp: Date.now()
+    };
+    taskStore.addMessage(assistantMsg);
+    const lastSeqRef = { current: 0 };
+    const handleEvent = createEventHandler(taskStore, set, lastSeqRef);
+    const settings = useSettingsStore.getState().settings;
+    sendChatMessage({
+      sessionId: task.sessionId,
+      content: text2,
+      mode: inputMode,
+      sceneMode,
+      workspace: settings.workspacePath,
+      model: settings.model,
+      onEvent: handleEvent,
+      onError: (err) => {
+        taskStore.updateLastAssistantMessage((m2) => ({
+          ...m2,
+          content: `**Error:** ${err.message}`,
+          isStreaming: false,
+          processCollapsed: true
+        }));
+        taskStore.updateTaskSeq(lastSeqRef.current);
+        set({ isProcessing: false });
+      },
+      onDone: () => {
+        const queueStore = useQueueStore.getState();
+        if (queueStore.queue.length > 0) {
+          setTimeout(() => {
+            const next = queueStore.shiftQueue();
+            if (next) {
+              useChatStore.getState().sendMessage(next);
+            }
+          }, 300);
+        }
+      }
+    });
+  },
+  // ===== RECONNECT =====
+  reconnect: () => {
+    const taskStore = useTaskStore.getState();
+    const task = taskStore.getCurrentTask();
+    if (!task || task.lastSeq === 0) return;
+    set({ isProcessing: true });
+    const lastSeqRef = { current: task.lastSeq };
+    const handleEvent = createEventHandler(taskStore, set, lastSeqRef);
+    reconnectStream(
+      task.sessionId,
+      task.lastSeq + 1,
+      handleEvent,
+      (err) => {
+        taskStore.updateLastAssistantMessage((m2) => ({
+          ...m2,
+          content: m2.content || `**Reconnect Error:** ${err.message}`,
+          isStreaming: false,
+          processCollapsed: true
+        }));
+        taskStore.updateTaskSeq(lastSeqRef.current);
+        set({ isProcessing: false });
+      },
+      () => {
+        taskStore.updateTaskSeq(lastSeqRef.current);
+      }
+    );
+  },
+  // ===== BUILD MODE =====
+  confirmTool: () => {
+    const taskStore = useTaskStore.getState();
+    const task = taskStore.getCurrentTask();
+    if (!task) return;
+    buildApi.confirm(task.sessionId).catch((err) => {
+      console.error("Build confirm failed:", err);
+    });
+  },
+  skipTool: () => {
+    const taskStore = useTaskStore.getState();
+    const task = taskStore.getCurrentTask();
+    if (!task) return;
+    buildApi.skip(task.sessionId).catch((err) => {
+      console.error("Build skip failed:", err);
+    });
+  },
+  stopTools: () => {
+    const taskStore = useTaskStore.getState();
+    const task = taskStore.getCurrentTask();
+    if (!task) return;
+    buildApi.abort(task.sessionId).catch((err) => {
+      console.error("Build abort failed:", err);
+    });
+  },
+  // ===== PLAN MODE =====
+  selectPlanOption: (_msgIdx, _value) => {
+  },
+  answerPlanQuestion: (_msgIdx, _textAnswer) => {
+  },
+  confirmPlan: () => {
+    const taskStore = useTaskStore.getState();
+    const task = taskStore.getCurrentTask();
+    if (!task) return;
+    taskStore.updateLastAssistantMessage((m2) => ({
+      ...m2,
+      planStatus: "confirmed"
+    }));
+    planApi.confirm(task.sessionId).catch((err) => {
+      console.error("Plan confirm failed:", err);
+      taskStore.updateLastAssistantMessage((m2) => ({
+        ...m2,
+        planStatus: "pending"
+      }));
+    });
+  },
+  editPlan: (msgIdx) => {
+    const taskStore = useTaskStore.getState();
+    const task = taskStore.getCurrentTask();
+    if (!task) return;
+    const msg = task.messages[msgIdx];
+    if (!msg?.planGenerated) return;
+    taskStore.updateLastAssistantMessage((m2) => ({ ...m2, planEditing: true }));
+    set({ currentEditingPlanMsgIdx: msgIdx });
+  },
+  rejectPlan: () => {
+    const taskStore = useTaskStore.getState();
+    const task = taskStore.getCurrentTask();
+    if (!task) return;
+    taskStore.updateLastAssistantMessage((m2) => ({
+      ...m2,
+      planStatus: "rejected",
+      processCollapsed: true
+    }));
+    planApi.reject(task.sessionId).catch((err) => {
+      console.error("Plan reject failed:", err);
+    });
+  },
+  // ===== PLAN EDITOR =====
+  openPlanEditor: (msgIdx, _planText) => {
+    set({ currentEditingPlanMsgIdx: msgIdx });
+  },
+  closePlanEditor: () => {
+    const taskStore = useTaskStore.getState();
+    const idx = get().currentEditingPlanMsgIdx;
+    if (idx != null) {
+      taskStore.updateLastAssistantMessage((m2) => ({ ...m2, planEditing: false }));
+    }
+    set({ currentEditingPlanMsgIdx: null });
+  },
+  savePlanFromEditor: (newText) => {
+    const idx = get().currentEditingPlanMsgIdx;
+    const taskStore = useTaskStore.getState();
+    const task = taskStore.getCurrentTask();
+    if (idx != null) {
+      taskStore.updateLastAssistantMessage((m2) => ({
+        ...m2,
+        planGenerated: newText,
+        planEditing: false
+      }));
+    }
+    set({ currentEditingPlanMsgIdx: null });
+    if (task) {
+      planApi.edit(task.sessionId, newText).catch((err) => {
+        console.error("Plan edit API failed:", err);
+      });
+    }
+  },
+  cancelPlanEdit: () => {
+    get().closePlanEditor();
+  }
+}));
 function ok$1() {
 }
 function unreachable() {
@@ -7769,7 +8222,7 @@ class Schema {
 Schema.prototype.normal = {};
 Schema.prototype.property = {};
 Schema.prototype.space = void 0;
-function merge$1(definitions, space2) {
+function merge(definitions, space2) {
   const property = {};
   const normal = {};
   for (const definition2 of definitions) {
@@ -7864,7 +8317,7 @@ function mark(values, key, value) {
     values[key] = value;
   }
 }
-function create$1(definition2) {
+function create(definition2) {
   const properties = {};
   const normals = {};
   for (const [property, value] of Object.entries(definition2.properties)) {
@@ -7883,7 +8336,7 @@ function create$1(definition2) {
   }
   return new Schema(properties, normals, definition2.space);
 }
-const aria = create$1({
+const aria = create({
   properties: {
     ariaActiveDescendant: null,
     ariaAtomic: booleanish,
@@ -7935,7 +8388,7 @@ const aria = create$1({
     ariaValueText: null,
     role: null
   },
-  transform(_2, property) {
+  transform(_, property) {
     return property === "role" ? property : "aria-" + property.slice(4).toLowerCase();
   }
 });
@@ -7945,7 +8398,7 @@ function caseSensitiveTransform(attributes, attribute) {
 function caseInsensitiveTransform(attributes, property) {
   return caseSensitiveTransform(attributes, property.toLowerCase());
 }
-const html$2 = create$1({
+const html$2 = create({
   attributes: {
     acceptcharset: "accept-charset",
     classname: "class",
@@ -8317,7 +8770,7 @@ const html$2 = create$1({
   space: "html",
   transform: caseInsensitiveTransform
 });
-const svg$1 = create$1({
+const svg$1 = create({
   attributes: {
     accentHeight: "accent-height",
     alignmentBaseline: "alignment-baseline",
@@ -8879,7 +9332,7 @@ const svg$1 = create$1({
   space: "svg",
   transform: caseSensitiveTransform
 });
-const xlink = create$1({
+const xlink = create({
   properties: {
     xLinkActuate: null,
     xLinkArcRole: null,
@@ -8890,20 +9343,20 @@ const xlink = create$1({
     xLinkType: null
   },
   space: "xlink",
-  transform(_2, property) {
+  transform(_, property) {
     return "xlink:" + property.slice(5).toLowerCase();
   }
 });
-const xmlns = create$1({
+const xmlns = create({
   attributes: { xmlnsxlink: "xmlns:xlink" },
   properties: { xmlnsXLink: null, xmlns: null },
   space: "xmlns",
   transform: caseInsensitiveTransform
 });
-const xml = create$1({
+const xml = create({
   properties: { xmlBase: null, xmlLang: null, xmlSpace: null },
   space: "xml",
-  transform(_2, property) {
+  transform(_, property) {
     return "xml:" + property.slice(3).toLowerCase();
   }
 });
@@ -8960,8 +9413,8 @@ function kebab($0) {
 function camelcase($0) {
   return $0.charAt(1).toUpperCase();
 }
-const html$1 = merge$1([aria, html$2, xlink, xmlns, xml], "html");
-const svg = merge$1([aria, svg$1, xlink, xmlns, xml], "svg");
+const html$1 = merge([aria, html$2, xlink, xmlns, xml], "html");
+const svg = merge([aria, svg$1, xlink, xmlns, xml], "svg");
 function stringify(values) {
   return values.join(" ").trim();
 }
@@ -8980,7 +9433,7 @@ var ASTERISK = "*";
 var EMPTY_STRING = "";
 var TYPE_COMMENT = "comment";
 var TYPE_DECLARATION = "declaration";
-function index$2(style, options) {
+function index$1(style, options) {
   if (typeof style !== "string") {
     throw new TypeError("First argument must be a string");
   }
@@ -9097,7 +9550,7 @@ function index$2(style, options) {
 function trim(str) {
   return str ? str.replace(TRIM_REGEX, EMPTY_STRING) : EMPTY_STRING;
 }
-var cjs$1 = index$2;
+var cjs$1 = index$1;
 var __importDefault$1 = commonjsGlobal && commonjsGlobal.__importDefault || function(mod) {
   return mod && mod.__esModule ? mod : { "default": mod };
 };
@@ -9216,12 +9669,12 @@ function stringifyPosition(value) {
   return "";
 }
 function point$1(point2) {
-  return index$1(point2 && point2.line) + ":" + index$1(point2 && point2.column);
+  return index(point2 && point2.line) + ":" + index(point2 && point2.column);
 }
 function position(pos) {
   return point$1(pos && pos.start) + "-" + point$1(pos && pos.end);
 }
-function index$1(value) {
+function index(value) {
   return value && typeof value === "number" ? value : 1;
 }
 class VFileMessage extends Error {
@@ -9497,7 +9950,7 @@ function root$1(state, node2, key) {
   addChildren(props, createChildren(state, node2));
   return state.create(node2, state.Fragment, props, key);
 }
-function text$3(_2, node2) {
+function text$3(_, node2) {
   return node2.value;
 }
 function addNode(state, props, type, node2) {
@@ -9513,9 +9966,9 @@ function addChildren(props, children) {
     }
   }
 }
-function productionCreate(_2, jsx, jsxs) {
+function productionCreate(_, jsx, jsxs) {
   return create2;
-  function create2(_3, type, props, key) {
+  function create2(_2, type, props, key) {
     const isStaticChildren = Array.isArray(props.children);
     const fn = isStaticChildren ? jsxs : jsx;
     return key ? fn(type, props, key) : fn(type, props);
@@ -9834,7 +10287,7 @@ function push(list2, items) {
   }
   return items;
 }
-const hasOwnProperty$1 = {}.hasOwnProperty;
+const hasOwnProperty = {}.hasOwnProperty;
 function combineExtensions(extensions) {
   const all2 = {};
   let index2 = -1;
@@ -9846,13 +10299,13 @@ function combineExtensions(extensions) {
 function syntaxExtension(all2, extension2) {
   let hook;
   for (hook in extension2) {
-    const maybe = hasOwnProperty$1.call(all2, hook) ? all2[hook] : void 0;
+    const maybe = hasOwnProperty.call(all2, hook) ? all2[hook] : void 0;
     const left = maybe || (all2[hook] = {});
     const right = extension2[hook];
     let code2;
     if (right) {
       for (code2 in right) {
-        if (!hasOwnProperty$1.call(left, code2)) left[code2] = [];
+        if (!hasOwnProperty.call(left, code2)) left[code2] = [];
         const value = right[code2];
         constructs(
           // @ts-expect-error Looks like a list.
@@ -13462,7 +13915,7 @@ function createTokenizer(parser, initialize, from) {
   function onsuccessfulconstruct(construct, info) {
     addResult(construct, info.from);
   }
-  function onsuccessfulcheck(_2, info) {
+  function onsuccessfulcheck(_, info) {
     info.restore();
   }
   function constructFactory(onreturn, fields) {
@@ -13771,7 +14224,7 @@ function fromMarkdown(value, encoding, options) {
   return compiler(options)(postprocess(parse(options).document().write(preprocess()(value, encoding, true))));
 }
 function compiler(options) {
-  const config2 = {
+  const config = {
     transforms: [],
     canContainEols: ["emphasis", "fragment", "heading", "paragraph", "strong"],
     enter: {
@@ -13869,7 +14322,7 @@ function compiler(options) {
       thematicBreak: closer()
     }
   };
-  configure(config2, (options || {}).mdastExtensions || []);
+  configure(config, (options || {}).mdastExtensions || []);
   const data = {};
   return compile;
   function compile(events) {
@@ -13880,7 +14333,7 @@ function compiler(options) {
     const context = {
       stack: [tree],
       tokenStack: [],
-      config: config2,
+      config,
       enter,
       exit: exit2,
       buffer,
@@ -13901,7 +14354,7 @@ function compiler(options) {
     }
     index2 = -1;
     while (++index2 < events.length) {
-      const handler = config2[events[index2][0]];
+      const handler = config[events[index2][0]];
       if (own$2.call(handler, events[index2][1].type)) {
         handler[events[index2][1].type].call(Object.assign({
           sliceSerialize: events[index2][2].sliceSerialize
@@ -13926,8 +14379,8 @@ function compiler(options) {
       })
     };
     index2 = -1;
-    while (++index2 < config2.transforms.length) {
-      tree = config2.transforms[index2](tree) || tree;
+    while (++index2 < config.transforms.length) {
+      tree = config.transforms[index2](tree) || tree;
     }
     return tree;
   }
@@ -14033,12 +14486,12 @@ function compiler(options) {
       children: []
     });
   }
-  function enter(node2, token, errorHandler2) {
+  function enter(node2, token, errorHandler) {
     const parent = this.stack[this.stack.length - 1];
     const siblings = parent.children;
     siblings.push(node2);
     this.stack.push(node2);
-    this.tokenStack.push([token, errorHandler2 || void 0]);
+    this.tokenStack.push([token, errorHandler || void 0]);
     node2.position = {
       start: point(token.start),
       // @ts-expect-error: `end` will be patched later.
@@ -14170,7 +14623,7 @@ function compiler(options) {
       this.data.atHardBreak = void 0;
       return;
     }
-    if (!this.data.setextHeadingSlurpLineEnding && config2.canContainEols.includes(context.type)) {
+    if (!this.data.setextHeadingSlurpLineEnding && config.canContainEols.includes(context.type)) {
       onenterdata.call(this, token);
       onexitdata.call(this, token);
     }
@@ -14977,7 +15430,7 @@ const SET = 6;
 const ERROR = 7;
 const BIGINT = 8;
 const env = typeof self === "object" ? self : globalThis;
-const guard = (name2, init2) => {
+const guard = (name2, init) => {
   switch (name2) {
     case "Function":
     case "SharedWorker":
@@ -14987,17 +15440,17 @@ const guard = (name2, init2) => {
     case "setTimeout":
       throw new TypeError("unable to deserialize " + name2);
   }
-  return new env[name2](init2);
+  return new env[name2](init);
 };
-const deserializer = ($2, _2) => {
+const deserializer = ($, _) => {
   const as = (out, index2) => {
-    $2.set(index2, out);
+    $.set(index2, out);
     return out;
   };
   const unpair = (index2) => {
-    if ($2.has(index2))
-      return $2.get(index2);
-    const [type, value] = _2[index2];
+    if ($.has(index2))
+      return $.get(index2);
+    const [type, value] = _[index2];
     switch (type) {
       case PRIMITIVE:
       case VOID:
@@ -15086,15 +15539,15 @@ const typeOf = (value) => {
   return [OBJECT, asString];
 };
 const shouldSkip = ([TYPE, type]) => TYPE === PRIMITIVE && (type === "function" || type === "symbol");
-const serializer = (strict, json, $2, _2) => {
+const serializer = (strict, json, $, _) => {
   const as = (out, value) => {
-    const index2 = _2.push(out) - 1;
-    $2.set(value, index2);
+    const index2 = _.push(out) - 1;
+    $.set(value, index2);
     return index2;
   };
   const pair = (value) => {
-    if ($2.has(value))
-      return $2.get(value);
+    if ($.has(value))
+      return $.get(value);
     let [TYPE, type] = typeOf(value);
     switch (TYPE) {
       case PRIMITIVE: {
@@ -15183,14 +15636,14 @@ const serializer = (strict, json, $2, _2) => {
   return pair;
 };
 const serialize = (value, { json, lossy } = {}) => {
-  const _2 = [];
-  return serializer(!(json || lossy), !!json, /* @__PURE__ */ new Map(), _2)(value), _2;
+  const _ = [];
+  return serializer(!(json || lossy), !!json, /* @__PURE__ */ new Map(), _)(value), _;
 };
 const structuredClone$1 = typeof structuredClone === "function" ? (
   /* c8 ignore start */
   (any, options) => options && ("json" in options || "lossy" in options) ? deserialize(serialize(any, options)) : structuredClone(any)
 ) : (any, options) => deserialize(serialize(any, options));
-function defaultFootnoteBackContent(_2, rereferenceIndex) {
+function defaultFootnoteBackContent(_, rereferenceIndex) {
   const result = [{ type: "text", value: "↩" }];
   if (rereferenceIndex > 1) {
     result.push({
@@ -17357,1245 +17810,1039 @@ function defaultUrlTransform(value) {
   }
   return "";
 }
-async function* parseSSEStream(reader) {
-  const decoder = new TextDecoder();
-  let buffer = "";
-  const accumulatingToolCalls = /* @__PURE__ */ new Map();
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith("data: ")) continue;
-      const data = trimmed.slice(6);
-      if (data === "[DONE]") {
-        yield { content: "", toolCalls: accumulatingToolCalls, done: true };
-        return;
-      }
-      try {
-        const parsed = JSON.parse(data);
-        const choice = parsed.choices?.[0];
-        if (!choice) continue;
-        const delta = choice.delta || {};
-        let content2 = "";
-        if (delta.content) {
-          content2 = delta.content;
-        }
-        if (delta.tool_calls) {
-          for (const tc2 of delta.tool_calls) {
-            const existing = accumulatingToolCalls.get(tc2.index) || {
-              id: tc2.id || "",
-              name: "",
-              arguments: "",
-              complete: false
-            };
-            if (tc2.id) existing.id = tc2.id;
-            if (tc2.function?.name) existing.name = tc2.function.name;
-            if (tc2.function?.arguments) existing.arguments += tc2.function.arguments;
-            accumulatingToolCalls.set(tc2.index, existing);
+function MessageItem({ message, msgIndex }) {
+  const isUser = message.role === "user";
+  const confirmTool = useChatStore((s) => s.confirmTool);
+  const skipTool = useChatStore((s) => s.skipTool);
+  const stopTools = useChatStore((s) => s.stopTools);
+  const selectPlanOption = useChatStore((s) => s.selectPlanOption);
+  const answerPlanQuestion = useChatStore((s) => s.answerPlanQuestion);
+  const confirmPlan = useChatStore((s) => s.confirmPlan);
+  const editPlan = useChatStore((s) => s.editPlan);
+  const rejectPlan = useChatStore((s) => s.rejectPlan);
+  const [selectedPlanValue, setSelectedPlanValue] = reactExports.useState(null);
+  const [planTextAnswer, setPlanTextAnswer] = reactExports.useState("");
+  const [processCollapsed, setProcessCollapsed] = reactExports.useState(message.processCollapsed ?? false);
+  if (isUser) {
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-3 max-w-[740px] self-end flex-row-reverse animate-[msgIn_0.2s_ease-out]", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[30px] h-[30px] rounded-md bg-[#f0fdf4] text-[#047857] flex items-center justify-center text-[13px] font-semibold flex-shrink-0", children: "Z" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-[#ecfdf5] text-[#064e3b] rounded-[14px_14px_4px_14px] py-3 px-4 text-sm leading-relaxed", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Markdown, { children: message.content }) })
+    ] });
+  }
+  const hasThinking = message.thinking || message.tools && message.tools.length > 0;
+  const hasRunning = message.tools?.some((t2) => t2.status === "running");
+  const hasPending = message.tools?.some((t2) => t2.status === "pending");
+  const toolCount = message.tools?.length || 0;
+  const isCollapsed = processCollapsed && !hasPending;
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-3 max-w-[740px] animate-[msgIn_0.2s_ease-out]", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[30px] h-[30px] rounded-md bg-[#f0fdf4] text-[#a7f3d0] flex items-center justify-center text-[15px] font-semibold flex-shrink-0", children: "AI" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-[#e2e8f0] rounded-[14px_14px_14px_4px] py-3 px-4 text-sm leading-relaxed text-[#0f172a] min-w-0 flex-1", children: [
+      message.planGenerated && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `mt-0 -mx-1 mb-3 p-4 rounded-[10px] border border-l-[3px] ${message.planStatus === "confirmed" ? "bg-[#ecfdf5] border-[#a7f3d0] border-l-[#10b981]" : message.planStatus === "rejected" ? "bg-[#fef2f2] border-[#fecaca] border-l-[#ef4444]" : "bg-[#f0fdf4] border-[#a7f3d0] border-l-[#10b981]"}`, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] font-semibold text-[#047857] uppercase tracking-wider mb-2", children: "执行计划" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[13px] text-[#0f172a] leading-relaxed whitespace-pre-wrap mb-3 bg-white p-3 rounded-md border border-[#e2e8f0]", children: message.planGenerated }),
+        message.planStatus === "pending" && (message.planEditing ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex gap-2", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs text-[#0369a1] font-medium flex items-center gap-1.5", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "14", height: "14", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 14h2l8-8-2-2-8 8v2z" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M12 3l2 2" })
+          ] }),
+          "正在右侧面板编辑计划..."
+        ] }) }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 flex-wrap", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => confirmPlan(), className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white border border-[#0f172a] hover:bg-[#334155] transition-colors cursor-pointer", children: "确认计划" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => editPlan(msgIndex), className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-white text-[#64748b] border border-[#e2e8f0] hover:bg-[#f1f5f9] hover:text-[#0f172a] transition-colors cursor-pointer", children: "编辑" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => rejectPlan(), className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-white text-[#b91c1c] border border-[#fecaca] hover:bg-[#fef2f2] transition-colors cursor-pointer", children: "拒绝" })
+        ] })),
+        message.planStatus === "confirmed" && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-[#047857] font-medium", children: "计划已确认，正在自动执行..." }),
+        message.planStatus === "rejected" && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-[#b91c1c] font-medium", children: "计划已取消" })
+      ] }),
+      message.planQuestion && !message.planQuestion.answer && /* @__PURE__ */ jsxRuntimeExports.jsx(
+        PlanQuestionBlock,
+        {
+          question: message.planQuestion,
+          msgIndex,
+          selectedValue: selectedPlanValue,
+          onSelectValue: setSelectedPlanValue,
+          textAnswer: planTextAnswer,
+          onTextAnswer: setPlanTextAnswer,
+          onSelectOption: (msgIdx, val) => selectPlanOption(msgIdx, val),
+          onSubmit: (msgIdx, textAnswer) => {
+            answerPlanQuestion(msgIdx, textAnswer);
+            setSelectedPlanValue(null);
+            setPlanTextAnswer("");
           }
         }
-        yield { content: content2, toolCalls: accumulatingToolCalls, done: false };
-      } catch {
-      }
-    }
-  }
+      ),
+      hasThinking && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `mt-2.5 border border-[#e2e8f0] rounded-md overflow-hidden ${isCollapsed ? "section-collapsed" : ""}`, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "div",
+          {
+            onClick: () => setProcessCollapsed(!processCollapsed),
+            className: "flex items-center gap-2 px-3 py-2 cursor-pointer text-xs font-medium text-[#64748b] bg-[#f8fafc] select-none hover:bg-[#f1f5f9] transition-colors",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `inline-block transition-transform text-[10px] text-[#94a3b8] ${isCollapsed ? "-rotate-90" : ""}`, children: "▼" }),
+              "思考与工具调用",
+              toolCount > 0 ? ` (${toolCount})` : "",
+              hasPending && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[#0369a1] text-[11px] ml-1", children: "等待确认..." }),
+              hasRunning && !hasPending && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[#b45309] text-[11px] ml-1", children: "执行中..." })
+            ]
+          }
+        ),
+        !isCollapsed && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-3.5 py-2.5 text-[13px] text-[#94a3b8] italic leading-relaxed bg-white border-t border-[#f1f5f9] max-h-[500px] overflow-y-auto", children: [
+          message.thinking && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mb-2.5 not-italic text-[#64748b]", children: message.thinking }),
+          message.tools?.map((tool, toolIdx) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start gap-2.5 py-2 border-b border-[#f1f5f9] not-italic text-[#0f172a] last:border-b-0", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-4 h-4 flex-shrink-0 mt-0.5 text-[#94a3b8]", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "8", cy: "8", r: "6" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 5v3l2 2" })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-xs text-[#0f172a]", children: tool.name }),
+              tool.command && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-1 py-1.5 px-2.5 bg-[#1e293b] text-[#a7f3d0] rounded text-[11px] font-mono whitespace-pre-wrap", children: [
+                "$ ",
+                tool.command
+              ] }),
+              tool.detail && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-[#94a3b8] mt-0.5", children: tool.detail }),
+              tool.status === "pending" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-1.5 mt-2 flex-wrap", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => confirmTool(), className: "px-3 py-1 rounded text-[11px] font-medium text-[#047857] border border-[#a7f3d0] bg-[#f0fdf4] hover:bg-[#a7f3d0] transition-colors cursor-pointer", children: "确认" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => skipTool(), className: "px-3 py-1 rounded text-[11px] font-medium text-[#b45309] border border-[#fcd34d] bg-[#fffbeb] hover:bg-[#fde68a] transition-colors cursor-pointer", children: "跳过" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => stopTools(), className: "px-3 py-1 rounded text-[11px] font-medium text-[#b91c1c] border border-[#fecaca] bg-[#fef2f2] hover:bg-[#fecaca] transition-colors cursor-pointer", children: "终止" })
+              ] }),
+              tool.result && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-1 py-1.5 px-2.5 bg-[#f8fafc] rounded text-[11px] font-mono whitespace-pre-wrap max-h-[100px] overflow-y-auto border border-[#f1f5f9]", children: tool.result })
+            ] }),
+            tool.status !== "pending" && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `text-[11px] px-2 py-0.5 rounded-lg font-medium flex-shrink-0 ${tool.status === "running" ? "text-[#b45309] bg-[#fffbeb]" : "text-[#047857] bg-[#ecfdf5]"}`, children: tool.status === "running" ? "执行中..." : "完成" })
+          ] }, tool.id || toolIdx))
+        ] })
+      ] }),
+      message.content && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-1 prose-sm max-w-none text-[#0f172a]", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Markdown, { children: message.content }) }),
+      message.isStreaming && !message.content && !hasThinking && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block w-2 h-4 bg-[#a7f3d0] animate-pulse" })
+    ] })
+  ] });
 }
-async function sendChatMessage(messages, onChunk, onError, onDone) {
-  const settings = useSettingsStore.getState().settings;
-  const url = `${settings.apiBaseUrl}/v1/chat/completions`;
-  const apiMessages = messages.map((m2) => ({
-    role: m2.role,
-    content: m2.content
-  }));
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${settings.apiKey}`
-      },
-      body: JSON.stringify({
-        model: settings.model,
-        messages: apiMessages,
-        stream: true
-      })
-    });
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
-    }
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error("Response body is not readable");
-    for await (const chunk of parseSSEStream(reader)) {
-      if (chunk.done) {
-        onDone();
-        return;
-      }
-      onChunk(chunk);
-    }
-    onDone();
-  } catch (err) {
-    onError(err instanceof Error ? err : new Error(String(err)));
-  }
-}
-let msgId = 1;
-function genMsgId() {
-  return `msg_${Date.now()}_${msgId++}`;
-}
-const TOOL_TYPE_MAP = {
-  glob: "glob",
-  read: "read",
-  grep: "grep",
-  write: "write",
-  edit: "edit"
-};
-const READ_TOOLS = /* @__PURE__ */ new Set(["glob", "read", "grep"]);
-const WRITE_TOOLS = /* @__PURE__ */ new Set(["write", "edit"]);
-async function executeToolCall(tc2, workspacePath) {
-  const { type, args } = tc2;
-  try {
-    switch (type) {
-      case "glob":
-        return JSON.stringify(await ipcClient.file.glob(args.pattern || "**/*"));
-      case "read":
-        return await ipcClient.file.read(args.path || args.filePath || "");
-      case "grep":
-        return JSON.stringify(
-          await ipcClient.file.grep(args.pattern || "", args.path || ".")
-        );
-      case "write":
-        await ipcClient.file.write(args.path || args.filePath || "", args.content || "");
-        return `File written: ${args.path || args.filePath}`;
-      case "edit":
-        await ipcClient.file.edit(
-          args.path || args.filePath || "",
-          args.oldStr || args.old_string || "",
-          args.newStr || args.new_string || ""
-        );
-        return `File edited: ${args.path || args.filePath}`;
-    }
-  } catch (err) {
-    throw new Error(err instanceof Error ? err.message : String(err));
-  }
-}
-const useChatStore = create$2(() => ({
-  isLoading: false,
-  sendMessage: async (content2) => {
-    const convStore = useConversationStore.getState();
-    const conv = convStore.getCurrentConversation();
-    let convId = conv?.id;
-    if (!convId) {
-      convId = convStore.create();
-    }
-    const userMsg = {
-      id: genMsgId(),
-      role: "user",
-      content: content2,
-      timestamp: Date.now()
-    };
-    convStore.addMessage(userMsg);
-    const assistantMsg = {
-      id: genMsgId(),
-      role: "assistant",
-      content: "",
-      isStreaming: true,
-      toolCalls: [],
-      timestamp: Date.now()
-    };
-    convStore.addMessage(assistantMsg);
-    const currentConv = convStore.getCurrentConversation();
-    if (!currentConv) return;
-    useChatStore.setState({ isLoading: true });
-    await sendChatMessage(
-      currentConv.messages.filter((m2) => !m2.isStreaming),
-      (chunk) => {
-        if (chunk.content) {
-          convStore.updateLastAssistantMessage((msg) => ({
-            ...msg,
-            content: msg.content + chunk.content
-          }));
-        }
-        if (chunk.toolCalls.size > 0) {
-          const existingToolCalls = convStore.getCurrentConversation()?.messages.find(
-            (m2) => m2.id === assistantMsg.id
-          )?.toolCalls || [];
-          chunk.toolCalls.forEach((tc2, idx) => {
-            const toolType = TOOL_TYPE_MAP[tc2.name] || "read";
-            const existing = existingToolCalls.find(
-              (et) => et.id === tc2.id || et.id.startsWith(`tool_${idx}`)
-            );
-            if (existing) {
-              existing.args = { ...existing.args, _raw: tc2.arguments };
-            } else if (tc2.name) {
-              let args = { _raw: tc2.arguments };
-              try {
-                const parsed = JSON.parse(tc2.arguments);
-                args = { ...parsed, _raw: tc2.arguments };
-              } catch {
-              }
-              const newTc = {
-                id: tc2.id || `tool_${idx}`,
-                type: toolType,
-                name: tc2.name,
-                args,
-                status: WRITE_TOOLS.has(toolType) ? "confirming" : "pending"
-              };
-              convStore.updateLastAssistantMessage((msg) => ({
-                ...msg,
-                toolCalls: [...msg.toolCalls || [], newTc]
-              }));
-            }
-          });
-          setTimeout(async () => {
-            const updatedConv = convStore.getCurrentConversation();
-            const updatedMsg = updatedConv?.messages.find(
-              (m2) => m2.id === assistantMsg.id
-            );
-            if (!updatedMsg?.toolCalls) return;
-            for (const tc2 of updatedMsg.toolCalls) {
-              if (tc2.status === "pending" && READ_TOOLS.has(tc2.type)) {
-                convStore.updateLastAssistantMessage((msg) => ({
-                  ...msg,
-                  toolCalls: msg.toolCalls?.map(
-                    (t2) => t2.id === tc2.id ? { ...t2, status: "executing" } : t2
-                  )
-                }));
-                try {
-                  const result = await executeToolCall(tc2, "");
-                  convStore.updateLastAssistantMessage((msg) => ({
-                    ...msg,
-                    toolCalls: msg.toolCalls?.map(
-                      (t2) => t2.id === tc2.id ? { ...t2, status: "done", result } : t2
-                    )
-                  }));
-                } catch (err) {
-                  convStore.updateLastAssistantMessage((msg) => ({
-                    ...msg,
-                    toolCalls: msg.toolCalls?.map(
-                      (t2) => t2.id === tc2.id ? {
-                        ...t2,
-                        status: "error",
-                        result: err instanceof Error ? err.message : String(err)
-                      } : t2
-                    )
-                  }));
-                }
-              }
-            }
-          }, 0);
-        }
-      },
-      (err) => {
-        convStore.updateLastAssistantMessage((msg) => ({
-          ...msg,
-          content: msg.content + `
-
-**错误:** ${err.message}`,
-          isStreaming: false
-        }));
-        useChatStore.setState({ isLoading: false });
-      },
-      () => {
-        convStore.updateLastAssistantMessage((msg) => ({
-          ...msg,
-          isStreaming: false
-        }));
-        useChatStore.setState({ isLoading: false });
-      }
-    );
-  },
-  confirmToolCall: async (tcId) => {
-    const convStore = useConversationStore.getState();
-    convStore.updateLastAssistantMessage((msg) => ({
-      ...msg,
-      toolCalls: msg.toolCalls?.map(
-        (t2) => t2.id === tcId ? { ...t2, status: "executing" } : t2
-      )
-    }));
-    const conv = convStore.getCurrentConversation();
-    const lastMsg = conv?.messages[conv.messages.length - 1];
-    const tc2 = lastMsg?.toolCalls?.find((t2) => t2.id === tcId);
-    if (tc2) {
-      try {
-        const result = await executeToolCall(tc2, "");
-        convStore.updateLastAssistantMessage((msg) => ({
-          ...msg,
-          toolCalls: msg.toolCalls?.map(
-            (t2) => t2.id === tcId ? { ...t2, status: "done", result } : t2
-          )
-        }));
-      } catch (err) {
-        convStore.updateLastAssistantMessage((msg) => ({
-          ...msg,
-          toolCalls: msg.toolCalls?.map(
-            (t2) => t2.id === tcId ? {
-              ...t2,
-              status: "error",
-              result: err instanceof Error ? err.message : String(err)
-            } : t2
-          )
-        }));
-      }
-    }
-  },
-  cancelToolCall: (tcId) => {
-    const convStore = useConversationStore.getState();
-    convStore.updateLastAssistantMessage((msg) => ({
-      ...msg,
-      toolCalls: msg.toolCalls?.map(
-        (t2) => t2.id === tcId ? { ...t2, status: "error", result: "User cancelled" } : t2
-      )
-    }));
-  }
-}));
-const STATUS_ICON = {
-  pending: /* @__PURE__ */ jsxRuntimeExports.jsx(Loader2, { size: 14, className: "animate-spin text-gray-400" }),
-  confirming: /* @__PURE__ */ jsxRuntimeExports.jsx(AlertCircle, { size: 14, className: "text-yellow-400" }),
-  executing: /* @__PURE__ */ jsxRuntimeExports.jsx(Loader2, { size: 14, className: "animate-spin text-blue-400" }),
-  done: /* @__PURE__ */ jsxRuntimeExports.jsx(CheckCircle, { size: 14, className: "text-green-400" }),
-  error: /* @__PURE__ */ jsxRuntimeExports.jsx(XCircle, { size: 14, className: "text-red-400" })
-};
-const STATUS_LABEL = {
-  pending: "执行中...",
-  confirming: "等待确认",
-  executing: "执行中...",
-  done: "完成",
-  error: "失败"
-};
-function ToolCallCard({ toolCall }) {
-  const confirm = useChatStore((s) => s.confirmToolCall);
-  const cancel = useChatStore((s) => s.cancelToolCall);
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "my-2 p-3 rounded-lg bg-sidebar-bg border border-sidebar-border", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 mb-2", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx(Wrench, { size: 14, className: "text-accent" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-sm font-medium text-gray-300", children: toolCall.name || toolCall.type }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "flex items-center gap-1 text-xs", children: [
-        STATUS_ICON[toolCall.status],
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-gray-500", children: STATUS_LABEL[toolCall.status] })
-      ] })
-    ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-gray-500 font-mono bg-chat-bg rounded p-2 mb-2 overflow-x-auto", children: formatArgs(toolCall.args) }),
-    toolCall.status === "confirming" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2", children: [
+function PlanQuestionBlock({
+  question,
+  msgIndex,
+  selectedValue,
+  onSelectValue,
+  textAnswer,
+  onTextAnswer,
+  onSelectOption,
+  onSubmit
+}) {
+  const isConfirm = question.input_type === "confirm";
+  const options = isConfirm ? ["是 / 确定", "否 / 取消"] : question.options || [];
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-3 p-4 bg-[#f0f9ff] border border-[#bae6fd] rounded-[10px] border-l-[3px] border-l-[#0ea5e9]", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] font-semibold text-[#0369a1] uppercase tracking-wider mb-1.5", children: "需求澄清" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm font-medium text-[#0f172a] mb-3 leading-relaxed", children: question.question }),
+    question.input_type === "text" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx(
-        "button",
+        "textarea",
         {
-          onClick: () => confirm(toolCall.id),
-          className: "px-3 py-1 text-xs rounded bg-green-600 hover:bg-green-700 text-white transition-colors",
-          children: "是，执行"
+          className: "w-full px-3 py-2 border border-[#bae6fd] rounded-md text-[13px] text-[#0f172a] outline-none resize-y mb-2.5 focus:border-[#0ea5e9] focus:shadow-[0_0_0_3px_rgba(14,165,233,0.15)] transition-colors",
+          placeholder: "输入你的回答...",
+          rows: 2,
+          value: textAnswer,
+          onChange: (e) => onTextAnswer(e.target.value),
+          onKeyDown: (e) => {
+            if (e.key === "Enter" && !e.shiftKey && textAnswer.trim()) {
+              e.preventDefault();
+              onSubmit(msgIndex, textAnswer);
+            }
+          }
         }
       ),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         "button",
         {
-          onClick: () => cancel(toolCall.id),
-          className: "px-3 py-1 text-xs rounded bg-red-600 hover:bg-red-700 text-white transition-colors",
-          children: "否，取消"
+          onClick: () => onSubmit(msgIndex, textAnswer),
+          disabled: !textAnswer.trim(),
+          className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white hover:bg-[#334155] transition-colors border-none cursor-pointer disabled:opacity-40",
+          children: "提交"
         }
       )
-    ] }),
-    toolCall.result && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-gray-400 font-mono bg-chat-bg rounded p-2 mt-2 max-h-32 overflow-y-auto whitespace-pre-wrap", children: toolCall.result })
-  ] });
-}
-function formatArgs(args) {
-  const { _raw, ...rest } = args;
-  if (_raw) return _raw;
-  return JSON.stringify(rest, null, 0);
-}
-function MessageItem({ message }) {
-  const isUser = message.role === "user";
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `flex gap-3 px-4 py-4 ${isUser ? "" : "bg-chat-bg/50"}`, children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsx(
-      "div",
-      {
-        className: `w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${isUser ? "bg-accent" : "bg-sidebar-active"}`,
-        children: isUser ? /* @__PURE__ */ jsxRuntimeExports.jsx(User, { size: 14 }) : /* @__PURE__ */ jsxRuntimeExports.jsx(Bot, { size: 14 })
-      }
-    ),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-gray-500 mb-1", children: isUser ? "你" : "Assistant" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "prose prose-invert prose-sm max-w-none text-gray-200", children: message.content ? /* @__PURE__ */ jsxRuntimeExports.jsx(Markdown, { children: message.content }) : message.isStreaming ? /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block w-2 h-4 bg-accent animate-pulse" }) : null }),
-      message.toolCalls?.map((tc2) => /* @__PURE__ */ jsxRuntimeExports.jsx(ToolCallCard, { toolCall: tc2 }, tc2.id))
+    ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-col gap-1.5 mb-3", children: options.map((opt) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: () => {
+            onSelectValue(opt);
+            onSelectOption(msgIndex, opt);
+          },
+          className: `px-3.5 py-2.5 border border-[#bae6fd] rounded-md text-[13px] text-[#0f172a] cursor-pointer bg-white text-left transition-colors hover:border-[#0ea5e9] hover:bg-[#f0f9ff] ${selectedValue === opt ? "border-[#0ea5e9] bg-[#e0f2fe] text-[#0369a1] font-medium" : ""}`,
+          children: opt
+        },
+        opt
+      )) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: () => onSubmit(msgIndex, selectedValue || void 0),
+          disabled: !selectedValue,
+          className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white hover:bg-[#334155] transition-colors border-none cursor-pointer disabled:opacity-40",
+          children: "提交"
+        }
+      )
     ] })
   ] });
 }
 function MessageList() {
-  const conv = useConversationStore((s) => s.getCurrentConversation());
-  const messages = conv?.messages || [];
+  const task = useTaskStore((s) => s.getCurrentTask());
   const bottomRef = reactExports.useRef(null);
   reactExports.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, messages[messages.length - 1]?.content]);
-  if (messages.length === 0) {
-    return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-1 flex items-center justify-center text-gray-500", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-center", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-4xl mb-3", children: "🤖" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm", children: "开始一段新对话" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs mt-1 text-gray-600", children: "输入 / 使用指令，或直接提问" })
+  }, [task?.messages.length]);
+  const sceneMode = useModeStore((s) => s.sceneMode);
+  const setSceneMode = useModeStore((s) => s.setSceneMode);
+  if (!task || !task.messages || task.messages.length === 0) {
+    return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-1 flex items-center justify-center", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col items-center text-center gap-3", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-14 h-14 rounded-[14px] bg-[#a7f3d0] text-white flex items-center justify-center text-[32px] font-bold", children: "✓" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-[22px] font-semibold text-[#0f172a] tracking-[-0.4px]", children: "iWork，您的AI工作助手" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 flex-wrap justify-center", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "button",
+          {
+            onClick: () => setSceneMode("office"),
+            className: `px-4 py-1.5 rounded-[20px] text-[13px] font-medium transition-colors border cursor-pointer ${sceneMode === "office" ? "bg-[#0f172a] text-white border-[#0f172a]" : "bg-white text-[#64748b] border-[#e2e8f0] hover:border-[#a7f3d0] hover:text-[#a7f3d0] hover:bg-[#f0fdf4]"}`,
+            children: "日常办公"
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "button",
+          {
+            onClick: () => setSceneMode("code"),
+            className: `px-4 py-1.5 rounded-[20px] text-[13px] font-medium transition-colors border cursor-pointer ${sceneMode === "code" ? "bg-[#0f172a] text-white border-[#0f172a]" : "bg-white text-[#64748b] border-[#e2e8f0] hover:border-[#a7f3d0] hover:text-[#a7f3d0] hover:bg-[#f0fdf4]"}`,
+            children: "代码开发"
+          }
+        )
+      ] })
     ] }) });
   }
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 overflow-y-auto", children: [
-    messages.map((msg) => /* @__PURE__ */ jsxRuntimeExports.jsx(MessageItem, { message: msg }, msg.id)),
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 overflow-y-auto flex flex-col gap-5 scroll-smooth min-h-0", children: [
+    task.messages.map((msg, idx) => /* @__PURE__ */ jsxRuntimeExports.jsx(MessageItem, { message: msg, msgIndex: idx }, msg.id)),
     /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: bottomRef })
   ] });
 }
-function _arrayLikeToArray(r2, a) {
-  (null == a || a > r2.length) && (a = r2.length);
-  for (var e = 0, n2 = Array(a); e < a; e++) n2[e] = r2[e];
-  return n2;
-}
-function _arrayWithHoles(r2) {
-  if (Array.isArray(r2)) return r2;
-}
-function _defineProperty$1(e, r2, t2) {
-  return (r2 = _toPropertyKey(r2)) in e ? Object.defineProperty(e, r2, {
-    value: t2,
-    enumerable: true,
-    configurable: true,
-    writable: true
-  }) : e[r2] = t2, e;
-}
-function _iterableToArrayLimit(r2, l2) {
-  var t2 = null == r2 ? null : "undefined" != typeof Symbol && r2[Symbol.iterator] || r2["@@iterator"];
-  if (null != t2) {
-    var e, n2, i, u2, a = [], f2 = true, o = false;
-    try {
-      if (i = (t2 = t2.call(r2)).next, 0 === l2) ;
-      else for (; !(f2 = (e = i.call(t2)).done) && (a.push(e.value), a.length !== l2); f2 = true) ;
-    } catch (r3) {
-      o = true, n2 = r3;
-    } finally {
-      try {
-        if (!f2 && null != t2.return && (u2 = t2.return(), Object(u2) !== u2)) return;
-      } finally {
-        if (o) throw n2;
-      }
-    }
-    return a;
-  }
-}
-function _nonIterableRest() {
-  throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
-}
-function ownKeys$1(e, r2) {
-  var t2 = Object.keys(e);
-  if (Object.getOwnPropertySymbols) {
-    var o = Object.getOwnPropertySymbols(e);
-    r2 && (o = o.filter(function(r3) {
-      return Object.getOwnPropertyDescriptor(e, r3).enumerable;
-    })), t2.push.apply(t2, o);
-  }
-  return t2;
-}
-function _objectSpread2$1(e) {
-  for (var r2 = 1; r2 < arguments.length; r2++) {
-    var t2 = null != arguments[r2] ? arguments[r2] : {};
-    r2 % 2 ? ownKeys$1(Object(t2), true).forEach(function(r3) {
-      _defineProperty$1(e, r3, t2[r3]);
-    }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t2)) : ownKeys$1(Object(t2)).forEach(function(r3) {
-      Object.defineProperty(e, r3, Object.getOwnPropertyDescriptor(t2, r3));
-    });
-  }
-  return e;
-}
-function _objectWithoutProperties(e, t2) {
-  if (null == e) return {};
-  var o, r2, i = _objectWithoutPropertiesLoose(e, t2);
-  if (Object.getOwnPropertySymbols) {
-    var n2 = Object.getOwnPropertySymbols(e);
-    for (r2 = 0; r2 < n2.length; r2++) o = n2[r2], -1 === t2.indexOf(o) && {}.propertyIsEnumerable.call(e, o) && (i[o] = e[o]);
-  }
-  return i;
-}
-function _objectWithoutPropertiesLoose(r2, e) {
-  if (null == r2) return {};
-  var t2 = {};
-  for (var n2 in r2) if ({}.hasOwnProperty.call(r2, n2)) {
-    if (-1 !== e.indexOf(n2)) continue;
-    t2[n2] = r2[n2];
-  }
-  return t2;
-}
-function _slicedToArray(r2, e) {
-  return _arrayWithHoles(r2) || _iterableToArrayLimit(r2, e) || _unsupportedIterableToArray(r2, e) || _nonIterableRest();
-}
-function _toPrimitive(t2, r2) {
-  if ("object" != typeof t2 || !t2) return t2;
-  var e = t2[Symbol.toPrimitive];
-  if (void 0 !== e) {
-    var i = e.call(t2, r2);
-    if ("object" != typeof i) return i;
-    throw new TypeError("@@toPrimitive must return a primitive value.");
-  }
-  return ("string" === r2 ? String : Number)(t2);
-}
-function _toPropertyKey(t2) {
-  var i = _toPrimitive(t2, "string");
-  return "symbol" == typeof i ? i : i + "";
-}
-function _unsupportedIterableToArray(r2, a) {
-  if (r2) {
-    if ("string" == typeof r2) return _arrayLikeToArray(r2, a);
-    var t2 = {}.toString.call(r2).slice(8, -1);
-    return "Object" === t2 && r2.constructor && (t2 = r2.constructor.name), "Map" === t2 || "Set" === t2 ? Array.from(r2) : "Arguments" === t2 || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t2) ? _arrayLikeToArray(r2, a) : void 0;
-  }
-}
-function _defineProperty(obj, key, value) {
-  if (key in obj) {
-    Object.defineProperty(obj, key, {
-      value,
-      enumerable: true,
-      configurable: true,
-      writable: true
-    });
-  } else {
-    obj[key] = value;
-  }
-  return obj;
-}
-function ownKeys(object, enumerableOnly) {
-  var keys2 = Object.keys(object);
-  if (Object.getOwnPropertySymbols) {
-    var symbols = Object.getOwnPropertySymbols(object);
-    if (enumerableOnly) symbols = symbols.filter(function(sym) {
-      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
-    });
-    keys2.push.apply(keys2, symbols);
-  }
-  return keys2;
-}
-function _objectSpread2(target) {
-  for (var i = 1; i < arguments.length; i++) {
-    var source = arguments[i] != null ? arguments[i] : {};
-    if (i % 2) {
-      ownKeys(Object(source), true).forEach(function(key) {
-        _defineProperty(target, key, source[key]);
-      });
-    } else if (Object.getOwnPropertyDescriptors) {
-      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
-    } else {
-      ownKeys(Object(source)).forEach(function(key) {
-        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
-      });
-    }
-  }
-  return target;
-}
-function compose$1() {
-  for (var _len = arguments.length, fns = new Array(_len), _key = 0; _key < _len; _key++) {
-    fns[_key] = arguments[_key];
-  }
-  return function(x2) {
-    return fns.reduceRight(function(y2, f2) {
-      return f2(y2);
-    }, x2);
-  };
-}
-function curry$1(fn) {
-  return function curried() {
-    var _this = this;
-    for (var _len2 = arguments.length, args = new Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
-      args[_key2] = arguments[_key2];
-    }
-    return args.length >= fn.length ? fn.apply(this, args) : function() {
-      for (var _len3 = arguments.length, nextArgs = new Array(_len3), _key3 = 0; _key3 < _len3; _key3++) {
-        nextArgs[_key3] = arguments[_key3];
-      }
-      return curried.apply(_this, [].concat(args, nextArgs));
-    };
-  };
-}
-function isObject$1(value) {
-  return {}.toString.call(value).includes("Object");
-}
-function isEmpty(obj) {
-  return !Object.keys(obj).length;
-}
-function isFunction(value) {
-  return typeof value === "function";
-}
-function hasOwnProperty(object, property) {
-  return Object.prototype.hasOwnProperty.call(object, property);
-}
-function validateChanges(initial, changes) {
-  if (!isObject$1(changes)) errorHandler$1("changeType");
-  if (Object.keys(changes).some(function(field) {
-    return !hasOwnProperty(initial, field);
-  })) errorHandler$1("changeField");
-  return changes;
-}
-function validateSelector(selector) {
-  if (!isFunction(selector)) errorHandler$1("selectorType");
-}
-function validateHandler(handler) {
-  if (!(isFunction(handler) || isObject$1(handler))) errorHandler$1("handlerType");
-  if (isObject$1(handler) && Object.values(handler).some(function(_handler) {
-    return !isFunction(_handler);
-  })) errorHandler$1("handlersType");
-}
-function validateInitial(initial) {
-  if (!initial) errorHandler$1("initialIsRequired");
-  if (!isObject$1(initial)) errorHandler$1("initialType");
-  if (isEmpty(initial)) errorHandler$1("initialContent");
-}
-function throwError$1(errorMessages2, type) {
-  throw new Error(errorMessages2[type] || errorMessages2["default"]);
-}
-var errorMessages$1 = {
-  initialIsRequired: "initial state is required",
-  initialType: "initial state should be an object",
-  initialContent: "initial state shouldn't be an empty object",
-  handlerType: "handler should be an object or a function",
-  handlersType: "all handlers should be a functions",
-  selectorType: "selector should be a function",
-  changeType: "provided value of changes should be an object",
-  changeField: 'it seams you want to change a field in the state which is not specified in the "initial" state',
-  "default": "an unknown error accured in `state-local` package"
-};
-var errorHandler$1 = curry$1(throwError$1)(errorMessages$1);
-var validators$1 = {
-  changes: validateChanges,
-  selector: validateSelector,
-  handler: validateHandler,
-  initial: validateInitial
-};
-function create(initial) {
-  var handler = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : {};
-  validators$1.initial(initial);
-  validators$1.handler(handler);
-  var state = {
-    current: initial
-  };
-  var didUpdate = curry$1(didStateUpdate)(state, handler);
-  var update = curry$1(updateState)(state);
-  var validate = curry$1(validators$1.changes)(initial);
-  var getChanges = curry$1(extractChanges)(state);
-  function getState2() {
-    var selector = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : function(state2) {
-      return state2;
-    };
-    validators$1.selector(selector);
-    return selector(state.current);
-  }
-  function setState2(causedChanges) {
-    compose$1(didUpdate, update, validate, getChanges)(causedChanges);
-  }
-  return [getState2, setState2];
-}
-function extractChanges(state, causedChanges) {
-  return isFunction(causedChanges) ? causedChanges(state.current) : causedChanges;
-}
-function updateState(state, changes) {
-  state.current = _objectSpread2(_objectSpread2({}, state.current), changes);
-  return changes;
-}
-function didStateUpdate(state, handler, changes) {
-  isFunction(handler) ? handler(state.current) : Object.keys(changes).forEach(function(field) {
-    var _handler$field;
-    return (_handler$field = handler[field]) === null || _handler$field === void 0 ? void 0 : _handler$field.call(handler, state.current[field]);
-  });
-  return changes;
-}
-var index = {
-  create
-};
-var config$1 = {
-  paths: {
-    vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.55.1/min/vs"
-  }
-};
-function curry(fn) {
-  return function curried() {
-    var _this = this;
-    for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
-      args[_key] = arguments[_key];
-    }
-    return args.length >= fn.length ? fn.apply(this, args) : function() {
-      for (var _len2 = arguments.length, nextArgs = new Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
-        nextArgs[_key2] = arguments[_key2];
-      }
-      return curried.apply(_this, [].concat(args, nextArgs));
-    };
-  };
-}
-function isObject(value) {
-  return {}.toString.call(value).includes("Object");
-}
-function validateConfig(config2) {
-  if (!config2) errorHandler("configIsRequired");
-  if (!isObject(config2)) errorHandler("configType");
-  if (config2.urls) {
-    informAboutDeprecation();
-    return {
-      paths: {
-        vs: config2.urls.monacoBase
-      }
-    };
-  }
-  return config2;
-}
-function informAboutDeprecation() {
-  console.warn(errorMessages.deprecation);
-}
-function throwError(errorMessages2, type) {
-  throw new Error(errorMessages2[type] || errorMessages2["default"]);
-}
-var errorMessages = {
-  configIsRequired: "the configuration object is required",
-  configType: "the configuration object should be an object",
-  "default": "an unknown error accured in `@monaco-editor/loader` package",
-  deprecation: "Deprecation warning!\n    You are using deprecated way of configuration.\n\n    Instead of using\n      monaco.config({ urls: { monacoBase: '...' } })\n    use\n      monaco.config({ paths: { vs: '...' } })\n\n    For more please check the link https://github.com/suren-atoyan/monaco-loader#config\n  "
-};
-var errorHandler = curry(throwError)(errorMessages);
-var validators = {
-  config: validateConfig
-};
-var compose = function compose2() {
-  for (var _len = arguments.length, fns = new Array(_len), _key = 0; _key < _len; _key++) {
-    fns[_key] = arguments[_key];
-  }
-  return function(x2) {
-    return fns.reduceRight(function(y2, f2) {
-      return f2(y2);
-    }, x2);
-  };
-};
-function merge(target, source) {
-  Object.keys(source).forEach(function(key) {
-    if (source[key] instanceof Object) {
-      if (target[key]) {
-        Object.assign(source[key], merge(target[key], source[key]));
-      }
-    }
-  });
-  return _objectSpread2$1(_objectSpread2$1({}, target), source);
-}
-var CANCELATION_MESSAGE = {
-  type: "cancelation",
-  msg: "operation is manually canceled"
-};
-function makeCancelable(promise) {
-  var hasCanceled_ = false;
-  var wrappedPromise = new Promise(function(resolve, reject) {
-    promise.then(function(val) {
-      return hasCanceled_ ? reject(CANCELATION_MESSAGE) : resolve(val);
-    });
-    promise["catch"](reject);
-  });
-  return wrappedPromise.cancel = function() {
-    return hasCanceled_ = true;
-  }, wrappedPromise;
-}
-var _excluded = ["monaco"];
-var _state$create = index.create({
-  config: config$1,
-  isInitialized: false,
-  resolve: null,
-  reject: null,
-  monaco: null
-}), _state$create2 = _slicedToArray(_state$create, 2), getState = _state$create2[0], setState = _state$create2[1];
-function config(globalConfig) {
-  var _validators$config = validators.config(globalConfig), monaco = _validators$config.monaco, config2 = _objectWithoutProperties(_validators$config, _excluded);
-  setState(function(state) {
-    return {
-      config: merge(state.config, config2),
-      monaco
-    };
-  });
-}
-function init() {
-  var state = getState(function(_ref) {
-    var monaco = _ref.monaco, isInitialized = _ref.isInitialized, resolve = _ref.resolve;
-    return {
-      monaco,
-      isInitialized,
-      resolve
-    };
-  });
-  if (!state.isInitialized) {
-    setState({
-      isInitialized: true
-    });
-    if (state.monaco) {
-      state.resolve(state.monaco);
-      return makeCancelable(wrapperPromise);
-    }
-    if (window.monaco && window.monaco.editor) {
-      storeMonacoInstance(window.monaco);
-      state.resolve(window.monaco);
-      return makeCancelable(wrapperPromise);
-    }
-    compose(injectScripts, getMonacoLoaderScript)(configureLoader);
-  }
-  return makeCancelable(wrapperPromise);
-}
-function injectScripts(script) {
-  return document.body.appendChild(script);
-}
-function createScript(src) {
-  var script = document.createElement("script");
-  return src && (script.src = src), script;
-}
-function getMonacoLoaderScript(configureLoader2) {
-  var state = getState(function(_ref2) {
-    var config2 = _ref2.config, reject = _ref2.reject;
-    return {
-      config: config2,
-      reject
-    };
-  });
-  var loaderScript = createScript("".concat(state.config.paths.vs, "/loader.js"));
-  loaderScript.onload = function() {
-    return configureLoader2();
-  };
-  loaderScript.onerror = state.reject;
-  return loaderScript;
-}
-function configureLoader() {
-  var state = getState(function(_ref3) {
-    var config2 = _ref3.config, resolve = _ref3.resolve, reject = _ref3.reject;
-    return {
-      config: config2,
-      resolve,
-      reject
-    };
-  });
-  var require2 = window.require;
-  require2.config(state.config);
-  require2(["vs/editor/editor.main"], function(loaded) {
-    var monaco = loaded.m || loaded;
-    storeMonacoInstance(monaco);
-    state.resolve(monaco);
-  }, function(error) {
-    state.reject(error);
-  });
-}
-function storeMonacoInstance(monaco) {
-  if (!getState().monaco) {
-    setState({
-      monaco
-    });
-  }
-}
-function __getMonacoInstance() {
-  return getState(function(_ref4) {
-    var monaco = _ref4.monaco;
-    return monaco;
-  });
-}
-var wrapperPromise = new Promise(function(resolve, reject) {
-  return setState({
-    resolve,
-    reject
-  });
-});
-var loader = {
-  config,
-  init,
-  __getMonacoInstance
-};
-var le = { wrapper: { display: "flex", position: "relative", textAlign: "initial" }, fullWidth: { width: "100%" }, hide: { display: "none" } }, v = le;
-var ae = { container: { display: "flex", height: "100%", width: "100%", justifyContent: "center", alignItems: "center" } }, Y = ae;
-function Me({ children: e }) {
-  return React$2.createElement("div", { style: Y.container }, e);
-}
-var Z = Me;
-var $ = Z;
-function Ee({ width: e, height: r2, isEditorReady: n2, loading: t2, _ref: a, className: m2, wrapperProps: E2 }) {
-  return React$2.createElement("section", { style: { ...v.wrapper, width: e, height: r2 }, ...E2 }, !n2 && React$2.createElement($, null, t2), React$2.createElement("div", { ref: a, style: { ...v.fullWidth, ...!n2 && v.hide }, className: m2 }));
-}
-var ee = Ee;
-var H = reactExports.memo(ee);
-function Ce(e) {
-  reactExports.useEffect(e, []);
-}
-var k = Ce;
-function he(e, r2, n2 = true) {
-  let t2 = reactExports.useRef(true);
-  reactExports.useEffect(t2.current || !n2 ? () => {
-    t2.current = false;
-  } : e, r2);
-}
-var l = he;
-function D() {
-}
-function h(e, r2, n2, t2) {
-  return De(e, t2) || be(e, r2, n2, t2);
-}
-function De(e, r2) {
-  return e.editor.getModel(te(e, r2));
-}
-function be(e, r2, n2, t2) {
-  return e.editor.createModel(r2, n2, t2 ? te(e, t2) : void 0);
-}
-function te(e, r2) {
-  return e.Uri.parse(r2);
-}
-function Oe({ original: e, modified: r2, language: n2, originalLanguage: t2, modifiedLanguage: a, originalModelPath: m2, modifiedModelPath: E2, keepCurrentOriginalModel: g = false, keepCurrentModifiedModel: N2 = false, theme: x2 = "light", loading: P2 = "Loading...", options: y2 = {}, height: V2 = "100%", width: z2 = "100%", className: F2, wrapperProps: j = {}, beforeMount: A2 = D, onMount: q2 = D }) {
-  let [M2, O2] = reactExports.useState(false), [T2, s] = reactExports.useState(true), u2 = reactExports.useRef(null), c = reactExports.useRef(null), w2 = reactExports.useRef(null), d = reactExports.useRef(q2), o = reactExports.useRef(A2), b = reactExports.useRef(false);
-  k(() => {
-    let i = loader.init();
-    return i.then((f2) => (c.current = f2) && s(false)).catch((f2) => f2?.type !== "cancelation" && console.error("Monaco initialization: error:", f2)), () => u2.current ? I2() : i.cancel();
-  }), l(() => {
-    if (u2.current && c.current) {
-      let i = u2.current.getOriginalEditor(), f2 = h(c.current, e || "", t2 || n2 || "text", m2 || "");
-      f2 !== i.getModel() && i.setModel(f2);
-    }
-  }, [m2], M2), l(() => {
-    if (u2.current && c.current) {
-      let i = u2.current.getModifiedEditor(), f2 = h(c.current, r2 || "", a || n2 || "text", E2 || "");
-      f2 !== i.getModel() && i.setModel(f2);
-    }
-  }, [E2], M2), l(() => {
-    let i = u2.current.getModifiedEditor();
-    i.getOption(c.current.editor.EditorOption.readOnly) ? i.setValue(r2 || "") : r2 !== i.getValue() && (i.executeEdits("", [{ range: i.getModel().getFullModelRange(), text: r2 || "", forceMoveMarkers: true }]), i.pushUndoStop());
-  }, [r2], M2), l(() => {
-    u2.current?.getModel()?.original.setValue(e || "");
-  }, [e], M2), l(() => {
-    let { original: i, modified: f2 } = u2.current.getModel();
-    c.current.editor.setModelLanguage(i, t2 || n2 || "text"), c.current.editor.setModelLanguage(f2, a || n2 || "text");
-  }, [n2, t2, a], M2), l(() => {
-    c.current?.editor.setTheme(x2);
-  }, [x2], M2), l(() => {
-    u2.current?.updateOptions(y2);
-  }, [y2], M2);
-  let L2 = reactExports.useCallback(() => {
-    if (!c.current) return;
-    o.current(c.current);
-    let i = h(c.current, e || "", t2 || n2 || "text", m2 || ""), f2 = h(c.current, r2 || "", a || n2 || "text", E2 || "");
-    u2.current?.setModel({ original: i, modified: f2 });
-  }, [n2, r2, a, e, t2, m2, E2]), U2 = reactExports.useCallback(() => {
-    !b.current && w2.current && (u2.current = c.current.editor.createDiffEditor(w2.current, { automaticLayout: true, ...y2 }), L2(), c.current?.editor.setTheme(x2), O2(true), b.current = true);
-  }, [y2, x2, L2]);
-  reactExports.useEffect(() => {
-    M2 && d.current(u2.current, c.current);
-  }, [M2]), reactExports.useEffect(() => {
-    !T2 && !M2 && U2();
-  }, [T2, M2, U2]);
-  function I2() {
-    let i = u2.current?.getModel();
-    g || i?.original?.dispose(), N2 || i?.modified?.dispose(), u2.current?.dispose();
-  }
-  return React$2.createElement(H, { width: z2, height: V2, isEditorReady: M2, loading: P2, _ref: w2, className: F2, wrapperProps: j });
-}
-var ie = Oe;
-reactExports.memo(ie);
-function He(e) {
-  let r2 = reactExports.useRef();
-  return reactExports.useEffect(() => {
-    r2.current = e;
-  }, [e]), r2.current;
-}
-var se = He;
-var _ = /* @__PURE__ */ new Map();
-function Ve({ defaultValue: e, defaultLanguage: r2, defaultPath: n2, value: t2, language: a, path: m2, theme: E2 = "light", line: g, loading: N2 = "Loading...", options: x2 = {}, overrideServices: P2 = {}, saveViewState: y2 = true, keepCurrentModel: V2 = false, width: z2 = "100%", height: F2 = "100%", className: j, wrapperProps: A2 = {}, beforeMount: q2 = D, onMount: M2 = D, onChange: O2, onValidate: T2 = D }) {
-  let [s, u2] = reactExports.useState(false), [c, w2] = reactExports.useState(true), d = reactExports.useRef(null), o = reactExports.useRef(null), b = reactExports.useRef(null), L2 = reactExports.useRef(M2), U2 = reactExports.useRef(q2), I2 = reactExports.useRef(), i = reactExports.useRef(t2), f2 = se(m2), Q2 = reactExports.useRef(false), B2 = reactExports.useRef(false);
-  k(() => {
-    let p2 = loader.init();
-    return p2.then((R2) => (d.current = R2) && w2(false)).catch((R2) => R2?.type !== "cancelation" && console.error("Monaco initialization: error:", R2)), () => o.current ? pe2() : p2.cancel();
-  }), l(() => {
-    let p2 = h(d.current, e || t2 || "", r2 || a || "", m2 || n2 || "");
-    p2 !== o.current?.getModel() && (y2 && _.set(f2, o.current?.saveViewState()), o.current?.setModel(p2), y2 && o.current?.restoreViewState(_.get(m2)));
-  }, [m2], s), l(() => {
-    o.current?.updateOptions(x2);
-  }, [x2], s), l(() => {
-    !o.current || t2 === void 0 || (o.current.getOption(d.current.editor.EditorOption.readOnly) ? o.current.setValue(t2) : t2 !== o.current.getValue() && (B2.current = true, o.current.executeEdits("", [{ range: o.current.getModel().getFullModelRange(), text: t2, forceMoveMarkers: true }]), o.current.pushUndoStop(), B2.current = false));
-  }, [t2], s), l(() => {
-    let p2 = o.current?.getModel();
-    p2 && a && d.current?.editor.setModelLanguage(p2, a);
-  }, [a], s), l(() => {
-    g !== void 0 && o.current?.revealLine(g);
-  }, [g], s), l(() => {
-    d.current?.editor.setTheme(E2);
-  }, [E2], s);
-  let X2 = reactExports.useCallback(() => {
-    if (!(!b.current || !d.current) && !Q2.current) {
-      U2.current(d.current);
-      let p2 = m2 || n2, R2 = h(d.current, t2 || e || "", r2 || a || "", p2 || "");
-      o.current = d.current?.editor.create(b.current, { model: R2, automaticLayout: true, ...x2 }, P2), y2 && o.current.restoreViewState(_.get(p2)), d.current.editor.setTheme(E2), g !== void 0 && o.current.revealLine(g), u2(true), Q2.current = true;
-    }
-  }, [e, r2, n2, t2, a, m2, x2, P2, y2, E2, g]);
-  reactExports.useEffect(() => {
-    s && L2.current(o.current, d.current);
-  }, [s]), reactExports.useEffect(() => {
-    !c && !s && X2();
-  }, [c, s, X2]), i.current = t2, reactExports.useEffect(() => {
-    s && O2 && (I2.current?.dispose(), I2.current = o.current?.onDidChangeModelContent((p2) => {
-      B2.current || O2(o.current.getValue(), p2);
-    }));
-  }, [s, O2]), reactExports.useEffect(() => {
-    if (s) {
-      let p2 = d.current.editor.onDidChangeMarkers((R2) => {
-        let G2 = o.current.getModel()?.uri;
-        if (G2 && R2.find((J2) => J2.path === G2.path)) {
-          let J2 = d.current.editor.getModelMarkers({ resource: G2 });
-          T2?.(J2);
-        }
-      });
-      return () => {
-        p2?.dispose();
-      };
-    }
-    return () => {
-    };
-  }, [s, T2]);
-  function pe2() {
-    I2.current?.dispose(), V2 ? y2 && _.set(m2, o.current.saveViewState()) : o.current.getModel()?.dispose(), o.current.dispose();
-  }
-  return React$2.createElement(H, { width: z2, height: F2, isEditorReady: s, loading: N2, _ref: b, className: j, wrapperProps: A2 });
-}
-var fe = Ve;
-var de = reactExports.memo(fe);
-var Ft = de;
-const BUILTIN_COMMANDS = [
-  { id: "explain", trigger: "/explain", label: "解释代码", description: "解释选中的代码" },
-  { id: "fix", trigger: "/fix", label: "修复问题", description: "修复代码中的问题" },
-  { id: "test", trigger: "/test", label: "生成测试", description: "为选中的代码生成测试" },
-  { id: "refactor", trigger: "/refactor", label: "重构代码", description: "重构选中的代码" }
-];
-const useCommandStore = create$2(() => ({
-  commands: BUILTIN_COMMANDS,
-  filter: (search2) => {
-    const q2 = search2.toLowerCase().replace(/^\//, "");
-    if (!q2) return BUILTIN_COMMANDS;
-    return BUILTIN_COMMANDS.filter(
-      (c) => c.trigger.toLowerCase().includes(q2) || c.label.toLowerCase().includes(q2) || c.description.toLowerCase().includes(q2)
-    );
-  }
-}));
+const MODELS = ["deepseek-v4-pro", "Claude Sonnet 4.6", "GPT-4o", "DeepSeek V3"];
+const WORKSPACES = ["/projects/data-report", "/projects/my-app", "/home/user/documents"];
 function ChatInput() {
   const sendMessage = useChatStore((s) => s.sendMessage);
-  const isLoading = useChatStore((s) => s.isLoading);
-  const filterCommands = useCommandStore((s) => s.filter);
-  const editorRef = reactExports.useRef(null);
-  const [showCommands, setShowCommands] = reactExports.useState(false);
-  const [commandList, setCommandList] = reactExports.useState([]);
-  const [selectedCmdIdx, setSelectedCmdIdx] = reactExports.useState(0);
-  const handleMount = (editor) => {
-    editorRef.current = editor;
-    editor.focus();
-  };
-  const getLineText = reactExports.useCallback(() => {
-    if (!editorRef.current) return "";
-    const model = editorRef.current.getModel();
-    if (!model) return "";
-    const position2 = editorRef.current.getPosition();
-    if (!position2) return "";
-    return model.getLineContent(position2.lineNumber);
-  }, []);
-  const insertCommand = reactExports.useCallback(
-    (cmd) => {
-      if (!editorRef.current) return;
-      const model = editorRef.current.getModel();
-      if (!model) return;
-      const position2 = editorRef.current.getPosition();
-      if (!position2) return;
-      const lineContent = model.getLineContent(position2.lineNumber);
-      const beforeCursor = lineContent.slice(0, position2.column);
-      const slashIdx = beforeCursor.lastIndexOf("/");
-      if (slashIdx === -1) return;
-      const before = lineContent.slice(0, slashIdx);
-      const after = lineContent.slice(position2.column);
-      model.setValue(
-        model.getValue().split("\n").map(
-          (l2, i) => i === position2.lineNumber - 1 ? before + cmd.trigger + " " + after : l2
-        ).join("\n")
-      );
-      editorRef.current.setPosition({
-        lineNumber: position2.lineNumber,
-        column: before.length + cmd.trigger.length + 2
-      });
-      setShowCommands(false);
-      editorRef.current.focus();
-    },
-    []
-  );
-  const handleKeyDown = reactExports.useCallback(
-    (e) => {
-      if (showCommands) {
-        if (e.key === "ArrowDown") {
-          e.preventDefault();
-          setSelectedCmdIdx((i) => Math.min(i + 1, commandList.length - 1));
-          return;
-        }
-        if (e.key === "ArrowUp") {
-          e.preventDefault();
-          setSelectedCmdIdx((i) => Math.max(i - 1, 0));
-          return;
-        }
-        if (e.key === "Enter" && commandList[selectedCmdIdx]) {
-          e.preventDefault();
-          insertCommand(commandList[selectedCmdIdx]);
-          return;
-        }
-        if (e.key === "Escape") {
-          setShowCommands(false);
-          return;
-        }
-      }
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
-      }
-    },
-    [showCommands, commandList, selectedCmdIdx]
-  );
+  const isProcessing = useChatStore((s) => s.isProcessing);
+  const inputMode = useModeStore((s) => s.inputMode);
+  const setInputMode = useModeStore((s) => s.setInputMode);
+  const queue = useQueueStore((s) => s.queue);
+  const removeFromQueue = useQueueStore((s) => s.removeFromQueue);
+  const settings = useSettingsStore((s) => s.settings);
+  const saveSettings = useSettingsStore((s) => s.save);
+  const [text2, setText] = reactExports.useState("");
+  const [wsDropdown, setWsDropdown] = reactExports.useState(false);
+  const [mdDropdown, setMdDropdown] = reactExports.useState(false);
+  const [modeDropdown, setModeDropdown] = reactExports.useState(false);
+  const textareaRef = reactExports.useRef(null);
   const handleSend = reactExports.useCallback(() => {
-    if (!editorRef.current || isLoading) return;
-    const text2 = editorRef.current.getValue().trim();
-    if (!text2) return;
-    sendMessage(text2);
-    editorRef.current.setValue("");
-    setShowCommands(false);
-  }, [sendMessage, isLoading]);
-  reactExports.useEffect(() => {
-    if (!editorRef.current) return;
-    const disposable = editorRef.current.onDidChangeCursorPosition(() => {
-      const lineText = getLineText();
-      const model = editorRef.current.getModel();
-      if (!model) return;
-      const pos = editorRef.current.getPosition();
-      if (!pos) return;
-      const beforeCursor = lineText.slice(0, pos.column);
-      const slashIdx = beforeCursor.lastIndexOf("/");
-      const spaceAfterSlash = beforeCursor.indexOf(" ", slashIdx);
-      if (slashIdx !== -1 && (spaceAfterSlash === -1 || spaceAfterSlash > pos.column)) {
-        const query = beforeCursor.slice(slashIdx, pos.column);
-        const results = filterCommands(query);
-        if (results.length > 0) {
-          setCommandList(results);
-          setShowCommands(true);
-          setSelectedCmdIdx(0);
-        } else {
-          setShowCommands(false);
-        }
-      } else {
-        setShowCommands(false);
-      }
-    });
-    return () => disposable.dispose();
-  }, [getLineText, filterCommands]);
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-shrink-0 border-t border-sidebar-border p-3 relative", children: [
-    showCommands && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute bottom-full left-3 right-3 mb-1 bg-sidebar-bg border border-sidebar-border rounded-lg shadow-lg max-h-48 overflow-y-auto z-50", children: commandList.map((cmd, idx) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
-      "button",
-      {
-        onClick: () => insertCommand(cmd),
-        className: `w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between ${idx === selectedCmdIdx ? "bg-sidebar-active text-gray-100" : "text-gray-400 hover:bg-sidebar-hover"}`,
-        children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-accent font-medium", children: cmd.trigger }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "mx-2", children: "—" }),
-            cmd.label
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-gray-600", children: cmd.description })
-        ]
-      },
-      cmd.id
-    )) }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-end gap-2 bg-chat-bg rounded-xl border border-sidebar-border px-4 py-2 focus-within:border-accent transition-colors", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-1 min-h-[40px] max-h-[200px] overflow-y-auto", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
-        Ft,
+    if (!text2.trim() || isProcessing) return;
+    sendMessage(text2.trim());
+    setText("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+  }, [text2, isProcessing, sendMessage]);
+  const handleKeyDown = reactExports.useCallback((e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  }, [handleSend]);
+  const autoResize = (el2) => {
+    el2.style.height = "auto";
+    el2.style.height = Math.min(el2.scrollHeight, 80) + "px";
+  };
+  const closeAllDropdowns = () => {
+    setWsDropdown(false);
+    setMdDropdown(false);
+    setModeDropdown(false);
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `flex-shrink-0 flex flex-col gap-2.5 ${"py-4 px-6 border-t border-[#e2e8f0] bg-white"}`, children: [
+    queue.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-col gap-1.5 max-w-[740px] w-full mx-auto", children: queue.map((qt, i) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 px-3.5 py-2 border border-[#e2e8f0] rounded-md text-[13px] bg-white", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-[#fffbeb] text-[#b45309] flex-shrink-0", children: [
+        "等待中 ",
+        i + 1
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[#64748b]", children: qt.length > 60 ? qt.substring(0, 60) + "..." : qt }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
         {
-          height: "40px",
-          defaultLanguage: "plaintext",
-          theme: "vs-dark",
-          onMount: handleMount,
-          loading: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-gray-500 text-sm px-1", children: "加载编辑器..." }),
-          options: {
-            minimap: { enabled: false },
-            lineNumbers: "off",
-            glyphMargin: false,
-            folding: false,
-            lineDecorationsWidth: 0,
-            lineNumbersMinChars: 0,
-            scrollBeyondLastLine: false,
-            wordWrap: "on",
-            renderLineHighlight: "none",
-            overviewRulerLanes: 0,
-            hideCursorInOverviewRuler: true,
-            overviewRulerBorder: false,
-            scrollbar: { vertical: "hidden", horizontal: "hidden" },
-            fontSize: 14,
-            fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace",
-            padding: { top: 0, bottom: 0 },
-            suggest: { showWords: false, showSnippets: false }
-          },
-          wrapperProps: { onKeyDown: handleKeyDown }
+          onClick: () => removeFromQueue(i),
+          className: "text-[#94a3b8] hover:text-[#ef4444] hover:bg-[#fef2f2] p-0.5 rounded transition-colors bg-transparent border-none cursor-pointer text-sm",
+          children: "×"
         }
-      ) }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex items-center gap-1 text-xs text-gray-500 pb-1 flex-shrink-0", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+      )
+    ] }, i)) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `flex items-center gap-2.5 border border-[#e2e8f0] rounded-[10px] py-2.5 px-4 transition-all bg-white focus-within:border-[#a7f3d0] focus-within:shadow-[0_0_0_3px_rgba(167,243,208,0.3)] ${"max-w-[740px] w-full mx-auto"}`, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "textarea",
+        {
+          ref: textareaRef,
+          value: text2,
+          onChange: (e) => {
+            setText(e.target.value);
+            autoResize(e.target);
+          },
+          onKeyDown: handleKeyDown,
+          placeholder: "输入任务，@引用文件， /调用技能与指令",
+          rows: 1,
+          className: "flex-1 border-none bg-transparent resize-none outline-none text-sm text-[#0f172a] leading-relaxed min-h-[24px] max-h-[80px] overflow-hidden placeholder:text-[#94a3b8]"
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
         "button",
         {
           onClick: handleSend,
-          disabled: isLoading,
-          className: "p-1.5 rounded-lg hover:bg-sidebar-hover text-gray-400 hover:text-gray-200 transition-colors disabled:opacity-50",
-          title: "发送 (Enter)",
-          children: isLoading ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(Send, { size: 16 })
+          disabled: !text2.trim() || isProcessing,
+          className: "bg-transparent border-none cursor-pointer p-1 flex items-center text-[#64748b] disabled:opacity-40 flex-shrink-0",
+          style: { opacity: text2.trim() ? 1 : 0.4, pointerEvents: text2.trim() ? "auto" : "none" },
+          children: isProcessing ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[22px] h-[22px] border-2 border-[#94a3b8] border-t-transparent rounded-full animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "12", y1: "19", x2: "12", y2: "5" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "5 12 12 5 19 12" })
+          ] })
         }
-      ) })
+      )
     ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-3 px-1 mt-2 text-xs text-gray-600", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "flex items-center gap-1", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx(CornerDownLeft, { size: 12 }),
-        " 发送"
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `flex items-center gap-2 ${"max-w-[740px] w-full mx-auto"}`, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "button",
+          {
+            onClick: (e) => {
+              e.stopPropagation();
+              setWsDropdown(!wsDropdown);
+              setMdDropdown(false);
+              setModeDropdown(false);
+            },
+            className: "flex items-center gap-1.5 py-[5px] px-2.5 border border-[#e2e8f0] rounded-md text-xs text-[#64748b] bg-white hover:border-[#cbd5e1] hover:bg-[#f8fafc] transition-colors cursor-pointer",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 5h3l1.5-2h4L12 5h2a1 1 0 011 1v7a1 1 0 01-1 1H3a1 1 0 01-1-1V6a1 1 0 011-1z" }) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[11px] text-[#94a3b8]", children: "工作空间" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-medium text-[#64748b]", children: settings.workspacePath }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4 text-[#94a3b8]", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M5 7l3 3 3-3" }) })
+            ]
+          }
+        ),
+        wsDropdown && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute bottom-full left-0 mb-1.5 bg-white border border-[#e2e8f0] rounded-[10px] shadow-lg min-w-[220px] p-1 z-[100]", children: [
+          WORKSPACES.map((ws) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "div",
+            {
+              onClick: () => {
+                saveSettings({ workspacePath: ws });
+                closeAllDropdowns();
+              },
+              className: `px-3 py-2 rounded-md text-[13px] cursor-pointer flex items-center gap-2 text-[#0f172a] hover:bg-[#f1f5f9] transition-colors ${settings.workspacePath === ws ? "bg-[#f0fdf4] text-[#047857] font-medium" : ""}`,
+              children: [
+                settings.workspacePath === ws && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ml-auto text-[#a7f3d0] font-semibold", children: "✓" }),
+                ws
+              ]
+            },
+            ws
+          )),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "h-px bg-[#e2e8f0] mx-2 my-1" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "div",
+            {
+              onClick: () => {
+                closeAllDropdowns();
+              },
+              className: "px-3 py-2 rounded-md text-[13px] cursor-pointer text-[#0f172a] hover:bg-[#f1f5f9] transition-colors",
+              children: "浏览选择目录..."
+            }
+          )
+        ] })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Shift+Enter 换行" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "/ 调用指令" })
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "button",
+          {
+            onClick: (e) => {
+              e.stopPropagation();
+              setMdDropdown(!mdDropdown);
+              setWsDropdown(false);
+              setModeDropdown(false);
+            },
+            className: "flex items-center gap-1.5 py-[5px] px-2.5 border border-[#e2e8f0] rounded-md text-xs text-[#64748b] bg-white hover:border-[#cbd5e1] hover:bg-[#f8fafc] transition-colors cursor-pointer",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "8", cy: "8", r: "3" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M13.5 8a5.5 5.5 0 00-11 0" })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-medium text-[#64748b]", children: settings.model }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4 text-[#94a3b8]", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M5 7l3 3 3-3" }) })
+            ]
+          }
+        ),
+        mdDropdown && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute bottom-full left-0 mb-1.5 bg-white border border-[#e2e8f0] rounded-[10px] shadow-lg min-w-[200px] p-1 z-[100]", children: MODELS.map((m2) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "div",
+          {
+            onClick: () => {
+              saveSettings({ model: m2 });
+              closeAllDropdowns();
+            },
+            className: `px-3 py-2 rounded-md text-[13px] cursor-pointer flex items-center gap-2 text-[#0f172a] hover:bg-[#f1f5f9] transition-colors ${settings.model === m2 ? "bg-[#f0fdf4] text-[#047857] font-medium" : ""}`,
+            children: [
+              settings.model === m2 && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ml-auto text-[#a7f3d0] font-semibold", children: "✓" }),
+              m2
+            ]
+          },
+          m2
+        )) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "button",
+          {
+            onClick: (e) => {
+              e.stopPropagation();
+              setModeDropdown(!modeDropdown);
+              setWsDropdown(false);
+              setMdDropdown(false);
+            },
+            className: "flex items-center gap-1 py-[5px] px-2.5 border border-[#e2e8f0] rounded-md text-xs text-[#64748b] bg-white hover:border-[#cbd5e1] hover:bg-[#f8fafc] transition-colors cursor-pointer",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-medium", children: inputMode === "build" ? "Build" : inputMode === "plan" ? "Plan" : "Ask" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4 text-[#94a3b8]", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M5 7l3 3 3-3" }) })
+            ]
+          }
+        ),
+        modeDropdown && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute bottom-full left-0 mb-1.5 bg-white border border-[#e2e8f0] rounded-[10px] shadow-lg min-w-[120px] p-1 z-[100]", children: ["build", "plan", "ask"].map((m2) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "div",
+          {
+            onClick: () => {
+              setInputMode(m2);
+              closeAllDropdowns();
+            },
+            className: `px-3 py-2 rounded-md text-[13px] cursor-pointer flex items-center gap-2 text-[#0f172a] hover:bg-[#f1f5f9] transition-colors ${inputMode === m2 ? "bg-[#f0fdf4] text-[#047857] font-medium" : ""}`,
+            children: [
+              inputMode === m2 && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ml-auto text-[#a7f3d0] font-semibold", children: "✓" }),
+              m2 === "build" ? "Build" : m2 === "plan" ? "Plan" : "Ask"
+            ]
+          },
+          m2
+        )) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ml-auto text-[11px] text-[#94a3b8]", children: isProcessing ? "AI 正在处理中..." : "Enter 发送 · Shift+Enter 换行" })
     ] })
   ] });
 }
 function ChatPanel() {
-  const conv = useConversationStore((s) => s.getCurrentConversation());
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "h-full flex flex-col", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 px-4 py-3 border-b border-sidebar-border", children: /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-sm font-medium text-gray-300 truncate", children: conv?.title || "Agent Desktop" }) }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx(MessageList, {}),
+  const task = useTaskStore((s) => s.getCurrentTask());
+  const isProcessing = useChatStore((s) => s.isProcessing);
+  const hasMessages = task && task.messages && task.messages.length > 0;
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `flex-1 flex flex-col min-h-0 overflow-hidden ${hasMessages ? "" : "justify-center"}`, children: [
+    hasMessages && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-shrink-0 flex items-center px-5 py-3 gap-2 border-b border-[#e2e8f0] bg-white rounded-t-[14px]", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[13px] font-medium text-[#0f172a] truncate flex-1", children: task?.title || "iWork" }),
+      isProcessing && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-[11px] text-[#f59e0b] font-medium flex items-center gap-1", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block w-2 h-2 rounded-full bg-[#f59e0b] animate-pulse" }),
+        "处理中..."
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `flex flex-col flex-1 min-h-0 overflow-hidden ${hasMessages ? "" : "justify-center"}`, children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `flex flex-col ${hasMessages ? "flex-1 min-h-0" : ""} max-w-[768px] w-full mx-auto px-6 gap-4`, children: /* @__PURE__ */ jsxRuntimeExports.jsx(MessageList, {}) }) }),
     /* @__PURE__ */ jsxRuntimeExports.jsx(ChatInput, {})
   ] });
 }
-function AppLayout() {
-  const [sidebarWidth, setSidebarWidth] = reactExports.useState(320);
-  const [dragging, setDragging] = reactExports.useState(false);
-  const handleMouseDown = reactExports.useCallback(() => {
-    setDragging(true);
-  }, []);
-  const handleMouseMove = reactExports.useCallback(
-    (e) => {
-      if (!dragging) return;
-      const newWidth = Math.max(240, Math.min(500, e.clientX));
-      setSidebarWidth(newWidth);
-    },
-    [dragging]
+function PlanEditorPanel() {
+  const currentEditingPlanMsgIdx = useChatStore((s) => s.currentEditingPlanMsgIdx);
+  const savePlanFromEditor = useChatStore((s) => s.savePlanFromEditor);
+  const closePlanEditor = useChatStore((s) => s.closePlanEditor);
+  const task = useTaskStore((s) => s.getCurrentTask());
+  const [text2, setText] = reactExports.useState("");
+  const textareaRef = reactExports.useRef(null);
+  const isOpen = currentEditingPlanMsgIdx != null;
+  reactExports.useEffect(() => {
+    if (isOpen && currentEditingPlanMsgIdx != null && task) {
+      const msg = task.messages[currentEditingPlanMsgIdx];
+      if (msg?.planGenerated) {
+        setText(msg.planGenerated);
+      }
+    }
+  }, [isOpen, currentEditingPlanMsgIdx]);
+  reactExports.useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          textareaRef.current.setSelectionRange(textareaRef.current.value.length, textareaRef.current.value.length);
+        }
+      }, 350);
+    }
+  }, [isOpen]);
+  if (!isOpen) return null;
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-[420px] min-w-[320px] bg-white ml-0 mr-2 my-2 rounded-[14px] border border-[#e2e8f0] shadow-lg flex flex-col transition-all", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2.5 px-5 py-4 border-b border-[#e2e8f0] flex-shrink-0", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "flex-1 text-[15px] font-semibold text-[#0f172a] tracking-[-0.2px]", children: "编辑计划" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: closePlanEditor,
+          className: "w-7 h-7 rounded-md border border-[#e2e8f0] bg-white cursor-pointer text-sm flex items-center justify-center text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#0f172a] transition-colors",
+          title: "关闭",
+          children: "×"
+        }
+      )
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-1 flex flex-col gap-3 p-4 overflow-y-auto", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+      "textarea",
+      {
+        ref: textareaRef,
+        className: "flex-1 min-h-[200px] w-full px-3.5 py-3 border border-[#e2e8f0] rounded-md text-[13px] text-[#0f172a] resize-none outline-none leading-relaxed focus:border-[#a7f3d0] focus:shadow-[0_0_0_3px_rgba(167,243,208,0.15)] transition-colors",
+        placeholder: "在此编辑执行计划...",
+        value: text2,
+        onChange: (e) => setText(e.target.value)
+      }
+    ) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-end gap-2 px-5 py-3 border-t border-[#e2e8f0] flex-shrink-0", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: closePlanEditor,
+          className: "px-5 py-2 rounded-md text-[13px] font-medium bg-white text-[#64748b] border border-[#e2e8f0] hover:bg-[#f1f5f9] hover:text-[#0f172a] transition-colors cursor-pointer",
+          children: "取消"
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: () => {
+            if (text2.trim()) {
+              savePlanFromEditor(text2.trim());
+            }
+          },
+          disabled: !text2.trim(),
+          className: "px-5 py-2 rounded-md text-[13px] font-medium bg-[#0f172a] text-white border border-[#0f172a] hover:bg-[#334155] transition-colors cursor-pointer disabled:opacity-40",
+          children: "保存修改"
+        }
+      )
+    ] })
+  ] });
+}
+const HUB_SKILLS = [
+  { id: "h1", name: "GitHub 集成", desc: "管理 Issues、PR、仓库操作", icon: "🐙", category: "开发" },
+  { id: "h2", name: "Slack 通知", desc: "发送消息、管理频道通知", icon: "💬", category: "协作" },
+  { id: "h3", name: "PDF 解析器", desc: "解析和提取 PDF 内容", icon: "📕", category: "文档" },
+  { id: "h4", name: "图片生成", desc: "通过 AI 生成和编辑图片", icon: "🎨", category: "创作" },
+  { id: "h5", name: "邮件助手", desc: "自动读取、分类和回复邮件", icon: "📧", category: "办公" },
+  { id: "h6", name: "数据可视化", desc: "生成图表和数据分析报告", icon: "📊", category: "数据" },
+  { id: "h7", name: "API 测试", desc: "REST API 自动化测试工具", icon: "🧪", category: "开发" },
+  { id: "h8", name: "翻译助手", desc: "多语言实时翻译", icon: "🌍", category: "办公" }
+];
+const MCP_HUB = [
+  { id: "mh1", name: "GitHub MCP", desc: "管理 Issues、PR、仓库操作", icon: "🐙", category: "开发" },
+  { id: "mh2", name: "Slack MCP", desc: "发送消息、管理频道通知", icon: "💬", category: "协作" },
+  { id: "mh3", name: "PostgreSQL MCP", desc: "数据库查询和管理", icon: "🗄️", category: "数据" },
+  { id: "mh4", name: "Filesystem MCP", desc: "安全文件系统访问", icon: "📁", category: "文件" },
+  { id: "mh5", name: "Redis MCP", desc: "缓存管理和数据操作", icon: "🔴", category: "数据" },
+  { id: "mh6", name: "Docker MCP", desc: "容器管理和部署操作", icon: "🐳", category: "运维" },
+  { id: "mh7", name: "Jira MCP", desc: "任务跟踪和项目管理", icon: "📋", category: "协作" },
+  { id: "mh8", name: "Notion MCP", desc: "文档和知识库管理", icon: "📝", category: "办公" }
+];
+let memId = 10;
+let ruleId = 10;
+const useConfigStore = create$1((set) => ({
+  hubSkills: HUB_SKILLS,
+  installedSkillIds: ["h1", "h3", "h8"],
+  customSkills: [
+    { id: "c1", name: "自定义日志分析", desc: "解析应用日志并生成报告", icon: "📋", source: "create", time: "1周前" },
+    { id: "c2", name: "数据库备份脚本", desc: "定时备份 PostgreSQL 数据库", icon: "💾", source: "upload", fileName: "db-backup.skill", time: "2周前" }
+  ],
+  mcpHub: MCP_HUB,
+  installedMcpIds: ["mh1", "mh3", "mh4"],
+  customMcps: [
+    { id: "cm1", name: "内部 API MCP", desc: "公司内部 API 接口调用", icon: "🔌", source: "create", time: "3天前" }
+  ],
+  memoryItems: [
+    { id: "m1", text: "用户偏好简洁回复，不要冗余解释", time: "3天前" },
+    { id: "m2", text: "项目使用 TypeScript + React + Tailwind CSS 技术栈", time: "1周前" },
+    { id: "m3", text: "用户是高级前端工程师，熟悉 React 生态", time: "2周前" }
+  ],
+  rulesItems: [
+    { id: "r1", text: "所有 API 调用需要统一的错误处理", time: "1周前" },
+    { id: "r2", text: "组件命名使用 PascalCase，文件与组件同名", time: "2周前" }
+  ],
+  // Skills
+  installSkill: (id2) => set((s) => ({
+    installedSkillIds: s.installedSkillIds.includes(id2) ? s.installedSkillIds : [...s.installedSkillIds, id2]
+  })),
+  uninstallSkill: (id2) => set((s) => ({
+    installedSkillIds: s.installedSkillIds.filter((x2) => x2 !== id2)
+  })),
+  addCustomSkill: (skill) => set((s) => ({ customSkills: [skill, ...s.customSkills] })),
+  deleteCustomSkill: (id2) => set((s) => ({ customSkills: s.customSkills.filter((x2) => x2.id !== id2) })),
+  // MCP
+  installMcp: (id2) => set((s) => ({
+    installedMcpIds: s.installedMcpIds.includes(id2) ? s.installedMcpIds : [...s.installedMcpIds, id2]
+  })),
+  uninstallMcp: (id2) => set((s) => ({
+    installedMcpIds: s.installedMcpIds.filter((x2) => x2 !== id2)
+  })),
+  addCustomMcp: (mcp) => set((s) => ({ customMcps: [mcp, ...s.customMcps] })),
+  deleteCustomMcp: (id2) => set((s) => ({ customMcps: s.customMcps.filter((x2) => x2.id !== id2) })),
+  // Memory
+  addMemory: (text2) => set((s) => ({
+    memoryItems: [{ id: `m${memId++}`, text: text2, time: "刚才" }, ...s.memoryItems]
+  })),
+  updateMemory: (id2, text2) => set((s) => ({
+    memoryItems: s.memoryItems.map((m2) => m2.id === id2 ? { ...m2, text: text2 } : m2)
+  })),
+  deleteMemory: (id2) => set((s) => ({
+    memoryItems: s.memoryItems.filter((m2) => m2.id !== id2)
+  })),
+  // Rules
+  addRule: (text2) => set((s) => ({
+    rulesItems: [{ id: `r${ruleId++}`, text: text2, time: "刚才" }, ...s.rulesItems]
+  })),
+  updateRule: (id2, text2) => set((s) => ({
+    rulesItems: s.rulesItems.map((r2) => r2.id === id2 ? { ...r2, text: text2 } : r2)
+  })),
+  deleteRule: (id2) => set((s) => ({
+    rulesItems: s.rulesItems.filter((r2) => r2.id !== id2)
+  }))
+}));
+function SkillsConfig() {
+  const [tab2, setTab] = reactExports.useState("hub");
+  const [search2, setSearch] = reactExports.useState("");
+  const {
+    hubSkills,
+    installedSkillIds,
+    customSkills,
+    installSkill,
+    uninstallSkill,
+    addCustomSkill,
+    deleteCustomSkill
+  } = useConfigStore();
+  const filtered = hubSkills.filter(
+    (s) => !search2 || s.name.toLowerCase().includes(search2.toLowerCase()) || s.desc.toLowerCase().includes(search2.toLowerCase()) || s.category.toLowerCase().includes(search2.toLowerCase())
   );
-  const handleMouseUp = reactExports.useCallback(() => {
-    setDragging(false);
-  }, []);
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs(
-    "div",
-    {
-      className: "flex h-screen select-none",
-      onMouseMove: handleMouseMove,
-      onMouseUp: handleMouseUp,
-      children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { width: sidebarWidth }, className: "flex-shrink-0", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Sidebar, {}) }),
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 mb-5", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex gap-0.5 bg-[#f1f5f9] rounded-md p-0.5", children: ["hub", "installed", "custom"].map((t2) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: () => setTab(t2),
+          className: `px-[18px] py-[7px] rounded-[5px] text-[13px] font-medium transition-colors ${tab2 === t2 ? "bg-white text-[#0f172a] shadow-sm" : "text-[#64748b] hover:text-[#0f172a] bg-transparent border-none cursor-pointer"}`,
+          children: t2 === "hub" ? "Hub" : t2 === "installed" ? "已安装" : "自己添加"
+        },
+        t2
+      )) }),
+      tab2 === "hub" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative ml-auto", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#94a3b8]", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "7", cy: "7", r: "4.5" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "10.5", y1: "10.5", x2: "14", y2: "14" })
+        ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "div",
+          "input",
           {
-            className: "w-1 cursor-col-resize hover:bg-accent bg-transparent transition-colors flex-shrink-0",
-            onMouseDown: handleMouseDown
+            className: "w-[200px] py-[6px] px-2.5 pl-[30px] border border-[#e2e8f0] rounded-md text-[13px] bg-white outline-none focus:border-[#a7f3d0]",
+            placeholder: "搜索 Skill...",
+            value: search2,
+            onChange: (e) => setSearch(e.target.value)
+          }
+        )
+      ] })
+    ] }),
+    tab2 === "hub" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5", children: [
+      filtered.map((s) => {
+        const installed = installedSkillIds.includes(s.id);
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5 hover:border-[#cbd5e1] hover:shadow-sm transition-all", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg", children: s.icon }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.name }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.desc }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 bg-[#f0fdf4] text-[#047857]", children: s.category })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 self-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              onClick: () => installed ? uninstallSkill(s.id) : installSkill(s.id),
+              className: `px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors border cursor-pointer ${installed ? "border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9]" : "border-[#a7f3d0] text-[#047857] bg-[#f0fdf4] hover:bg-[#a7f3d0]"}`,
+              children: installed ? "已安装" : "安装"
+            }
+          ) })
+        ] }, s.id);
+      }),
+      filtered.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#94a3b8] text-[13px] py-3", children: "未找到匹配的 Skill" })
+    ] }),
+    tab2 === "installed" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] font-semibold text-[#94a3b8] uppercase tracking-wider mb-2", children: "Hub 已安装" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5 mb-5", children: [
+        hubSkills.filter((s) => installedSkillIds.includes(s.id)).map((s) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-l-[3px] border-l-[#a7f3d0] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg", children: s.icon }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.name }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.desc }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 bg-[#f0fdf4] text-[#047857]", children: s.category })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 self-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => uninstallSkill(s.id), className: "px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9] cursor-pointer", children: "卸载" }) })
+        ] }, s.id)),
+        hubSkills.filter((s) => installedSkillIds.includes(s.id)).length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#94a3b8] text-[13px] py-3", children: "暂无已安装的 Hub Skill" })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] font-semibold text-[#94a3b8] uppercase tracking-wider mb-2", children: "内置 Skills" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5", children: [
+        { id: "s1", name: "文件操作", desc: "读取、写入、搜索本地文件", icon: "📄" },
+        { id: "s2", name: "Shell 执行", desc: "执行命令行指令和脚本", icon: "⚡" },
+        { id: "s3", name: "浏览器操控", desc: "自动打开浏览器执行网页操作", icon: "🌐" },
+        { id: "s4", name: "代码分析", desc: "分析代码结构、依赖和潜在问题", icon: "🔍" },
+        { id: "s5", name: "文档生成", desc: "自动生成 README、API 文档等", icon: "📝" }
+      ].map((s) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-l-[3px] border-l-[#a7f3d0] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg", children: s.icon }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.name }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.desc }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 bg-[#f0fdf4] text-[#047857]", children: "内置" })
+        ] })
+      ] }, s.id)) })
+    ] }),
+    tab2 === "custom" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 mb-5", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "button",
+          {
+            onClick: () => {
+              const name2 = prompt("输入 Skill 名称:");
+              if (name2) addCustomSkill({ id: "c" + Date.now(), name: name2, desc: "自定义创建的 Skill", icon: "✨", source: "create", time: "刚才" });
+            },
+            className: "flex items-center gap-1.5 px-4 py-2 border border-dashed border-[#e2e8f0] rounded-md text-[13px] text-[#64748b] hover:border-[#a7f3d0] hover:text-[#047857] hover:bg-[#f0fdf4] transition-colors cursor-pointer bg-white",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 10V2M4 6l4-4 4 4" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 12v2h12v-2" })
+              ] }),
+              "上传 Skill"
+            ]
           }
         ),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-1 min-w-0", children: /* @__PURE__ */ jsxRuntimeExports.jsx(ChatPanel, {}) })
-      ]
-    }
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "button",
+          {
+            onClick: () => {
+              const name2 = prompt("输入 Skill 名称:");
+              if (name2) addCustomSkill({ id: "c" + Date.now(), name: name2, desc: "自定义创建的 Skill", icon: "✨", source: "create", time: "刚才" });
+            },
+            className: "flex items-center gap-1.5 px-4 py-2 border border-dashed border-[#e2e8f0] rounded-md text-[13px] text-[#64748b] hover:border-[#a7f3d0] hover:text-[#047857] hover:bg-[#f0fdf4] transition-colors cursor-pointer bg-white",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 3v10M3 8h10" }) }),
+              "自己创建"
+            ]
+          }
+        )
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5", children: [
+        customSkills.map((s) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-l-[3px] border-l-[#a7f3d0] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg", children: s.icon }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.name }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.desc }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 ${s.source === "create" ? "bg-[#f0fdf4] text-[#047857]" : "bg-[#fffbeb] text-[#b45309]"}`, children: s.source === "create" ? "自建" : `上传 · ${s.fileName || ""}` })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 self-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => deleteCustomSkill(s.id), className: "px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9] cursor-pointer", children: "删除" }) })
+        ] }, s.id)),
+        customSkills.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#94a3b8] text-[13px] py-3", children: "暂无自定义 Skill，点击上方按钮添加" })
+      ] })
+    ] })
+  ] });
+}
+function McpConfig() {
+  const [tab2, setTab] = reactExports.useState("hub");
+  const [search2, setSearch] = reactExports.useState("");
+  const {
+    mcpHub,
+    installedMcpIds,
+    customMcps,
+    installMcp,
+    uninstallMcp,
+    addCustomMcp,
+    deleteCustomMcp
+  } = useConfigStore();
+  const filtered = mcpHub.filter(
+    (s) => !search2 || s.name.toLowerCase().includes(search2.toLowerCase()) || s.desc.toLowerCase().includes(search2.toLowerCase()) || s.category.toLowerCase().includes(search2.toLowerCase())
   );
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 mb-5", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex gap-0.5 bg-[#f1f5f9] rounded-md p-0.5", children: ["hub", "installed", "custom"].map((t2) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: () => setTab(t2),
+          className: `px-[18px] py-[7px] rounded-[5px] text-[13px] font-medium transition-colors ${tab2 === t2 ? "bg-white text-[#0f172a] shadow-sm" : "text-[#64748b] hover:text-[#0f172a] bg-transparent border-none cursor-pointer"}`,
+          children: t2 === "hub" ? "Hub" : t2 === "installed" ? "已安装" : "自己添加"
+        },
+        t2
+      )) }),
+      tab2 === "hub" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative ml-auto", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#94a3b8]", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "7", cy: "7", r: "4.5" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "10.5", y1: "10.5", x2: "14", y2: "14" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "input",
+          {
+            className: "w-[200px] py-[6px] px-2.5 pl-[30px] border border-[#e2e8f0] rounded-md text-[13px] bg-white outline-none focus:border-[#a7f3d0]",
+            placeholder: "搜索 MCP...",
+            value: search2,
+            onChange: (e) => setSearch(e.target.value)
+          }
+        )
+      ] })
+    ] }),
+    tab2 === "hub" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5", children: [
+      filtered.map((s) => {
+        const installed = installedMcpIds.includes(s.id);
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5 hover:border-[#cbd5e1] hover:shadow-sm transition-all", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg", children: s.icon }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.name }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.desc }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 bg-[#fffbeb] text-[#b45309]", children: s.category })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 self-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              onClick: () => installed ? uninstallMcp(s.id) : installMcp(s.id),
+              className: `px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors border cursor-pointer ${installed ? "border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9]" : "border-[#a7f3d0] text-[#047857] bg-[#f0fdf4] hover:bg-[#a7f3d0]"}`,
+              children: installed ? "已安装" : "安装"
+            }
+          ) })
+        ] }, s.id);
+      }),
+      filtered.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#94a3b8] text-[13px] py-3", children: "未找到匹配的 MCP" })
+    ] }),
+    tab2 === "installed" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] font-semibold text-[#94a3b8] uppercase tracking-wider mb-2", children: "Hub 已安装" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5", children: [
+        mcpHub.filter((s) => installedMcpIds.includes(s.id)).map((s) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-l-[3px] border-l-[#a7f3d0] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg", children: s.icon }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.name }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.desc }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 bg-[#fffbeb] text-[#b45309]", children: s.category })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 self-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => uninstallMcp(s.id), className: "px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9] cursor-pointer", children: "卸载" }) })
+        ] }, s.id)),
+        mcpHub.filter((s) => installedMcpIds.includes(s.id)).length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#94a3b8] text-[13px] py-3", children: "暂无已安装的 Hub MCP" })
+      ] })
+    ] }),
+    tab2 === "custom" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 mb-5", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "button",
+          {
+            onClick: () => {
+              const name2 = prompt("输入 MCP 名称:");
+              if (name2) addCustomMcp({ id: "cm" + Date.now(), name: name2, desc: "自定义创建的 MCP", icon: "🔧", source: "create", time: "刚才" });
+            },
+            className: "flex items-center gap-1.5 px-4 py-2 border border-dashed border-[#e2e8f0] rounded-md text-[13px] text-[#64748b] hover:border-[#a7f3d0] hover:text-[#047857] hover:bg-[#f0fdf4] transition-colors cursor-pointer bg-white",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 10V2M4 6l4-4 4 4" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 12v2h12v-2" })
+              ] }),
+              "上传 MCP"
+            ]
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "button",
+          {
+            onClick: () => {
+              const name2 = prompt("输入 MCP 名称:");
+              if (name2) addCustomMcp({ id: "cm" + Date.now(), name: name2, desc: "自定义创建的 MCP", icon: "🔧", source: "create", time: "刚才" });
+            },
+            className: "flex items-center gap-1.5 px-4 py-2 border border-dashed border-[#e2e8f0] rounded-md text-[13px] text-[#64748b] hover:border-[#a7f3d0] hover:text-[#047857] hover:bg-[#f0fdf4] transition-colors cursor-pointer bg-white",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 3v10M3 8h10" }) }),
+              "自己创建"
+            ]
+          }
+        )
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5", children: [
+        customMcps.map((s) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-l-[3px] border-l-[#a7f3d0] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg", children: s.icon }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.name }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.desc }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 ${s.source === "create" ? "bg-[#f0fdf4] text-[#047857]" : "bg-[#fffbeb] text-[#b45309]"}`, children: s.source === "create" ? "自建" : `上传 · ${s.fileName || ""}` })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 self-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => deleteCustomMcp(s.id), className: "px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9] cursor-pointer", children: "删除" }) })
+        ] }, s.id)),
+        customMcps.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#94a3b8] text-[13px] py-3", children: "暂无自定义 MCP，点击上方按钮添加" })
+      ] })
+    ] })
+  ] });
+}
+function MemoryConfig() {
+  const { memoryItems, rulesItems, updateMemory, deleteMemory, addMemory, updateRule, deleteRule, addRule } = useConfigStore();
+  const [editingId, setEditingId] = reactExports.useState(null);
+  const [editText, setEditText] = reactExports.useState("");
+  const [editType, setEditType] = reactExports.useState("memory");
+  const openEdit = (type, id2, text2) => {
+    setEditType(type);
+    setEditingId(id2);
+    setEditText(text2);
+  };
+  const saveEdit = () => {
+    if (!editText.trim() || !editingId) return;
+    if (editType === "memory") updateMemory(editingId, editText.trim());
+    else updateRule(editingId, editText.trim());
+    setEditingId(null);
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] font-semibold text-[#94a3b8] uppercase tracking-wider mb-2", children: "聊天记忆" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-1.5 mb-6", children: [
+      memoryItems.map((m2) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-white border border-[#e2e8f0] rounded-md py-3 px-3.5 flex items-center gap-3 hover:border-[#cbd5e1] transition-colors", children: editingId === m2.id && editType === "memory" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "input",
+          {
+            className: "flex-1 px-2 py-1 border border-[#e2e8f0] rounded text-[13px] outline-none focus:border-[#a7f3d0]",
+            value: editText,
+            onChange: (e) => setEditText(e.target.value),
+            onKeyDown: (e) => {
+              if (e.key === "Enter") saveEdit();
+              if (e.key === "Escape") setEditingId(null);
+            },
+            autoFocus: true
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: saveEdit, className: "text-[11px] text-[#047857] font-medium hover:underline", children: "保存" })
+      ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "flex-1 text-[13px] text-[#0f172a]", children: m2.text }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[11px] text-[#94a3b8] flex-shrink-0", children: m2.time }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => openEdit("memory", m2.id, m2.text), className: "text-[#94a3b8] hover:text-[#047857] hover:bg-[#f0fdf4] p-1 rounded transition-colors bg-transparent border-none cursor-pointer", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "12", height: "12", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 14h2l8-8-2-2-8 8v2z" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M12 3l2 2" })
+        ] }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => deleteMemory(m2.id), className: "text-[#94a3b8] hover:text-[#ef4444] hover:bg-[#fef2f2] p-1 rounded transition-colors bg-transparent border-none cursor-pointer", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "12", height: "12", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "2 4 14 4 12 16 4 16 2 4" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "6", y1: "7", x2: "6", y2: "12" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "10", y1: "7", x2: "10", y2: "12" })
+        ] }) })
+      ] }) }, m2.id)),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "button",
+        {
+          onClick: () => {
+            const text2 = prompt("输入新的记忆:");
+            if (text2?.trim()) addMemory(text2.trim());
+          },
+          className: "flex items-center gap-1.5 px-4 py-2 border border-dashed border-[#e2e8f0] rounded-md text-[13px] text-[#64748b] hover:border-[#a7f3d0] hover:text-[#047857] hover:bg-[#f0fdf4] transition-colors cursor-pointer bg-white mt-1",
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 3v10M3 8h10" }) }),
+            "添加记忆"
+          ]
+        }
+      )
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] font-semibold text-[#94a3b8] uppercase tracking-wider mb-2 mt-5", children: "Rules" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-1.5", children: [
+      rulesItems.map((r2) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-white border border-[#e2e8f0] rounded-md py-3 px-3.5 flex items-center gap-3 hover:border-[#cbd5e1] transition-colors", children: editingId === r2.id && editType === "rule" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "input",
+          {
+            className: "flex-1 px-2 py-1 border border-[#e2e8f0] rounded text-[13px] outline-none focus:border-[#a7f3d0]",
+            value: editText,
+            onChange: (e) => setEditText(e.target.value),
+            onKeyDown: (e) => {
+              if (e.key === "Enter") saveEdit();
+              if (e.key === "Escape") setEditingId(null);
+            },
+            autoFocus: true
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: saveEdit, className: "text-[11px] text-[#047857] font-medium hover:underline", children: "保存" })
+      ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "flex-1 text-[13px] text-[#0f172a]", children: r2.text }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[11px] text-[#94a3b8] flex-shrink-0", children: r2.time }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => openEdit("rule", r2.id, r2.text), className: "text-[#94a3b8] hover:text-[#047857] hover:bg-[#f0fdf4] p-1 rounded transition-colors bg-transparent border-none cursor-pointer", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "12", height: "12", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 14h2l8-8-2-2-8 8v2z" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M12 3l2 2" })
+        ] }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => deleteRule(r2.id), className: "text-[#94a3b8] hover:text-[#ef4444] hover:bg-[#fef2f2] p-1 rounded transition-colors bg-transparent border-none cursor-pointer", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "12", height: "12", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "2 4 14 4 12 16 4 16 2 4" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "6", y1: "7", x2: "6", y2: "12" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "10", y1: "7", x2: "10", y2: "12" })
+        ] }) })
+      ] }) }, r2.id)),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "button",
+        {
+          onClick: () => {
+            const text2 = prompt("输入新的规则:");
+            if (text2?.trim()) addRule(text2.trim());
+          },
+          className: "flex items-center gap-1.5 px-4 py-2 border border-dashed border-[#e2e8f0] rounded-md text-[13px] text-[#64748b] hover:border-[#a7f3d0] hover:text-[#047857] hover:bg-[#f0fdf4] transition-colors cursor-pointer bg-white mt-1",
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 3v10M3 8h10" }) }),
+            "添加规则"
+          ]
+        }
+      )
+    ] })
+  ] });
+}
+const CONFIG_TITLES = {
+  skills: "Skills 配置",
+  mcp: "MCP 配置",
+  memory: "记忆配置"
+};
+function AppLayout() {
+  const [configPage, setConfigPage] = reactExports.useState(null);
+  const currentEditingPlanMsgIdx = useChatStore((s) => s.currentEditingPlanMsgIdx);
+  const isPlanEditorOpen = currentEditingPlanMsgIdx != null;
+  reactExports.useEffect(() => {
+    const handler = (e) => {
+      const menu = document.getElementById("ctxMenu");
+      if (menu && !e.target.closest(".ctx-menu") && !e.target.closest(".task-item")) {
+        menu.classList.remove("show");
+      }
+    };
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, []);
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex h-screen w-screen overflow-hidden bg-[#e2e8f0]", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx(
+      Sidebar,
+      {
+        onOpenConfig: (page) => setConfigPage(configPage === page ? null : page),
+        activeConfig: configPage
+      }
+    ),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "main",
+      {
+        className: `flex-1 flex flex-col bg-[#f8fafc] my-2 mr-2 rounded-[14px] shadow-lg relative overflow-hidden border border-[#e2e8f0] transition-all ${isPlanEditorOpen ? "mr-1" : ""}`,
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(ChatPanel, {}),
+          configPage && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute top-0 left-0 right-0 bottom-0 bg-[#f8fafc] z-20 flex flex-col rounded-[14px] m-0 border border-[#e2e8f0]", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-3.5 px-6 py-[18px] border-b border-[#e2e8f0] bg-white rounded-t-[14px]", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  onClick: () => setConfigPage(null),
+                  className: "w-8 h-8 rounded-md border border-[#e2e8f0] bg-white cursor-pointer text-[15px] flex items-center justify-center text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#0f172a] transition-colors",
+                  children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M10 3L5 8l5 5" }) })
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-[17px] font-semibold text-[#0f172a] tracking-[-0.2px]", children: CONFIG_TITLES[configPage] })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 overflow-y-auto p-6", children: [
+              configPage === "skills" && /* @__PURE__ */ jsxRuntimeExports.jsx(SkillsConfig, {}),
+              configPage === "mcp" && /* @__PURE__ */ jsxRuntimeExports.jsx(McpConfig, {}),
+              configPage === "memory" && /* @__PURE__ */ jsxRuntimeExports.jsx(MemoryConfig, {})
+            ] })
+          ] })
+        ]
+      }
+    ),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(PlanEditorPanel, {}),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { id: "toast", className: "fixed top-5 left-1/2 -translate-x-1/2 bg-[#0f172a] text-white py-2.5 px-5 rounded-md text-[13px] z-[999] opacity-0 transition-opacity pointer-events-none font-medium" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { id: "ctxMenu", className: "ctx-menu fixed bg-white border border-[#e2e8f0] rounded-[10px] shadow-lg min-w-[160px] p-1 z-[200] hidden" })
+  ] });
 }
 function App() {
   const load = useSettingsStore((s) => s.load);
-  const create2 = useConversationStore((s) => s.create);
   reactExports.useEffect(() => {
     load();
-    create2();
   }, []);
   return /* @__PURE__ */ jsxRuntimeExports.jsx(AppLayout, {});
 }

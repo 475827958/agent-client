@@ -1,219 +1,199 @@
-import { useRef, useState, useCallback, useEffect, KeyboardEvent } from 'react'
-import Editor, { type OnMount } from '@monaco-editor/react'
-import type { editor } from 'monaco-editor'
-import { Send, CornerDownLeft } from 'lucide-react'
+import { useState, useRef, useCallback } from 'react'
 import { useChatStore } from '../../stores/chatStore'
-import { useCommandStore } from '../../stores/commandStore'
-import type { Command } from '../../types'
+import { useModeStore } from '../../stores/modeStore'
+import { useQueueStore } from '../../stores/queueStore'
+import { useSettingsStore } from '../../stores/settingsStore'
+import type { AppMode } from '../../types'
+
+const MODELS = ['deepseek-v4-pro',]
+const WORKSPACES = ['/projects/data-report', '/projects/my-app', '/home/user/documents']
 
 export function ChatInput() {
   const sendMessage = useChatStore((s) => s.sendMessage)
-  const isLoading = useChatStore((s) => s.isLoading)
-  const filterCommands = useCommandStore((s) => s.filter)
+  const isProcessing = useChatStore((s) => s.isProcessing)
+  const inputMode = useModeStore((s) => s.inputMode)
+  const setInputMode = useModeStore((s) => s.setInputMode)
+  const queue = useQueueStore((s) => s.queue)
+  const removeFromQueue = useQueueStore((s) => s.removeFromQueue)
+  const settings = useSettingsStore((s) => s.settings)
+  const saveSettings = useSettingsStore((s) => s.save)
 
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
-  const [showCommands, setShowCommands] = useState(false)
-  const [commandList, setCommandList] = useState<Command[]>([])
-  const [selectedCmdIdx, setSelectedCmdIdx] = useState(0)
-
-  const handleMount: OnMount = (editor) => {
-    editorRef.current = editor
-    editor.focus()
-  }
-
-  const getLineText = useCallback((): string => {
-    if (!editorRef.current) return ''
-    const model = editorRef.current.getModel()
-    if (!model) return ''
-    const position = editorRef.current.getPosition()
-    if (!position) return ''
-    return model.getLineContent(position.lineNumber)
-  }, [])
-
-  const insertCommand = useCallback(
-    (cmd: Command) => {
-      if (!editorRef.current) return
-      const model = editorRef.current.getModel()
-      if (!model) return
-      const position = editorRef.current.getPosition()
-      if (!position) return
-
-      const lineContent = model.getLineContent(position.lineNumber)
-      const beforeCursor = lineContent.slice(0, position.column)
-      const slashIdx = beforeCursor.lastIndexOf('/')
-      if (slashIdx === -1) return
-
-      const before = lineContent.slice(0, slashIdx)
-      const after = lineContent.slice(position.column)
-      model.setValue(
-        model
-          .getValue()
-          .split('\n')
-          .map((l, i) =>
-            i === position.lineNumber - 1 ? before + cmd.trigger + ' ' + after : l
-          )
-          .join('\n')
-      )
-      editorRef.current.setPosition({
-        lineNumber: position.lineNumber,
-        column: before.length + cmd.trigger.length + 2
-      })
-      setShowCommands(false)
-      editorRef.current.focus()
-    },
-    []
-  )
-
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (showCommands) {
-        if (e.key === 'ArrowDown') {
-          e.preventDefault()
-          setSelectedCmdIdx((i) => Math.min(i + 1, commandList.length - 1))
-          return
-        }
-        if (e.key === 'ArrowUp') {
-          e.preventDefault()
-          setSelectedCmdIdx((i) => Math.max(i - 1, 0))
-          return
-        }
-        if (e.key === 'Enter' && commandList[selectedCmdIdx]) {
-          e.preventDefault()
-          insertCommand(commandList[selectedCmdIdx])
-          return
-        }
-        if (e.key === 'Escape') {
-          setShowCommands(false)
-          return
-        }
-      }
-
-      // Submit on Enter (without Shift)
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault()
-        handleSend()
-      }
-    },
-    [showCommands, commandList, selectedCmdIdx]
-  )
+  const [text, setText] = useState('')
+  const [wsDropdown, setWsDropdown] = useState(false)
+  const [mdDropdown, setMdDropdown] = useState(false)
+  const [modeDropdown, setModeDropdown] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const handleSend = useCallback(() => {
-    if (!editorRef.current || isLoading) return
-    const text = editorRef.current.getValue().trim()
-    if (!text) return
-    sendMessage(text)
-    editorRef.current.setValue('')
-    setShowCommands(false)
-  }, [sendMessage, isLoading])
+    if (!text.trim() || isProcessing) return
+    sendMessage(text.trim())
+    setText('')
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+    }
+  }, [text, isProcessing, sendMessage])
 
-  // Watch for / commands
-  useEffect(() => {
-    if (!editorRef.current) return
-    const disposable = editorRef.current.onDidChangeCursorPosition(() => {
-      const lineText = getLineText()
-      const model = editorRef.current.getModel()
-      if (!model) return
-      const pos = editorRef.current!.getPosition()
-      if (!pos) return
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }, [handleSend])
 
-      const beforeCursor = lineText.slice(0, pos.column)
-      const slashIdx = beforeCursor.lastIndexOf('/')
-      const spaceAfterSlash = beforeCursor.indexOf(' ', slashIdx)
+  const autoResize = (el: HTMLTextAreaElement) => {
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 80) + 'px'
+  }
 
-      if (slashIdx !== -1 && (spaceAfterSlash === -1 || spaceAfterSlash > pos.column)) {
-        const query = beforeCursor.slice(slashIdx, pos.column)
-        const results = filterCommands(query)
-        if (results.length > 0) {
-          setCommandList(results)
-          setShowCommands(true)
-          setSelectedCmdIdx(0)
-        } else {
-          setShowCommands(false)
-        }
-      } else {
-        setShowCommands(false)
-      }
-    })
+  const closeAllDropdowns = () => {
+    setWsDropdown(false)
+    setMdDropdown(false)
+    setModeDropdown(false)
+  }
 
-    return () => disposable.dispose()
-  }, [getLineText, filterCommands])
+  const hasMessages = true // Always show input area
 
   return (
-    <div className="flex-shrink-0 border-t border-sidebar-border p-3 relative">
-      {showCommands && (
-        <div className="absolute bottom-full left-3 right-3 mb-1 bg-sidebar-bg border border-sidebar-border rounded-lg shadow-lg max-h-48 overflow-y-auto z-50">
-          {commandList.map((cmd, idx) => (
-            <button
-              key={cmd.id}
-              onClick={() => insertCommand(cmd)}
-              className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between ${
-                idx === selectedCmdIdx
-                  ? 'bg-sidebar-active text-gray-100'
-                  : 'text-gray-400 hover:bg-sidebar-hover'
-              }`}
-            >
-              <span>
-                <span className="text-accent font-medium">{cmd.trigger}</span>
-                <span className="mx-2">—</span>
-                {cmd.label}
+    <div className={`flex-shrink-0 flex flex-col gap-2.5 ${hasMessages ? 'py-4 px-6 border-t border-[#e2e8f0] bg-white' : ''}`}>
+      {/* Queue */}
+      {queue.length > 0 && (
+        <div className="flex flex-col gap-1.5 max-w-[740px] w-full mx-auto">
+          {queue.map((qt, i) => (
+            <div key={i} className="flex items-center gap-2 px-3.5 py-2 border border-[#e2e8f0] rounded-md text-[13px] bg-white">
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-[#fffbeb] text-[#b45309] flex-shrink-0">
+                等待中 {i + 1}
               </span>
-              <span className="text-xs text-gray-600">{cmd.description}</span>
-            </button>
+              <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[#64748b]">
+                {qt.length > 60 ? qt.substring(0, 60) + '...' : qt}
+              </span>
+              <button
+                onClick={() => removeFromQueue(i)}
+                className="text-[#94a3b8] hover:text-[#ef4444] hover:bg-[#fef2f2] p-0.5 rounded transition-colors bg-transparent border-none cursor-pointer text-sm"
+              >
+                ×
+              </button>
+            </div>
           ))}
         </div>
       )}
 
-      <div className="flex items-end gap-2 bg-chat-bg rounded-xl border border-sidebar-border px-4 py-2 focus-within:border-accent transition-colors">
-        <div className="flex-1 min-h-[40px] max-h-[200px] overflow-y-auto">
-          <Editor
-            height="40px"
-            defaultLanguage="plaintext"
-            theme="vs-dark"
-            onMount={handleMount}
-            loading={<div className="text-gray-500 text-sm px-1">加载编辑器...</div>}
-            options={{
-              minimap: { enabled: false },
-              lineNumbers: 'off',
-              glyphMargin: false,
-              folding: false,
-              lineDecorationsWidth: 0,
-              lineNumbersMinChars: 0,
-              scrollBeyondLastLine: false,
-              wordWrap: 'on',
-              renderLineHighlight: 'none',
-              overviewRulerLanes: 0,
-              hideCursorInOverviewRuler: true,
-              overviewRulerBorder: false,
-              scrollbar: { vertical: 'hidden', horizontal: 'hidden' },
-              fontSize: 14,
-              fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace",
-              padding: { top: 0, bottom: 0 },
-              suggest: { showWords: false, showSnippets: false }
-            }}
-            wrapperProps={{ onKeyDown: handleKeyDown }}
-          />
-        </div>
-        <div className="flex items-center gap-1 text-xs text-gray-500 pb-1 flex-shrink-0">
-          <button
-            onClick={handleSend}
-            disabled={isLoading}
-            className="p-1.5 rounded-lg hover:bg-sidebar-hover text-gray-400 hover:text-gray-200 transition-colors disabled:opacity-50"
-            title="发送 (Enter)"
-          >
-            {isLoading ? (
-              <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Send size={16} />
-            )}
-          </button>
-        </div>
+      {/* Input box */}
+      <div className={`flex items-center gap-2.5 border border-[#e2e8f0] rounded-[10px] py-2.5 px-4 transition-all bg-white focus-within:border-[#a7f3d0] focus-within:shadow-[0_0_0_3px_rgba(167,243,208,0.3)] ${hasMessages ? 'max-w-[740px] w-full mx-auto' : 'max-w-[768px] w-full mx-auto shadow-sm'}`}>
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onChange={(e) => { setText(e.target.value); autoResize(e.target) }}
+          onKeyDown={handleKeyDown}
+          placeholder="输入任务，@引用文件， /调用技能与指令"
+          rows={1}
+          className="flex-1 border-none bg-transparent resize-none outline-none text-sm text-[#0f172a] leading-relaxed min-h-[24px] max-h-[80px] overflow-hidden placeholder:text-[#94a3b8]"
+        />
+        <button
+          onClick={handleSend}
+          disabled={!text.trim() || isProcessing}
+          className="bg-transparent border-none cursor-pointer p-1 flex items-center text-[#64748b] disabled:opacity-40 flex-shrink-0"
+          style={{ opacity: text.trim() ? 1 : 0.4, pointerEvents: text.trim() ? 'auto' : 'none' }}
+        >
+          {isProcessing ? (
+            <div className="w-[22px] h-[22px] border-2 border-[#94a3b8] border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+            </svg>
+          )}
+        </button>
       </div>
-      <div className="flex items-center gap-3 px-1 mt-2 text-xs text-gray-600">
-        <span className="flex items-center gap-1">
-          <CornerDownLeft size={12} /> 发送
+
+      {/* Toolbar */}
+      <div className={`flex items-center gap-2 ${hasMessages ? 'max-w-[740px] w-full mx-auto' : 'max-w-[768px] w-full mx-auto'}`}>
+        {/* Workspace selector */}
+        <div className="relative">
+          <button
+            onClick={(e) => { e.stopPropagation(); setWsDropdown(!wsDropdown); setMdDropdown(false); setModeDropdown(false) }}
+            className="flex items-center gap-1.5 py-[5px] px-2.5 border border-[#e2e8f0] rounded-md text-xs text-[#64748b] bg-white hover:border-[#cbd5e1] hover:bg-[#f8fafc] transition-colors cursor-pointer"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M2 5h3l1.5-2h4L12 5h2a1 1 0 011 1v7a1 1 0 01-1 1H3a1 1 0 01-1-1V6a1 1 0 011-1z"/></svg>
+            <span className="text-[11px] text-[#94a3b8]">工作空间</span>
+            <span className="font-medium text-[#64748b]">{settings.workspacePath}</span>
+            <svg className="w-4 h-4 text-[#94a3b8]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 7l3 3 3-3"/></svg>
+          </button>
+          {wsDropdown && (
+            <div className="absolute bottom-full left-0 mb-1.5 bg-white border border-[#e2e8f0] rounded-[10px] shadow-lg min-w-[220px] p-1 z-[100]">
+              {WORKSPACES.map(ws => (
+                <div
+                  key={ws}
+                  onClick={() => { saveSettings({ workspacePath: ws }); closeAllDropdowns() }}
+                  className={`px-3 py-2 rounded-md text-[13px] cursor-pointer flex items-center gap-2 text-[#0f172a] hover:bg-[#f1f5f9] transition-colors ${settings.workspacePath === ws ? 'bg-[#f0fdf4] text-[#047857] font-medium' : ''}`}
+                >
+                  {settings.workspacePath === ws && <span className="ml-auto text-[#a7f3d0] font-semibold">✓</span>}
+                  {ws}
+                </div>
+              ))}
+              <div className="h-px bg-[#e2e8f0] mx-2 my-1" />
+              <div
+                onClick={() => { closeAllDropdowns() }}
+                className="px-3 py-2 rounded-md text-[13px] cursor-pointer text-[#0f172a] hover:bg-[#f1f5f9] transition-colors"
+              >
+                浏览选择目录...
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Model selector */}
+        <div className="relative">
+          <button
+            onClick={(e) => { e.stopPropagation(); setMdDropdown(!mdDropdown); setWsDropdown(false); setModeDropdown(false) }}
+            className="flex items-center gap-1.5 py-[5px] px-2.5 border border-[#e2e8f0] rounded-md text-xs text-[#64748b] bg-white hover:border-[#cbd5e1] hover:bg-[#f8fafc] transition-colors cursor-pointer"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8" r="3"/><path d="M13.5 8a5.5 5.5 0 00-11 0"/></svg>
+            <span className="font-medium text-[#64748b]">{settings.model}</span>
+            <svg className="w-4 h-4 text-[#94a3b8]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 7l3 3 3-3"/></svg>
+          </button>
+          {mdDropdown && (
+            <div className="absolute bottom-full left-0 mb-1.5 bg-white border border-[#e2e8f0] rounded-[10px] shadow-lg min-w-[200px] p-1 z-[100]">
+              {MODELS.map(m => (
+                <div
+                  key={m}
+                  onClick={() => { saveSettings({ model: m }); closeAllDropdowns() }}
+                  className={`px-3 py-2 rounded-md text-[13px] cursor-pointer flex items-center gap-2 text-[#0f172a] hover:bg-[#f1f5f9] transition-colors ${settings.model === m ? 'bg-[#f0fdf4] text-[#047857] font-medium' : ''}`}
+                >
+                  {settings.model === m && <span className="ml-auto text-[#a7f3d0] font-semibold">✓</span>}
+                  {m}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Input Mode picker */}
+        <div className="relative">
+          <button
+            onClick={(e) => { e.stopPropagation(); setModeDropdown(!modeDropdown); setWsDropdown(false); setMdDropdown(false) }}
+            className="flex items-center gap-1 py-[5px] px-2.5 border border-[#e2e8f0] rounded-md text-xs text-[#64748b] bg-white hover:border-[#cbd5e1] hover:bg-[#f8fafc] transition-colors cursor-pointer"
+          >
+            <span className="font-medium">{inputMode === 'build' ? 'Build' : inputMode === 'plan' ? 'Plan' : 'Ask'}</span>
+            <svg className="w-4 h-4 text-[#94a3b8]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 7l3 3 3-3"/></svg>
+          </button>
+          {modeDropdown && (
+            <div className="absolute bottom-full left-0 mb-1.5 bg-white border border-[#e2e8f0] rounded-[10px] shadow-lg min-w-[120px] p-1 z-[100]">
+              {(['build', 'plan', 'ask'] as AppMode[]).map(m => (
+                <div
+                  key={m}
+                  onClick={() => { setInputMode(m); closeAllDropdowns() }}
+                  className={`px-3 py-2 rounded-md text-[13px] cursor-pointer flex items-center gap-2 text-[#0f172a] hover:bg-[#f1f5f9] transition-colors ${inputMode === m ? 'bg-[#f0fdf4] text-[#047857] font-medium' : ''}`}
+                >
+                  {inputMode === m && <span className="ml-auto text-[#a7f3d0] font-semibold">✓</span>}
+                  {m === 'build' ? 'Build' : m === 'plan' ? 'Plan' : 'Ask'}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <span className="ml-auto text-[11px] text-[#94a3b8]">
+          {isProcessing ? 'AI 正在处理中...' : 'Enter 发送 · Shift+Enter 换行'}
         </span>
-        <span>Shift+Enter 换行</span>
-        <span>/ 调用指令</span>
       </div>
     </div>
   )

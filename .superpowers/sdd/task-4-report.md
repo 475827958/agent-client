@@ -1,11 +1,19 @@
-### Task 4 Report: Preload Script
+### Task 4 Report: Plan mode API integration
 
-**File created:** `src/preload/index.ts`
+**Status:** DONE
 
-**Confirmation:** The preload script was created exactly as specified in the brief. It uses `contextBridge.exposeInMainWorld` to expose `window.electronAPI` with three namespaces:
+**File modified:** `src/renderer/src/stores/chatStore.ts`
 
-- `file` — glob, read, grep, write, edit (all delegating to `ipcRenderer.invoke`)
-- `workspace` — select
-- `settings` — save, load
+**Changes:**
+- Added `planApi` to the import line from `../services/api`
+- Replaced 4 stub methods with full implementations:
+  1. `confirmPlan()` — optimistically sets planStatus to 'confirmed', calls `planApi.confirm(task.id)`, reverts to 'pending' on error
+  2. `rejectPlan()` — sets planStatus to 'rejected', collapses process, calls `planApi.reject(task.id)`
+  3. `editPlan(msgIdx)` — validates message has `planGenerated`, sets planEditing to true, sets `currentEditingPlanMsgIdx`
+  4. `savePlanFromEditor(newText)` — updates planGenerated locally, clears editing state, calls `planApi.edit(task.id, newText)`
 
-**Commit:** `c0774ff` — feat: add preload script with contextBridge API
+**Verification:**
+- `npx tsc --noEmit --project tsconfig.web.json` passed with zero errors
+- Commit: `6f32362` — "feat: integrate Plan mode with real planApi endpoints"
+
+**Concerns:** None

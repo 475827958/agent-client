@@ -1,52 +1,43 @@
-### Task 7: Command Store
+### Task 7: Final integration — pass settings to sendChatMessage
 
 **Files:**
-- Create: `src/renderer/src/stores/commandStore.ts`
+- Modify: `src/renderer/src/stores/chatStore.ts`
 
 **Interfaces:**
-- Produces: `useCommandStore` with `commands` list and `filter` method
+- Consumes: `useSettingsStore` from `./settingsStore`
 
-- [ ] **Step 1: Create command store**
+Currently `sendChatMessage` is called with empty `workspace` and `model`. Wire up the settings store.
 
-`src/renderer/src/stores/commandStore.ts`:
+- [ ] **Step 1: Import settingsStore and read settings in sendMessage**
 
-```typescript
-import { create } from 'zustand'
-import type { Command } from '../types'
+Add import:
+```ts
+import { useSettingsStore } from './settingsStore'
+```
 
-const BUILTIN_COMMANDS: Command[] = [
-  { id: 'explain', trigger: '/explain', label: '解释代码', description: '解释选中的代码' },
-  { id: 'fix', trigger: '/fix', label: '修复问题', description: '修复代码中的问题' },
-  { id: 'test', trigger: '/test', label: '生成测试', description: '为选中的代码生成测试' },
-  { id: 'refactor', trigger: '/refactor', label: '重构代码', description: '重构选中的代码' }
-]
+In `sendMessage`, read settings before calling the API:
 
-interface CommandState {
-  commands: Command[]
-  filter: (search: string) => Command[]
-}
+```ts
+const settings = useSettingsStore.getState().settings
 
-export const useCommandStore = create<CommandState>(() => ({
-  commands: BUILTIN_COMMANDS,
-
-  filter: (search: string) => {
-    const q = search.toLowerCase().replace(/^\//, '')
-    if (!q) return BUILTIN_COMMANDS
-    return BUILTIN_COMMANDS.filter(
-      (c) =>
-        c.trigger.toLowerCase().includes(q) ||
-        c.label.toLowerCase().includes(q) ||
-        c.description.toLowerCase().includes(q)
-    )
-  }
-}))
+sendChatMessage({
+  sessionId: task.id,
+  content: text,
+  mode: inputMode,
+  sceneMode: sceneMode,
+  workspace: settings.workspacePath,
+  model: settings.model,
+  onEvent: handleEvent,
+  onError: (err) => { /* ... */ },
+  onDone: () => { /* ... */ }
+})
 ```
 
 - [ ] **Step 2: Commit**
 
 ```bash
-git add src/renderer/src/stores/commandStore.ts
-git commit -m "feat: add command store with built-in / commands"
+git add src/renderer/src/stores/chatStore.ts
+git commit -m "feat: wire settings workspace/model into sendChatMessage"
 ```
 
 ---

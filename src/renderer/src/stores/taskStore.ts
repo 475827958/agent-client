@@ -124,6 +124,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         mode: modeStore.inputMode,
         client_tools: CLIENT_TOOLS
       })
+
+      console.log('Created session:', sessionId)
       set((s) => ({
         tasks: s.tasks.map((t) =>
           t.id === id ? { ...t, sessionId } : t

@@ -155,9 +155,9 @@ function registerFileOps(workspacePath) {
   });
 }
 const defaults = {
-  apiBaseUrl: "http://localhost:8080",
+  apiBaseUrl: "",
   apiKey: "",
-  model: "gpt-4",
+  model: "deepseek-v4-pro",
   workspacePath: "",
   fullAccess: false
 };

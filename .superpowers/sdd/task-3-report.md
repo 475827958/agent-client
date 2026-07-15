@@ -1,38 +1,35 @@
-# Task 3 Report: Electron Main Process
+# Task 3 Report: Rewrite chatStore
 
-## Status: Complete
+## Status: DONE
 
-## Files Created
+## What was done
 
-| File | Path | Lines |
-|------|------|-------|
-| Main process entry | `src/main/index.ts` | 61 |
-| File operations handler | `src/main/fileOps.ts` | 126 |
-| Settings handler | `src/main/settings.ts` | 35 |
-| **Total** | | **222** |
+1. **Removed all demo code**: Deleted `getDemoResponse()` (~65 lines), `simulateAssistant()` with all inner functions (~240 lines), `simTimer` variable, `pendingTool` state, `planPending` state, and `genToolId()`.
 
-## Commit
+2. **Simplified ChatState interface**: Removed `pendingTool` and `planPending` from the interface. All plan/build methods are stubs for Tasks 4+5.
 
-- **Hash:** `dec7c4d`
-- **Message:** `feat: add Electron main process with IPC handlers`
-- **Files:** 3 files changed, 222 insertions(+)
+3. **Implemented `sendMessage()` with real API**: Calls `sendChatMessage()` from `../services/api` with a ServerEvent handler that updates the assistant message via `taskStore.updateLastAssistantMessage()`.
 
-## What Was Done
+4. **Added `reconnect()` method**: Uses `reconnectStream()` with the same event handler pattern.
 
-Created the Electron main process with three modules:
+5. **Extracted `createEventHandler()` helper**: A shared function that takes `taskStore`, `set`, and a mutable `lastSeqRef` object, returning a `(event: ServerEvent) => void` handler. Used by both `sendMessage` and `reconnect` to avoid code duplication.
 
-1. **`src/main/index.ts`** -- App entry point. Creates a `BrowserWindow` (1400x900, min 900x600) with context isolation enabled, sandbox disabled, and preload script. Registers settings and file ops handlers on `app.whenReady()`, sets up the optimizer, and handles macOS `activate` and `window-all-closed` lifecycle events.
+6. **Handles all ServerEvent types**: Every event type in the `ServerEvent` union is handled in the switch statement, satisfying TypeScript exhaustiveness. No-op handlers have comments explaining why they're no-ops.
 
-2. **`src/main/fileOps.ts`** -- Registers 6 IPC handlers:
-   - `file:glob` -- recursive file globbing with regex pattern matching, skips `node_modules` and `.git`
-   - `file:read` -- reads file content with path-traversal protection
-   - `file:grep` -- searches files for regex pattern, returns `file:line: content` results
-   - `file:write` -- writes content, auto-creates parent directories
-   - `file:edit` -- string replacement in file (fails if `old_string` not found)
-   - `workspace:select` -- native directory picker dialog
+7. **Kept `genMsgId()`**, removed `genToolId()`. Renamed `msgId` counter to `msgIdCounter`.
 
-3. **`src/main/settings.ts`** -- Registers 2 IPC handlers (`settings:save`, `settings:load`) backed by `electron-store`. Defaults: `apiBaseUrl: http://localhost:8080`, `model: gpt-4`, empty `apiKey` and `workspacePath`, `fullAccess: false`.
+8. **`updateTaskSeq` already existed** in taskStore.ts -- no changes needed there.
 
-## Issues Encountered
+## TypeScript verification
 
-None. All files copied verbatim from the task brief.
+`npx tsc --noEmit --project tsconfig.web.json` -- **0 errors, clean build**
+
+## Commits
+
+- `973626c` feat: replace demo simulation with real NDJSON API streaming
+
+## Concerns
+
+- **`build.step_confirmed` and `build.step_skipped` lack `tool_call_id`** in the ServerEvent type definition. The current implementation matches by `tool_name` + `status: 'pending'` as a workaround, which could match the wrong tool if there are multiple pending tools with the same name. Consider adding `tool_call_id` to these event types.
+- **`planApi` and `buildApi` imports were intentionally omitted** since the plan/build methods are stubs. They should be re-imported when Tasks 4 and 5 implement those methods.
+- **Workspace and model are hardcoded to empty strings** -- Task 7 will wire settings.

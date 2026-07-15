@@ -66,8 +66,8 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   apiBaseUrl: '',
   apiKey: '',
-  model: 'claude-opus-4-7',
-  workspacePath: '/projects/data-report',
+  model: '/projects/data-report',
+  workspacePath: '',
   fullAccess: false
 }
 

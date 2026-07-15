@@ -29,7 +29,7 @@ export interface CreateSessionRequest {
 }
 
 export interface CreateSessionResponse {
-  session_id: string
+  id: string
 }
 
 export const CLIENT_TOOLS = [
@@ -120,7 +120,7 @@ export async function createSession(req: CreateSessionRequest): Promise<string> 
   }
 
   const data: CreateSessionResponse = await response.json()
-  return data.session_id
+  return data.id
 }
 
 // ===== Main chat channel =====

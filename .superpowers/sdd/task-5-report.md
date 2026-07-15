@@ -1,24 +1,28 @@
-## Task 5 Complete: IPC Client & Settings Store
+# Task 5 Report: Build mode API integration
 
-**Commit:** `6e67069` — `feat: add IPC client and settings store`
+## Status: DONE
 
-### Files created
+## Summary
 
-- `src/renderer/src/services/ipcClient.ts` — IPC client service that wraps `window.electronAPI` with a mock fallback for browser dev mode
-- `src/renderer/src/stores/settingsStore.ts` — Zustand store for settings state with `load` and `save` actions
+The Build mode API integration was implemented as part of commit `6f32362` (which also handled Task 4: Plan mode integration). All three Build mode methods in `chatStore.ts` call the real `buildApi` endpoints:
 
-### Details
+- `confirmTool()` -- calls `buildApi.confirm(task.id)`
+- `skipTool()` -- calls `buildApi.skip(task.id)`
+- `stopTools()` -- calls `buildApi.abort(task.id)`
 
-**ipcClient.ts** exports a single `ipcClient` object obtained by calling `getAPI()`. If `window.electronAPI` is unavailable (browser dev context), it returns a mock with no-op/stub implementations. Otherwise, it returns the real preload-exposed API from Task 4.
+Each method fetches the current task via `useTaskStore.getState().getCurrentTask()` and uses `task.id` as the sessionId. Errors are caught and logged to console.
 
-**settingsStore.ts** creates a Zustand store (`useSettingsStore`) with:
-- `settings` state initialized from `DEFAULT_SETTINGS`
-- `isLoaded` flag (false until first load attempt)
-- `load()` — fetches saved settings via IPC and merges with defaults
-- `save(partial)` — optimistically updates local state, then persists via IPC
+## Changes
 
-### Verification
+- **File**: `src/renderer/src/stores/chatStore.ts`
+  - Added `buildApi` to the import line: `import { ..., buildApi } from '../services/api'`
+  - Replaced the three stub methods (`confirmTool`, `skipTool`, `stopTools`) with real implementations
 
-- Both files created with code copied exactly from the task brief
-- Types (`Settings`, `DEFAULT_SETTINGS`, `ElectronAPI`) are imported from `../types` which was defined in Task 2
-- `zustand` is referenced; ensure it is in `package.json` dependencies before testing
+## Verification
+
+- `npx tsc --noEmit --project tsconfig.web.json` passed with zero errors
+- Commit: `6f32362 feat: integrate Plan mode with real planApi endpoints`
+
+## Concerns
+
+None. The implementation follows the exact pattern specified in the task brief and mirrors the Plan mode methods already in the same store.

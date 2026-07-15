@@ -151,7 +151,18 @@
       "Bash(ELECTRON_MIRROR=\"https://npmmirror.com/mirrors/electron/\" npm install electron@22.3.27 --save-dev)",
       "Bash(node_modules/electron/dist/electron.exe -e \"console.log\\('electron:', process.versions.electron\\); console.log\\('node:', process.versions.node\\); console.log\\('require type:', typeof require\\('electron'\\)\\);\")",
       "Bash(node_modules/electron/dist/electron.exe --require ./electron-preload.cjs out/main/index.js)",
-      "Bash(node_modules/electron/dist/electron.exe -e \"try { const e = require\\('electron'\\); console.log\\('type:', typeof e, 'app:', !!e.app\\); } catch\\(err\\) { console.log\\('ERROR:', err.code, err.message.substring\\(0,100\\)\\); }\")"
+      "Bash(node_modules/electron/dist/electron.exe -e \"try { const e = require\\('electron'\\); console.log\\('type:', typeof e, 'app:', !!e.app\\); } catch\\(err\\) { console.log\\('ERROR:', err.code, err.message.substring\\(0,100\\)\\); }\")",
+      "Bash(bash \"C:/Users/csybo/.claude/plugins/cache/claude-plugins-official/superpowers/6.1.1/skills/subagent-driven-development/scripts/task-brief\" \"d:/MyProject/project_money/agent/agent-electron-app/docs/superpowers/plans/2026-07-15-real-api-integration-plan.md\" 1)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" --connect-timeout 5 \"http://172.0.1.197:8000/sessions\")",
+      "Bash(uuidgen)",
+      "Bash(curl -s -X POST \"http://172.0.1.197:8000/sessions\" -H \"Content-Type: application/json\" -d \"{\\\\\"id\\\\\":\\\\\"$\\(uuidgen || echo '00000000-0000-0000-0000-000000000000'\\)\\\\\",\\\\\"scene_mode\\\\\":\\\\\"office\\\\\",\\\\\"workspace\\\\\":\\\\\"/\\\\\",\\\\\"model\\\\\":\\\\\"claude-opus-4-7\\\\\",\\\\\"mode\\\\\":\\\\\"ask\\\\\",\\\\\"client_tools\\\\\":[]}\" --connect-timeout 5)",
+      "Bash(find /c/Users/csybo/AppData/Roaming -name \"config.json\" -path \"*agent*\" 2>/dev/null | head -5; find /c/Users/csybo/AppData/Roaming -name \"config.json\" -path \"*electron*\" 2>/dev/null | head -5)",
+      "Read(//c/Users/csybo/AppData/Roaming/**)",
+      "Read(//c/Users/csybo/AppData/Roaming/agent-desktop/**)",
+      "Bash(rm \"C:/Users/csybo/AppData/Roaming/agent-desktop/config.json\" && echo \"deleted\")"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\csybo\\AppData\\Roaming\\agent-desktop"
     ]
   }
 }

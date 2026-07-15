@@ -1,0 +1,2498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>iWork - 自主AI工作助手</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --font: "Inter", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+
+    /* Surface */
+    --bg-app: #e2e8f0;
+    --bg-main: #f8fafc;
+    --bg-card: #ffffff;
+    --bg-input: #ffffff;
+
+    /* Sidebar */
+    --sidebar-bg: #f8fafc;
+    --sidebar-text: #475569;
+    --sidebar-text-dim: #94a3b8;
+    --sidebar-active-bg: rgba(167, 243, 208, 0.4);
+    --sidebar-active-text: #047857;
+    --sidebar-hover-bg: #f1f5f9;
+    --sidebar-divider: #e2e8f0;
+    --sidebar-border: #e2e8f0;
+
+    /* Accent */
+    --accent: #a7f3d0;
+    --accent-hover: #6ee7b7;
+    --accent-soft: #f0fdf4;
+    --accent-text: #047857;
+
+    /* Text */
+    --text: #0f172a;
+    --text-secondary: #64748b;
+    --text-muted: #94a3b8;
+    --text-on-accent: #ffffff;
+
+    /* Border */
+    --border: #e2e8f0;
+    --border-light: #f1f5f9;
+
+    /* Radius */
+    --radius-sm: 6px;
+    --radius: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 18px;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.06);
+
+    /* Status */
+    --green: #10b981;
+    --green-bg: #ecfdf5;
+    --orange: #f59e0b;
+    --orange-bg: #fffbeb;
+    --red: #ef4444;
+    --red-bg: #fef2f2;
+
+    /* Spacing scale (4px base) */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-10: 40px;
+
+    /* Chat */
+    --user-bubble-bg: #ecfdf5;
+    --user-bubble-text: #064e3b;
+    --ai-bubble-bg: #ffffff;
+    --ai-bubble-border: #e2e8f0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--font);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg-app);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ===== SIDEBAR ===== */
+  .sidebar {
+    width: 252px; min-width: 252px;
+    background: var(--sidebar-bg);
+    color: var(--sidebar-text);
+    display: flex; flex-direction: column;
+    padding: var(--space-5);
+    gap: 2px;
+    border-right: 1px solid var(--sidebar-border);
+  }
+
+  .sidebar-brand {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 10px 24px;
+    font-size: 18px; font-weight: 700;
+    color: var(--text); letter-spacing: -0.4px;
+  }
+
+  .sidebar-brand svg { flex-shrink: 0; }
+
+  .sidebar-section-label {
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.6px;
+    color: var(--sidebar-text-dim);
+    padding: 16px 10px 4px;
+  }
+
+  .sidebar-btn {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 10px; border-radius: var(--radius-sm);
+    cursor: pointer; font-size: 13px; font-weight: 450;
+    transition: all 0.15s ease; border: none; background: none;
+    color: var(--sidebar-text); font-family: var(--font);
+    width: 100%; text-align: left;
+    letter-spacing: -0.1px;
+  }
+  .sidebar-btn:hover { background: var(--sidebar-hover-bg); color: var(--text); }
+  .sidebar-btn.active { background: var(--sidebar-active-bg); color: var(--sidebar-active-text); font-weight: 500; }
+
+  .sidebar-btn.primary {
+    background: var(--text); color: #fff; margin-bottom: 4px;
+    justify-content: center; font-weight: 500; font-size: 13px;
+    padding: 10px;
+  }
+  .sidebar-btn.primary:hover { background: #334155; color: #fff; }
+
+  .sidebar-spacer { flex: 1; }
+
+  .sidebar-footer {
+    border-top: 1px solid var(--sidebar-divider);
+    padding-top: 12px; margin-top: 4px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 12px; color: var(--sidebar-text-dim);
+    font-weight: 420;
+  }
+  .sidebar-footer .user-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    color: #047857; font-size: 12px; font-weight: 600;
+  }
+
+  /* Task list in sidebar */
+  .task-list { display: flex; flex-direction: column; gap: 1px; max-height: 320px; overflow-y: auto; }
+  .task-item {
+    padding: 8px 10px; border-radius: var(--radius-sm); font-size: 13px;
+    cursor: pointer; display: flex; align-items: center; gap: 8px;
+    transition: all 0.15s ease; font-weight: 420; color: var(--sidebar-text);
+  }
+  .task-item:hover { background: var(--sidebar-hover-bg); }
+  .task-item.active { background: var(--sidebar-active-bg); color: var(--sidebar-active-text); }
+  .task-item .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .task-item .time { font-size: 11px; color: var(--sidebar-text-dim); flex-shrink: 0; }
+
+  /* ===== MAIN ===== */
+  .main {
+    flex: 1; display: flex; flex-direction: column;
+    background: var(--bg-main);
+    margin: 8px 8px 8px 0; border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    position: relative; overflow: hidden;
+    border: 1px solid var(--border);
+    transition: margin-right 0.3s ease;
+  }
+
+  /* Mode bar */
+  .mode-bar {
+    display: flex; align-items: center;
+    padding: 12px 20px; gap: 8px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--bg-card);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+
+  .mode-switcher {
+    display: flex; background: #f1f5f9;
+    border-radius: var(--radius-sm); padding: 3px; gap: 2px;
+  }
+
+  .mode-btn {
+    padding: 6px 16px; border-radius: 5px;
+    border: none; cursor: pointer;
+    font-size: 13px; font-weight: 500; font-family: var(--font);
+    color: var(--text); background: transparent;
+    transition: all 0.15s ease; letter-spacing: -0.1px;
+  }
+  .mode-btn:hover { opacity: 0.8; }
+  .mode-btn.active {
+    background: #fff; color: var(--text);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .mode-desc { margin-left: 12px; font-size: 12px; color: var(--text-muted); font-weight: 420; }
+
+  /* ===== CHAT BODY ===== */
+  .chat-body {
+    flex: 1; display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  .chat-body.welcome-state { justify-content: center; }
+
+  /* Center block: wraps welcome + input + messages, constrains width, centered */
+  .center-block {
+    display: flex; flex-direction: column;
+    gap: 16px;
+    max-width: 768px; width: 100%;
+    margin: 0 auto;
+    padding: 0 24px;
+    flex-shrink: 1;
+    overflow: hidden;
+    max-height: 100%;
+  }
+
+  .chat-body.chat-state .center-block {
+    flex: 1;
+    gap: 0; overflow: hidden;
+    min-height: 0;
+  }
+  .welcome-inner {
+    display: flex; flex-direction: column;
+    align-items: center; text-align: center;
+    gap: 12px;
+  }
+
+  .welcome-inner .logo {
+    width: 56px; height: 56px; border-radius: 14px;
+    background: var(--accent);
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 32px; font-weight: 700;
+  }
+
+  .welcome-inner h2 { font-size: 22px; font-weight: 650; color: var(--text); letter-spacing: -0.4px; }
+  .welcome-inner p {
+    color: var(--text-secondary); font-size: 14px;
+    max-width: 400px; line-height: 1.6; font-weight: 420;
+  }
+
+  .quick-actions-wrap { width: 100%; }
+  .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .quick-action {
+    padding: 7px 16px; border: 1px solid var(--border);
+    border-radius: 20px; font-size: 13px; font-weight: 460;
+    color: var(--text-secondary); cursor: pointer;
+    background: var(--bg-card); transition: all 0.15s ease;
+    font-family: var(--font); letter-spacing: -0.1px;
+  }
+  .quick-action:hover {
+    border-color: var(--accent); color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .quick-action.active {
+    background: var(--text); color: #fff;
+    border-color: var(--text);
+  }
+
+  /* ===== MESSAGES ===== */
+  .messages-area {
+    flex: 1; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 20px;
+    scroll-behavior: smooth;
+    min-height: 0;
+  }
+
+  .chat-body.chat-state .messages-area {
+    order: 1; flex: 1; overflow-y: auto; min-height: 0;
+    scrollbar-width: none;
+  }
+  .chat-body.chat-state .messages-area::-webkit-scrollbar { display: none; }
+
+  .chat-body.chat-state .input-area {
+    order: 2; flex-shrink: 0;
+  }
+
+  .message { display: flex; gap: 12px; max-width: 740px; animation: msgIn 0.2s ease-out; }
+  @keyframes msgIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .message.user { align-self: flex-end; flex-direction: row-reverse; }
+
+  .msg-avatar {
+    width: 30px; height: 30px; border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; flex-shrink: 0; font-weight: 600;
+    font-family: var(--font);
+  }
+  .msg-avatar.user { background: var(--accent-soft); color: var(--accent-text); }
+  .msg-avatar.assistant { background: var(--accent-soft); color: var(--accent); font-size: 15px; }
+
+  .msg-bubble {
+    background: var(--ai-bubble-bg); border: 1px solid var(--ai-bubble-border);
+    border-radius: 14px 14px 14px 4px;
+    padding: 12px 16px; font-size: 14px; font-weight: 420;
+    line-height: 1.65; color: var(--text);
+    letter-spacing: -0.1px;
+  }
+  .message.user .msg-bubble {
+    background: var(--user-bubble-bg); color: var(--user-bubble-text);
+    border: none; border-radius: 14px 14px 4px 14px;
+  }
+
+  .msg-bubble code {
+    background: rgba(0,0,0,0.05); padding: 2px 6px;
+    border-radius: 4px; font-size: 13px; font-family: "SF Mono", "Fira Code", monospace;
+  }
+  .message.user .msg-bubble code { background: rgba(0,0,0,0.08); }
+
+  .msg-text { margin-top: 4px; }
+  .msg-text:first-child { margin-top: 0; }
+
+  /* Tool block (legacy) */
+  .tool-block {
+    margin-top: 10px; padding: 10px 14px;
+    background: #f8fafc; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); font-size: 13px;
+    display: flex; align-items: center; gap: 10px;
+    transition: all 0.25s ease;
+  }
+  .tool-block.running { border-left: 3px solid var(--orange); }
+  .tool-block.done { border-left: 3px solid var(--green); }
+
+  .tool-icon-svg { flex-shrink: 0; color: var(--text-muted); }
+  .tool-info { flex: 1; min-width: 0; }
+  .tool-name { font-weight: 580; color: var(--text); font-size: 12px; }
+  .tool-detail { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .tool-status {
+    font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 10px; flex-shrink: 0;
+  }
+  .tool-status.running { color: var(--orange); background: var(--orange-bg); }
+  .tool-status.done { color: var(--green); background: var(--green-bg); }
+  .tool-result {
+    margin-top: 6px; padding: 8px 12px;
+    background: #fff; border-radius: 4px;
+    font-size: 12px; color: var(--text-secondary);
+    border: 1px solid var(--border-light);
+    max-height: 80px; overflow-y: auto;
+    font-family: "SF Mono", "Fira Code", monospace;
+    display: none;
+  }
+  .tool-block.done .tool-result { display: block; }
+
+  /* ===== COLLAPSIBLE SECTIONS ===== */
+  .think-section {
+    margin-top: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  .think-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 12px; font-weight: 500;
+    color: var(--text-secondary);
+    background: #f8fafc;
+    user-select: none;
+    transition: background 0.12s;
+  }
+  .think-header:hover { background: #f1f5f9; }
+
+  .think-header .chevron {
+    display: inline-block;
+    transition: transform 0.2s ease;
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+  .section-collapsed .chevron { transform: rotate(-90deg); }
+  .section-collapsed .think-body {
+    max-height: 0;
+    padding-top: 0; padding-bottom: 0;
+    border-top-color: transparent;
+  }
+
+  .think-body {
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--text-muted);
+    font-style: italic;
+    line-height: 1.6;
+    background: #fff;
+    border-top: 1px solid var(--border-light);
+    max-height: 500px; overflow-y: auto;
+    transition: max-height 0.25s ease, padding 0.25s ease, border-top-color 0.25s ease;
+  }
+
+  .think-body .tool-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-light);
+    font-style: normal; color: var(--text);
+  }
+  .think-body .tool-item:last-child { border-bottom: none; }
+
+  .tool-item .t-icon { flex-shrink: 0; margin-top: 1px; color: var(--text-muted); }
+  .tool-item .t-info { flex: 1; min-width: 0; }
+  .tool-item .t-name { font-weight: 580; font-size: 12px; color: var(--text); }
+  .tool-item .t-cmd {
+    margin-top: 4px; padding: 6px 10px;
+    background: #1e293b; color: #a7f3d0;
+    border-radius: 4px;
+    font-size: 11px; font-family: "SF Mono", "Fira Code", monospace;
+  }
+  .tool-item .t-cmd code { color: inherit; background: none; padding: 0; }
+  .tool-item .t-detail { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .tool-item .t-result {
+    margin-top: 4px; padding: 6px 10px;
+    background: #f8fafc; border-radius: 4px;
+    font-size: 11px; font-family: "SF Mono", "Fira Code", monospace;
+    white-space: pre-wrap; max-height: 100px; overflow-y: auto;
+    border: 1px solid var(--border-light);
+  }
+  .tool-item .t-status {
+    font-size: 11px; padding: 2px 8px; border-radius: 8px; flex-shrink: 0;
+    font-weight: 500;
+  }
+  .t-status.running { color: #b45309; background: #fffbeb; }
+  .t-status.done { color: #047857; background: #ecfdf5; }
+  .t-status.pending { color: #0369a1; background: #f0f9ff; }
+
+  .tool-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .tool-action-btn {
+    padding: 5px 12px; border-radius: 4px;
+    font-size: 11px; font-weight: 500; font-family: var(--font);
+    cursor: pointer; border: 1px solid var(--border);
+    transition: all 0.12s ease; background: var(--bg-card);
+    color: var(--text-secondary);
+  }
+  .tool-action-btn.confirm { color: #047857; border-color: var(--accent); background: var(--accent-soft); }
+  .tool-action-btn.confirm:hover { background: var(--accent); color: #047857; }
+  .tool-action-btn.skip { color: #b45309; border-color: #fcd34d; background: var(--orange-bg); }
+  .tool-action-btn.skip:hover { background: #fde68a; }
+  .tool-action-btn.stop { color: #b91c1c; border-color: #fecaca; background: var(--red-bg); }
+  .tool-action-btn.stop:hover { background: #fecaca; }
+  .tool-stopped-msg { font-size: 11px; color: #b91c1c; margin-top: 6px; font-weight: 500; }
+
+  /* ===== PLAN QUESTION & GENERATED ===== */
+  .plan-question-block {
+    margin-top: 12px; padding: 14px 16px;
+    background: #f0f9ff; border: 1px solid #bae6fd;
+    border-radius: var(--radius); border-left: 3px solid #0ea5e9;
+  }
+  .plan-q-label { font-size: 10px; font-weight: 600; color: #0369a1; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+  .plan-q-text { font-size: 14px; font-weight: 550; color: var(--text); margin-bottom: 12px; line-height: 1.5; }
+  .plan-options { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .plan-option {
+    padding: 10px 14px; border: 1px solid #bae6fd; border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 440; color: var(--text); cursor: pointer;
+    background: #fff; transition: all 0.12s ease; font-family: var(--font);
+    text-align: left;
+  }
+  .plan-option:hover { border-color: #0ea5e9; background: #f0f9ff; }
+  .plan-option.selected { border-color: #0ea5e9; background: #e0f2fe; color: #0369a1; font-weight: 500; }
+  .plan-answer-btn {
+    padding: 7px 18px; border-radius: var(--radius-sm); border: none;
+    font-size: 12px; font-weight: 500; font-family: var(--font); cursor: pointer;
+    background: var(--text); color: #fff; transition: all 0.12s ease;
+  }
+  .plan-answer-btn:hover { background: #334155; }
+  .plan-answer-btn:disabled { opacity: 0.4; cursor: default; }
+  .plan-text-input {
+    width: 100%; padding: 8px 12px; border: 1px solid #bae6fd;
+    border-radius: var(--radius-sm); font-size: 13px; font-family: var(--font);
+    color: var(--text); outline: none; margin-bottom: 10px; resize: vertical;
+    transition: border-color 0.15s;
+  }
+  .plan-text-input:focus { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,0.15); }
+  .plan-question-block .answered-mark {
+    font-size: 11px; color: #0369a1; font-weight: 500;
+    display: flex; align-items: center; gap: 4px; margin-top: 8px;
+  }
+
+  .plan-generated-block {
+    margin-top: 12px; padding: 16px 18px;
+    background: var(--accent-soft); border: 1px solid var(--accent);
+    border-radius: var(--radius); border-left: 3px solid #10b981;
+  }
+  .plan-generated-block.confirmed { border-left-color: #10b981; background: #ecfdf5; }
+  .plan-generated-block.rejected { border-left-color: #ef4444; background: #fef2f2; border-color: #fecaca; }
+  .plan-gen-label { font-size: 10px; font-weight: 600; color: #047857; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; }
+  .plan-gen-text {
+    font-size: 13px; color: var(--text); line-height: 1.7;
+    white-space: pre-wrap; margin-bottom: 14px;
+    background: #fff; padding: 12px 14px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+  }
+  .plan-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .plan-action-btn {
+    padding: 7px 18px; border-radius: var(--radius-sm); font-size: 12px;
+    font-weight: 500; font-family: var(--font); cursor: pointer;
+    transition: all 0.12s ease; border: 1px solid var(--border);
+  }
+  .plan-action-btn.confirm { background: var(--text); color: #fff; border-color: var(--text); }
+  .plan-action-btn.confirm:hover { background: #334155; }
+  .plan-action-btn.edit { background: #fff; color: var(--text-secondary); border-color: var(--border); }
+  .plan-action-btn.edit:hover { background: #f1f5f9; color: var(--text); }
+  .plan-action-btn.reject { background: #fff; color: #b91c1c; border-color: #fecaca; }
+  .plan-action-btn.reject:hover { background: #fef2f2; }
+  .plan-action-btn:disabled { opacity: 0.4; cursor: default; }
+  .plan-edit-textarea {
+    width: 100%; min-height: 100px; padding: 10px 12px;
+    border: 1px solid var(--accent); border-radius: var(--radius-sm);
+    font-size: 13px; font-family: var(--font); color: var(--text);
+    resize: vertical; outline: none; line-height: 1.6;
+    margin-bottom: 10px;
+  }
+  .plan-edit-textarea:focus { box-shadow: 0 0 0 3px rgba(167,243,208,0.2); }
+
+  /* ===== PLAN EDITOR PANEL (right side) ===== */
+  .main.shrunk {
+    margin-right: 4px;
+    transition: margin-right 0.3s ease, flex 0.3s ease;
+  }
+
+  .plan-editor-panel {
+    width: 0; min-width: 0;
+    overflow: hidden;
+    background: var(--bg-card);
+    margin: 8px 8px 8px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+    display: flex; flex-direction: column;
+    transition: width 0.3s ease, min-width 0.3s ease, padding 0.3s ease;
+  }
+  .plan-editor-panel.open {
+    width: 420px; min-width: 320px;
+  }
+
+  .plan-editor-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .plan-editor-header h3 {
+    flex: 1; font-size: 15px; font-weight: 600;
+    color: var(--text); letter-spacing: -0.2px;
+  }
+  .plan-editor-close {
+    width: 28px; height: 28px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: #fff;
+    cursor: pointer; font-size: 14px; display: flex;
+    align-items: center; justify-content: center;
+    transition: all 0.12s ease; color: var(--text-secondary);
+  }
+  .plan-editor-close:hover { background: #f1f5f9; color: var(--text); }
+
+  .plan-editor-body {
+    flex: 1; display: flex; flex-direction: column; gap: 12px;
+    padding: 16px 20px; overflow-y: auto;
+  }
+  .plan-editor-body .plan-edit-textarea {
+    flex: 1; min-height: 200px;
+    width: 100%; padding: 12px 14px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    font-size: 13px; font-family: var(--font); color: var(--text);
+    resize: none; outline: none; line-height: 1.7;
+    transition: border-color 0.15s;
+  }
+  .plan-editor-body .plan-edit-textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(167,243,208,0.15);
+  }
+  .plan-editor-footer {
+    display: flex; justify-content: flex-end; gap: 8px;
+    padding: 12px 20px; border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .plan-editor-panel .plan-action-btn {
+    padding: 8px 20px; font-size: 13px;
+  }
+
+  /* ===== MESSAGE QUEUE ===== */
+  .queue-container {
+    display: none; flex-direction: column; gap: 6px;
+  }
+  .queue-container.show { display: flex; }
+  .queue-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13px; color: var(--text);
+    background: var(--bg-card);
+    animation: queueIn 0.15s ease-out;
+    font-weight: 440;
+  }
+  @keyframes queueIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+  .queue-item .q-text {
+    flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--text-secondary);
+  }
+  .queue-item .q-badge {
+    font-size: 10px; font-weight: 600; padding: 2px 8px;
+    border-radius: 8px; background: var(--orange-bg); color: #b45309;
+    flex-shrink: 0;
+  }
+  .queue-item .q-remove {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); padding: 2px 4px; border-radius: 4px;
+    flex-shrink: 0; font-size: 14px; line-height: 1;
+    transition: all 0.12s ease;
+  }
+  .queue-item .q-remove:hover { color: var(--red); background: var(--red-bg); }
+
+  /* ===== INPUT AREA ===== */
+  .input-area { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
+
+  .chat-body.welcome-state .input-box {
+    padding: 12px 26px 96px 26px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    align-items: flex-start;
+    position: relative;
+  }
+  .chat-body.welcome-state .send-btn-icon {
+    position: absolute;
+    bottom: 16px;
+    right: 20px;
+  }
+  .chat-body.welcome-state .input-box textarea {
+    font-size: 15px;
+    min-height: 28px;
+    align-self: flex-start;
+    flex: none;
+    width: 100%;
+  }
+  .chat-body.welcome-state .input-box textarea::placeholder {
+    color: var(--text-muted);
+    vertical-align: top;
+  }
+
+  .chat-body.chat-state .input-area {
+    padding: 16px 24px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-card);
+  }
+
+  .input-box {
+    display: flex; align-items: center; gap: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 16px;
+    transition: all 0.15s ease;
+    width: 100%;
+    background: var(--bg-input);
+  }
+  .input-box:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(167,243,208,0.3);
+  }
+
+  .input-mode-picker {
+    display: flex; align-items: center; gap: 4px;
+    padding: 5px 10px; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); font-size: 12px;
+    color: var(--text-secondary); cursor: pointer;
+    background: var(--bg-card); font-weight: 500; font-family: var(--font);
+    transition: all 0.12s ease;
+    position: relative;
+  }
+  .input-mode-picker:hover { border-color: #cbd5e1; background: #f8fafc; }
+
+  .chat-body.chat-state .input-box { max-width: 740px; width: 100%; margin: 0 auto; }
+
+  .input-box textarea {
+    flex: 1; border: none; background: transparent;
+    resize: none; outline: none; font-size: 14px;
+    font-family: var(--font); color: var(--text);
+    line-height: 1.5; min-height: 24px; max-height: 80px;
+    font-weight: 420; letter-spacing: -0.1px;
+    overflow: hidden;
+  }
+  .input-box textarea::placeholder { color: var(--text-muted); }
+
+  .input-toolbar {
+    display: flex; align-items: center; gap: 8px;
+    flex-shrink: 0;
+  }
+  .chat-body.chat-state .input-toolbar { max-width: 740px; width: 100%; margin: 0 auto; }
+  .input-toolbar .hint { margin-left: auto; font-size: 11px; color: var(--text-muted); font-weight: 420; }
+
+  /* Selector pill */
+  .selector {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); font-size: 13px;
+    color: var(--text-secondary); cursor: pointer;
+    background: var(--bg-card); transition: all 0.15s ease;
+    position: relative; font-weight: 440;
+  }
+  .selector:hover { border-color: #cbd5e1; background: #f8fafc; }
+  .selector .sel-label { font-size: 11px; color: var(--text-muted); }
+  .selector .sel-val { font-weight: 500; color: var(--text-secondary); }
+
+  /* ===== DROPDOWN ===== */
+  .dropdown {
+    position: absolute; bottom: calc(100% + 6px); left: 0;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow-lg);
+    min-width: 220px; padding: 4px;
+    display: none; z-index: 100;
+  }
+  .dropdown.show { display: block; }
+
+  .dropdown-item {
+    padding: 8px 12px; border-radius: var(--radius-sm); font-size: 13px;
+    cursor: pointer; display: flex; align-items: center; gap: 8px;
+    color: var(--text); font-weight: 440; transition: background 0.12s;
+  }
+  .dropdown-item:hover { background: #f1f5f9; }
+  .dropdown-item.selected { background: var(--accent-soft); color: var(--accent-text); font-weight: 500; }
+  .dropdown-item .check { margin-left: auto; color: var(--accent); font-weight: 600; }
+  .dropdown-divider { height: 1px; background: var(--border); margin: 4px 8px; }
+
+  /* ===== SKILLS PAGE ===== */
+  .page-panel {
+    position: absolute; top: 0; left: 252px; right: 0; bottom: 0;
+    background: var(--bg-main); z-index: 20;
+    display: none; flex-direction: column;
+    border-radius: var(--radius-lg); margin: 8px 8px 8px 0;
+    border: 1px solid var(--border);
+  }
+  .page-panel.show { display: flex; }
+
+  .page-header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 18px 24px; border-bottom: 1px solid var(--border);
+    background: var(--bg-card); border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+  .page-back {
+    width: 32px; height: 32px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: #fff;
+    cursor: pointer; font-size: 15px; display: flex;
+    align-items: center; justify-content: center;
+    transition: all 0.15s ease; color: var(--text-secondary);
+  }
+  .page-back:hover { background: #f1f5f9; color: var(--text); }
+  .page-header h3 { font-size: 17px; font-weight: 600; color: var(--text); letter-spacing: -0.2px; }
+
+  .page-content { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+
+  .skill-section-label {
+    font-size: 11px; font-weight: 600; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px;
+  }
+
+  /* Skill tabs */
+  .skill-tabs {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 20px;
+  }
+  .skill-tabs-left {
+    display: flex; gap: 2px;
+    background: #f1f5f9; border-radius: var(--radius-sm);
+    padding: 3px;
+  }
+  .skill-tab {
+    padding: 7px 18px; border-radius: 5px;
+    border: none; cursor: pointer;
+    font-size: 13px; font-weight: 500; font-family: var(--font);
+    color: var(--text-secondary); background: transparent;
+    transition: all 0.15s ease; letter-spacing: -0.1px;
+  }
+  .skill-tab:hover { color: var(--text); }
+  .skill-tab.active { background: #fff; color: var(--text); box-shadow: var(--shadow-sm); }
+
+  .skill-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+
+  /* Install button on skill card */
+  .skill-card .s-action {
+    flex-shrink: 0; align-self: center;
+  }
+  .s-install {
+    padding: 6px 14px; border-radius: var(--radius-sm);
+    border: 1px solid var(--accent); cursor: pointer;
+    font-size: 12px; font-weight: 500; font-family: var(--font);
+    color: var(--accent-text); background: var(--accent-soft);
+    transition: all 0.12s ease;
+  }
+  .s-install:hover { background: var(--accent); }
+  .s-install.installed {
+    border-color: var(--border); color: var(--text-muted);
+    background: #f1f5f9;
+  }
+
+  .custom-actions {
+    display: flex; gap: 8px; margin-bottom: 20px;
+  }
+  .custom-action-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 16px; border: 1px dashed var(--border);
+    border-radius: var(--radius-sm); cursor: pointer;
+    font-size: 13px; font-weight: 500; font-family: var(--font);
+    color: var(--text-secondary); background: var(--bg-card);
+    transition: all 0.12s ease;
+  }
+  .custom-action-btn:hover { border-color: var(--accent); color: var(--accent-text); background: var(--accent-soft); }
+
+  .hub-search { position: relative; margin-left: auto; flex-shrink: 0; }
+  .hub-search-input {
+    width: 200px; padding: 6px 10px 6px 30px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    font-size: 13px; font-family: var(--font); color: var(--text);
+    background: var(--bg-card); outline: none;
+    transition: border-color 0.15s;
+  }
+  .hub-search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(167,243,208,0.15); }
+  .hub-search-input::placeholder { color: var(--text-muted); }
+
+  .skill-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px 18px 18px 20px;
+    display: flex; gap: 14px; transition: all 0.15s ease; cursor: pointer;
+    border-left: 3px solid transparent;
+  }
+  .skill-card:hover { border-color: #cbd5e1; box-shadow: var(--shadow); }
+  .skill-card.enabled { border-left-color: var(--accent); }
+
+  .skill-card .s-icon {
+    width: 38px; height: 38px; border-radius: var(--radius-sm);
+    background: #f1f5f9; display: flex; align-items: center;
+    justify-content: center; flex-shrink: 0;
+    font-size: 18px; color: var(--text-secondary);
+  }
+  .skill-card .s-info { flex: 1; min-width: 0; }
+  .skill-card .s-name { font-weight: 580; color: var(--text); font-size: 14px; letter-spacing: -0.1px; }
+  .skill-card .s-desc { font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; font-weight: 420; }
+  .skill-card .s-badge {
+    display: inline-block; font-size: 10px; font-weight: 550; padding: 2px 6px;
+    border-radius: 4px; margin-top: 6px; letter-spacing: 0.2px;
+  }
+  .s-badge.builtin { background: var(--accent-soft); color: var(--accent-text); }
+  .s-badge.mcp { background: var(--orange-bg); color: #b45309; }
+  .s-badge.third { background: var(--green-bg); color: #047857; }
+
+  /* Memory & Rules items */
+  .memory-list, .rules-list { display: flex; flex-direction: column; gap: 6px; }
+
+  .memory-item {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 12px 14px;
+    display: flex; align-items: center; gap: 12px;
+    transition: all 0.12s ease;
+  }
+  .memory-item:hover { border-color: #cbd5e1; }
+
+  .mem-text { flex: 1; font-size: 13px; color: var(--text); font-weight: 440; line-height: 1.5; }
+  .mem-time { font-size: 11px; color: var(--text-muted); flex-shrink: 0; font-weight: 420; }
+  .mem-edit {
+    background: none; border: none; cursor: pointer; flex-shrink: 0;
+    color: var(--text-muted); padding: 4px; border-radius: 4px;
+    transition: all 0.12s ease;
+  }
+  .mem-edit:hover { color: var(--accent-text); background: var(--accent-soft); }
+  .mem-delete {
+    background: none; border: none; cursor: pointer; flex-shrink: 0;
+    color: var(--text-muted); padding: 4px; border-radius: 4px;
+    transition: all 0.12s ease;
+  }
+  .mem-delete:hover { color: var(--red); background: var(--red-bg); }
+
+  .skill-card .s-toggle {
+    width: 40px; height: 22px; border-radius: 11px;
+    border: none; cursor: pointer; transition: all 0.2s ease; flex-shrink: 0;
+    position: relative; margin-top: 4px;
+  }
+  .s-toggle.off { background: #cbd5e1; }
+  .s-toggle.on { background: var(--accent); }
+  .s-toggle::after {
+    content: ''; position: absolute; top: 2px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #fff; transition: all 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+  }
+  .s-toggle.off::after { left: 2px; }
+  .s-toggle.on::after { left: 20px; }
+
+  /* ===== TOAST ===== */
+  .toast {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--text); color: #fff; padding: 10px 20px;
+    border-radius: var(--radius-sm); font-size: 13px; z-index: 999;
+    opacity: 0; transition: opacity 0.25s ease;
+    pointer-events: none; font-weight: 450; font-family: var(--font);
+  }
+  .toast.show { opacity: 1; }
+
+  /* ===== EDIT MODAL ===== */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(15,23,42,0.4);
+    z-index: 300; display: none; align-items: center; justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+
+  .modal-box {
+    background: var(--bg-card); border-radius: var(--radius-lg);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    width: 480px; max-width: 90vw; padding: 24px;
+    display: flex; flex-direction: column; gap: 16px;
+    animation: modalIn 0.2s ease-out;
+  }
+  @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+  .modal-box h4 { font-size: 15px; font-weight: 620; color: var(--text); letter-spacing: -0.2px; }
+  .modal-box textarea {
+    width: 100%; min-height: 80px; padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    font-size: 14px; font-family: var(--font); color: var(--text);
+    resize: vertical; outline: none; line-height: 1.6;
+    transition: border-color 0.15s;
+  }
+  .modal-box textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(167,243,208,0.2); }
+
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .modal-btn {
+    padding: 8px 18px; border-radius: var(--radius-sm); font-size: 13px;
+    font-weight: 500; font-family: var(--font); cursor: pointer;
+    transition: all 0.12s ease; border: none;
+  }
+  .modal-btn.cancel { background: #f1f5f9; color: var(--text-secondary); }
+  .modal-btn.cancel:hover { background: #e2e8f0; color: var(--text); }
+  .modal-btn.confirm { background: var(--text); color: #fff; }
+  .modal-btn.confirm:hover { background: #334155; }
+
+  /* ===== CONTEXT MENU ===== */
+  .ctx-menu {
+    position: fixed; background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow-lg);
+    min-width: 160px; padding: 4px; z-index: 200; display: none;
+  }
+  .ctx-menu.show { display: block; }
+  .ctx-menu-item {
+    padding: 8px 12px; border-radius: var(--radius-sm); font-size: 13px;
+    cursor: pointer; color: var(--text); display: flex; align-items: center; gap: 8px;
+    font-weight: 440; transition: background 0.12s;
+  }
+  .ctx-menu-item:hover { background: #f1f5f9; }
+  .ctx-menu-item.danger { color: var(--red); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+  /* SVG icon helpers */
+  .icon-sm { width: 16px; height: 16px; flex-shrink: 0; }
+  .icon-md { width: 20px; height: 20px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <h4 id="modalTitle">编辑</h4>
+    <textarea id="modalInput" rows="3" placeholder="输入内容..." onkeydown="if(event.key==='Escape')closeModal();if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();confirmModal();}"></textarea>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeModal()">取消</button>
+      <button class="modal-btn confirm" onclick="confirmModal()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Context Menu -->
+<div class="ctx-menu" id="ctxMenu"></div>
+
+<!-- ===== SIDEBAR ===== -->
+<aside class="sidebar">
+
+  <div class="sidebar-brand">
+    <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+      <rect width="30" height="30" rx="8" fill="#a7f3d0"/>
+      <path d="M7 15L13 21L23 9" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    iWork
+  </div>
+
+  <button class="sidebar-btn primary" onclick="newTask()">
+    <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>
+    新建任务
+  </button>
+
+  <div class="sidebar-section-label">配置</div>
+  <button class="sidebar-btn config-nav" id="btnSkills" onclick="openConfig('skills')">
+    <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="1.5" width="5" height="5" rx="1"/><rect x="9.5" y="1.5" width="5" height="5" rx="1"/><rect x="1.5" y="9.5" width="5" height="5" rx="1"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/></svg>
+    Skills 配置
+  </button>
+  <button class="sidebar-btn config-nav" id="btnMcp" onclick="openConfig('mcp')">
+    <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="5" r="2"/><circle cx="11" cy="11" r="2"/><line x1="6.3" y1="6.3" x2="9.7" y2="9.7"/><line x1="5" y1="13" x2="5" y2="7"/><line x1="11" y1="9" x2="11" y2="3"/></svg>
+    MCP 配置
+  </button>
+  <button class="sidebar-btn config-nav" id="btnMemory" onclick="openConfig('memory')">
+    <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 6v3M8 11v.01"/></svg>
+    记忆配置
+  </button>
+
+  <button class="sidebar-btn" id="btnExpert">
+    <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="5" r="2"/><circle cx="11" cy="6" r="2"/><circle cx="4" cy="11" r="2"/><circle cx="10" cy="11" r="2"/></svg>
+    专家和专家团
+  </button>
+  <button class="sidebar-btn" id="btnAutomation">
+    <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2"/><path d="M2 8a6 6 0 0112 0"/><path d="M5 3a6 6 0 015 10"/></svg>
+    自动化
+  </button>
+
+  <div class="sidebar-section-label">工作任务</div>
+  <div class="task-list" id="taskList"><!-- dynamic --></div>
+
+  <div class="sidebar-spacer"></div>
+
+  <div class="sidebar-footer">
+    <div class="user-avatar">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+    </div>
+    <span>ZLL</span>
+  </div>
+</aside>
+
+<!-- ===== CONFIG PAGE ===== -->
+<div class="page-panel" id="configPanel">
+  <div class="page-header">
+    <button class="page-back" onclick="closeConfig()">
+      <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3L5 8l5 5"/></svg>
+    </button>
+    <h3 id="configTitle">Skills 配置</h3>
+  </div>
+  <div class="page-content" id="configContent"><!-- dynamic --></div>
+</div>
+
+<!-- ===== MAIN ===== -->
+<main class="main" id="mainContent">
+
+  <div class="chat-body welcome-state" id="chatBody">
+
+    <div class="center-block" id="centerBlock">
+
+      <div class="welcome-inner" id="welcomeScreen">
+        <div class="logo">✓</div>
+        <h2>iWork，您的AI工作助手</h2>
+        <div class="quick-actions-wrap">
+          <div class="quick-actions">
+            <button class="quick-action active" data-mode="office" onclick="switchMode('office', this)">日常办公</button>
+            <button class="quick-action" data-mode="code" onclick="switchMode('code', this)">代码开发</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="input-area" id="inputArea">
+        <div class="queue-container" id="queueContainer"></div>
+        <div class="input-box">
+          <textarea id="chatInput" placeholder="输入任务，@引用文件， /调用技能与指令" rows="1" oninput="autoResize(this)" onkeydown="handleKeyDown(event)"></textarea>
+          <button class="send-btn-icon" id="sendBtn" onclick="sendMessage()" style="background:none;border:none;cursor:pointer;padding:4px;display:flex;align-items:center;color:var(--text-secondary);flex-shrink:0;" disabled>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          </button>
+        </div>
+
+        <div class="input-toolbar">
+          <div class="selector" onclick="toggleDropdown('wsDropdown')">
+            <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 5h3l1.5-2h4L12 5h2a1 1 0 011 1v7a1 1 0 01-1 1H3a1 1 0 01-1-1V6a1 1 0 011-1z"/></svg>
+            <span class="sel-label">工作空间</span>
+            <span class="sel-val" id="wsVal">/projects/data-report</span>
+            <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--text-muted);"><path d="M5 7l3 3 3-3"/></svg>
+            <div class="dropdown" id="wsDropdown">
+              <div class="dropdown-item selected" onclick="selectWs('/projects/data-report', this, event)">/projects/data-report <span class="check">✓</span></div>
+              <div class="dropdown-item" onclick="selectWs('/projects/my-app', this, event)">/projects/my-app</div>
+              <div class="dropdown-item" onclick="selectWs('/home/user/documents', this, event)">/home/user/documents</div>
+              <div class="dropdown-divider"></div>
+              <div class="dropdown-item" onclick="selectWs('browse', this, event)">浏览选择目录...</div>
+            </div>
+          </div>
+
+          <div class="selector" onclick="toggleDropdown('mdDropdown')">
+            <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"/><path d="M13.5 8a5.5 5.5 0 00-11 0"/></svg>
+            <span class="sel-val" id="mdVal">Claude Opus 4.7</span>
+            <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--text-muted);"><path d="M5 7l3 3 3-3"/></svg>
+            <div class="dropdown" id="mdDropdown">
+              <div class="dropdown-item selected" onclick="selectModel('Claude Opus 4.7', this, event)">Claude Opus 4.7 <span class="check">✓</span></div>
+              <div class="dropdown-item" onclick="selectModel('Claude Sonnet 4.6', this, event)">Claude Sonnet 4.6</div>
+              <div class="dropdown-item" onclick="selectModel('GPT-4o', this, event)">GPT-4o</div>
+              <div class="dropdown-item" onclick="selectModel('DeepSeek V3', this, event)">DeepSeek V3</div>
+            </div>
+          </div>
+
+          <div class="input-mode-picker" onclick="toggleDropdown('inputModeDropdown')">
+            <span class="input-mode-val" id="inputModeVal">Build</span>
+            <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--text-muted);"><path d="M5 7l3 3 3-3"/></svg>
+            <div class="dropdown" id="inputModeDropdown">
+              <div class="dropdown-item selected" onclick="selectInputMode('Build', this, event)">Build <span class="check">✓</span></div>
+              <div class="dropdown-item" onclick="selectInputMode('Plan', this, event)">Plan</div>
+              <div class="dropdown-item" onclick="selectInputMode('Ask', this, event)">Ask</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="messages-area" id="messagesArea" style="display:none;"></div>
+
+    </div>
+
+  </div>
+
+</main>
+
+<!-- Plan Editor Panel (right side) -->
+<div class="plan-editor-panel" id="planEditorPanel">
+  <div class="plan-editor-header">
+    <h3>编辑计划</h3>
+    <button class="plan-editor-close" onclick="closePlanEditor()" title="关闭">×</button>
+  </div>
+  <div class="plan-editor-body">
+    <textarea class="plan-edit-textarea" id="planEditorTextarea" placeholder="在此编辑执行计划..." oninput="onPlanEditorInput()"></textarea>
+  </div>
+  <div class="plan-editor-footer">
+    <button class="plan-action-btn edit" onclick="closePlanEditor()">取消</button>
+    <button class="plan-action-btn confirm" id="planEditorSaveBtn" onclick="savePlanFromEditor()">保存修改</button>
+  </div>
+</div>
+
+<script>
+// ===== STATE =====
+let currentMode = 'office';
+let currentTaskId = 'task-1';
+let isProcessing = false;
+let messageQueue = []; // queued messages while AI is processing
+let pendingTool = null; // { taskId, msgIndex, toolIndex, resolve } — Build mode tool confirmation
+let planPending = null; // { type: 'plan_question'|'plan_confirm', resolve } — Plan mode interaction
+let currentEditingPlanMsgIdx = null; // which message's plan is being edited in the side panel
+
+let tasks = [
+  { id: 'task-1', title: '新建任务', time: '刚才', active: true, messages: [] },
+  { id: 'task-2', title: '分析 data-report 项目', time: '2小时前', active: false, messages: [
+    { role: 'user', text: '帮我分析 /projects/data-report 目录下的代码结构，然后写一份 README' },
+    { role: 'assistant', thinking: '用户想要分析项目目录结构并生成 README。需要先列出目录了解文件结构，再读取关键文件理解代码逻辑，最后总结分析结果。', processCollapsed: true, tools: [
+      { name: '列出目录', command: 'ls -laR /projects/data-report/', detail: '/projects/data-report/', result: 'data-report/\n├── main.py      # 入口文件\n├── analyzer.py   # 数据分析模块\n├── config.yaml   # 配置文件\n└── utils.py      # 工具函数', status: 'done' },
+      { name: '读取文件', command: 'cat /projects/data-report/main.py', detail: 'main.py', result: 'def main():\n    config = load_config("config.yaml")\n    analyzer = DataAnalyzer(config)\n    analyzer.run()', status: 'done' }
+    ], text: '分析完成。该项目是一个数据分析工具：\n\n- <strong>main.py</strong> — 入口文件，加载配置并启动分析器\n- <strong>analyzer.py</strong> — 核心数据分析模块\n- <strong>config.yaml</strong> — 项目配置\n- <strong>utils.py</strong> — 工具函数\n\n需要我继续生成 README 吗？' }
+  ]},
+  { id: 'task-3', title: '编写数据分析脚本', time: '2小时前', active: false, messages: [] },
+  { id: 'task-4', title: '修复支付模块 Bug', time: '昨天', active: false, messages: [] },
+  { id: 'task-5', title: '生成本周工作周报', time: '昨天', active: false, messages: [] },
+  { id: 'task-6', title: '重构用户权限中间件', time: '3天前', active: false, messages: [] }
+];
+
+// Hub skills (admin configured)
+let hubSkills = [
+  { id: 'h1', name: 'GitHub 集成', desc: '管理 Issues、PR、仓库操作', icon: '🐙', category: '开发' },
+  { id: 'h2', name: 'Slack 通知', desc: '发送消息、管理频道通知', icon: '💬', category: '协作' },
+  { id: 'h3', name: 'PDF 解析器', desc: '解析和提取 PDF 内容', icon: '📕', category: '文档' },
+  { id: 'h4', name: '图片生成', desc: '通过 AI 生成和编辑图片', icon: '🎨', category: '创作' },
+  { id: 'h5', name: '邮件助手', desc: '自动读取、分类和回复邮件', icon: '📧', category: '办公' },
+  { id: 'h6', name: '数据可视化', desc: '生成图表和数据分析报告', icon: '📊', category: '数据' },
+  { id: 'h7', name: 'API 测试', desc: 'REST API 自动化测试工具', icon: '🧪', category: '开发' },
+  { id: 'h8', name: '翻译助手', desc: '多语言实时翻译', icon: '🌍', category: '办公' },
+];
+
+// Installed skill IDs (from hub)
+let installedSkillIds = ['h1', 'h3', 'h8'];
+
+// Custom skills (user created or uploaded)
+let customSkills = [
+  { id: 'c1', name: '自定义日志分析', desc: '解析应用日志并生成报告', icon: '📋', source: 'create', time: '1周前' },
+  { id: 'c2', name: '数据库备份脚本', desc: '定时备份 PostgreSQL 数据库', icon: '💾', source: 'upload', fileName: 'db-backup.skill', time: '2周前' },
+];
+
+// Builtin skills (always enabled)
+const builtinSkills = [
+  { id: 's1', name: '文件操作', desc: '读取、写入、搜索本地文件', icon: '📄' },
+  { id: 's2', name: 'Shell 执行', desc: '执行命令行指令和脚本', icon: '⚡' },
+  { id: 's3', name: '浏览器操控', desc: '自动打开浏览器执行网页操作', icon: '🌐' },
+  { id: 's4', name: '代码分析', desc: '分析代码结构、依赖和潜在问题', icon: '🔍' },
+  { id: 's5', name: '文档生成', desc: '自动生成 README、API 文档等', icon: '📝' },
+];
+
+// MCP Hub data
+let mcpHub = [
+  { id: 'mh1', name: 'GitHub MCP', desc: '管理 Issues、PR、仓库操作', icon: '🐙', category: '开发' },
+  { id: 'mh2', name: 'Slack MCP', desc: '发送消息、管理频道通知', icon: '💬', category: '协作' },
+  { id: 'mh3', name: 'PostgreSQL MCP', desc: '数据库查询和管理', icon: '🗄️', category: '数据' },
+  { id: 'mh4', name: 'Filesystem MCP', desc: '安全文件系统访问', icon: '📁', category: '文件' },
+  { id: 'mh5', name: 'Redis MCP', desc: '缓存管理和数据操作', icon: '🔴', category: '数据' },
+  { id: 'mh6', name: 'Docker MCP', desc: '容器管理和部署操作', icon: '🐳', category: '运维' },
+  { id: 'mh7', name: 'Jira MCP', desc: '任务跟踪和项目管理', icon: '📋', category: '协作' },
+  { id: 'mh8', name: 'Notion MCP', desc: '文档和知识库管理', icon: '📝', category: '办公' },
+];
+let installedMcpIds = ['mh1', 'mh3', 'mh4'];
+let customMcps = [
+  { id: 'cm1', name: '内部 API MCP', desc: '公司内部 API 接口调用', icon: '🔌', source: 'create', time: '3天前' },
+];
+let mcpTab = 'hub';
+
+// ===== INIT =====
+function init() {
+  renderTaskList();
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.selector')) {
+      document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('show'));
+    }
+    if (!e.target.closest('.task-item')) {
+      document.getElementById('ctxMenu').classList.remove('show');
+    }
+  });
+  updateSendButton();
+}
+
+// ===== LAYOUT =====
+function setChatLayout() {
+  const task = tasks.find(t => t.id === currentTaskId);
+  const hasMessages = task && task.messages && task.messages.length > 0;
+  const body = document.getElementById('chatBody');
+  const welcome = document.getElementById('welcomeScreen');
+  const msgs = document.getElementById('messagesArea');
+  const centerBlock = document.getElementById('centerBlock');
+
+  if (hasMessages) {
+    body.className = 'chat-body chat-state';
+    welcome.style.display = 'none';
+    msgs.style.display = 'flex';
+    centerBlock.style.display = 'flex';
+  } else {
+    body.className = 'chat-body welcome-state';
+    welcome.style.display = 'flex';
+    msgs.style.display = 'none';
+    centerBlock.style.display = 'flex';
+  }
+}
+
+// ===== TASKS =====
+function renderTaskList() {
+  document.getElementById('taskList').innerHTML = tasks.map(t => `
+    <div class="task-item ${t.active ? 'active' : ''}" data-id="${t.id}"
+         onclick="switchTask('${t.id}')"
+         oncontextmenu="taskContextMenu(event, '${t.id}')">
+      <span class="title">${t.title}</span>
+      <span class="time">${t.time}</span>
+    </div>
+  `).join('');
+}
+
+function newTask() {
+  const id = 'task-' + Date.now();
+  tasks.unshift({ id, title: '新建任务', time: '刚才', active: false, messages: [] });
+  switchTask(id);
+}
+
+function switchTask(id) {
+  // Clean up any pending tool / plan confirmation
+  if (pendingTool) {
+    pendingTool.resolve('stop');
+    pendingTool = null;
+    isProcessing = false;
+    updateSendButton();
+  }
+  if (planPending) {
+    planPending.resolve('reject');
+    planPending = null;
+    isProcessing = false;
+    updateSendButton();
+  }
+  // Close plan editor panel if open
+  if (currentEditingPlanMsgIdx != null) {
+    const panel = document.getElementById('planEditorPanel');
+    const main = document.getElementById('mainContent');
+    panel.classList.remove('open');
+    main.classList.remove('shrunk');
+    currentEditingPlanMsgIdx = null;
+  }
+  tasks.forEach(t => t.active = (t.id === id));
+  currentTaskId = id;
+  renderTaskList();
+  setChatLayout();
+  renderMessages();
+  document.getElementById('configPanel').classList.remove('show');
+  document.getElementById('mainContent').style.display = 'flex';
+  document.querySelectorAll('.config-nav').forEach(b => b.classList.remove('active'));
+}
+
+// ===== MESSAGES =====
+function renderMessages() {
+  const task = tasks.find(t => t.id === currentTaskId);
+  if (!task) return;
+  const msgsEl = document.getElementById('messagesArea');
+  msgsEl.innerHTML = '';
+
+  if (task.messages && task.messages.length > 0) {
+    task.messages.forEach((msg, msgIdx) => {
+      const div = document.createElement('div');
+      div.className = 'message ' + msg.role;
+
+      const avatar = document.createElement('div');
+      avatar.className = 'msg-avatar ' + msg.role;
+      avatar.textContent = msg.role === 'user' ? 'Z' : 'AI';
+
+      const bubble = document.createElement('div');
+      bubble.className = 'msg-bubble';
+
+      // Plan: generated plan with confirm/edit/reject (top of bubble)
+      if (msg.planGenerated) {
+        const pgDiv = document.createElement('div');
+        pgDiv.className = 'plan-generated-block';
+        if (msg.planStatus === 'confirmed') pgDiv.classList.add('confirmed');
+        if (msg.planStatus === 'rejected') pgDiv.classList.add('rejected');
+
+        let actionsHtml = '';
+        if (msg.planStatus === 'pending') {
+          if (msg.planEditing) {
+            actionsHtml = `
+              <div class="plan-actions">
+                <span style="font-size:12px;color:#0369a1;font-weight:500;display:flex;align-items:center;gap:6px;">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 14h2l8-8-2-2-8 8v2z"/><path d="M12 3l2 2"/></svg>
+                  正在右侧面板编辑计划...
+                </span>
+              </div>
+            `;
+          } else {
+            actionsHtml = `
+              <div class="plan-actions">
+                <button class="plan-action-btn confirm" onclick="event.stopPropagation();confirmPlan(${msgIdx})">确认计划</button>
+                <button class="plan-action-btn edit" onclick="event.stopPropagation();editPlan(${msgIdx})">编辑</button>
+                <button class="plan-action-btn reject" onclick="event.stopPropagation();rejectPlan(${msgIdx})">拒绝</button>
+              </div>
+            `;
+          }
+        } else if (msg.planStatus === 'confirmed') {
+          actionsHtml = '<div class="plan-actions"><span style="font-size:12px;color:#047857;font-weight:500;">计划已确认，正在自动执行...</span></div>';
+        } else if (msg.planStatus === 'rejected') {
+          actionsHtml = '<div class="plan-actions"><span style="font-size:12px;color:#b91c1c;font-weight:500;">计划已取消</span></div>';
+        }
+
+        pgDiv.innerHTML = `
+          <div class="plan-gen-label">执行计划</div>
+          <div class="plan-gen-text">${msg.planGenerated}</div>
+          ${actionsHtml}
+        `;
+        bubble.appendChild(pgDiv);
+      }
+
+      // Plan: current question (interactive)
+      if (msg.planQuestion && !msg.planQuestion.answer) {
+        const pq = msg.planQuestion;
+        const pqDiv = document.createElement('div');
+        pqDiv.className = 'plan-question-block';
+        pqDiv.id = 'planQuestion_' + msgIdx;
+
+        let inputHtml = '';
+        if (pq.input_type === 'select' || pq.input_type === 'confirm') {
+          const opts = pq.input_type === 'confirm' ? ['是 / 确定', '否 / 取消'] : (pq.options || []);
+          inputHtml = `<div class="plan-options">${opts.map(o =>
+            `<button class="plan-option" onclick="event.stopPropagation();selectPlanOption(this,${msgIdx})" data-value="${o.replace(/"/g,'&quot;')}">${o}</button>`
+          ).join('')}</div>`;
+        } else if (pq.input_type === 'text') {
+          inputHtml = `<textarea class="plan-text-input" id="planTextInput_${msgIdx}" placeholder="输入你的回答..." rows="2" oninput="updatePlanAnswerBtn(${msgIdx})"></textarea>`;
+        }
+        pqDiv.innerHTML = `
+          <div class="plan-q-label">需求澄清</div>
+          <div class="plan-q-text">${pq.question}</div>
+          ${inputHtml}
+          <button class="plan-answer-btn" id="planAnswerBtn_${msgIdx}" disabled onclick="event.stopPropagation();answerPlanQuestion(${msgIdx})">提交</button>
+        `;
+        bubble.appendChild(pqDiv);
+      }
+
+      // Thinking + Tools combined section (collapsible)
+      if (msg.thinking || (msg.tools && msg.tools.length > 0)) {
+        const processSec = document.createElement('div');
+        processSec.className = 'think-section';
+        if (msg.processCollapsed) processSec.classList.add('section-collapsed');
+
+        const header = document.createElement('div');
+        header.className = 'think-header';
+        const hasRunning = msg.tools && msg.tools.some(t => t.status === 'running');
+        const hasPending = msg.tools && msg.tools.some(t => t.status === 'pending');
+        const toolCount = msg.tools ? msg.tools.length : 0;
+        header.innerHTML = `<span class="chevron">▼</span> 思考与工具调用` + (toolCount > 0 ? ` (${toolCount})` : '') + (hasPending ? ' <span style="color:#0369a1;font-size:11px;">等待确认...</span>' : '') + (hasRunning ? ' <span style="color:#b45309;font-size:11px;">执行中...</span>' : '');
+
+        if (hasPending) {
+          processSec.classList.remove('section-collapsed');
+          msg.processCollapsed = false;
+        }
+        header.onclick = function() {
+          processSec.classList.toggle('section-collapsed');
+          msg.processCollapsed = processSec.classList.contains('section-collapsed');
+        };
+
+        const body = document.createElement('div');
+        body.className = 'think-body';
+
+        // Thinking text
+        if (msg.thinking) {
+          const thinkP = document.createElement('div');
+          thinkP.style.cssText = 'margin-bottom:10px;';
+          thinkP.textContent = msg.thinking;
+          body.appendChild(thinkP);
+        }
+
+        // Tool items
+        if (msg.tools && msg.tools.length > 0) {
+          msg.tools.forEach((tool, toolIdx) => {
+            const item = document.createElement('div');
+            item.className = 'tool-item';
+            item.innerHTML = `
+              <svg class="icon-sm t-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
+              <div class="t-info">
+                <div class="t-name">${tool.name}</div>
+                ${tool.command ? `<div class="t-cmd">$ ${tool.command}</div>` : ''}
+                ${tool.status === 'pending' ? `
+                  <div class="tool-actions">
+                    <button class="tool-action-btn confirm" onclick="event.stopPropagation();confirmTool(${msgIdx}, ${toolIdx})">确认</button>
+                    <button class="tool-action-btn skip" onclick="event.stopPropagation();skipTool(${msgIdx}, ${toolIdx})">跳过</button>
+                    <button class="tool-action-btn stop" onclick="event.stopPropagation();stopTools(${msgIdx}, ${toolIdx})">终止</button>
+                  </div>
+                ` : ''}
+                ${tool.detail ? `<div class="t-detail">${tool.detail}</div>` : ''}
+                ${tool.result ? `<div class="t-result">${tool.result}</div>` : ''}
+              </div>
+              ${tool.status !== 'pending' ? `<div class="t-status ${tool.status}">${tool.status === 'running' ? '执行中...' : '完成'}</div>` : ''}
+            `;
+            body.appendChild(item);
+          });
+        }
+
+        processSec.appendChild(header);
+        processSec.appendChild(body);
+        bubble.appendChild(processSec);
+      }
+
+      // Final text (always visible)
+      if (msg.text) {
+        const textDiv = document.createElement('div');
+        textDiv.className = 'msg-text';
+        textDiv.innerHTML = msg.text.replace(/\n/g, '<br>').replace(/`([^`]+)`/g, '<code>$1</code>');
+        bubble.appendChild(textDiv);
+      }
+
+      div.appendChild(avatar);
+      div.appendChild(bubble);
+      msgsEl.appendChild(div);
+    });
+  }
+
+  setTimeout(() => { if (msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight; }, 50);
+}
+
+// ===== SEND =====
+function sendMessage(text) {
+  const input = document.getElementById('chatInput');
+  const msgText = text || input.value.trim();
+  if (!msgText) return;
+
+  // If AI is processing, queue this message instead of blocking
+  if (isProcessing) {
+    messageQueue.push(msgText);
+    renderQueue();
+    input.value = ''; input.style.height = 'auto';
+    updateSendButton();
+    return;
+  }
+
+  const task = tasks.find(t => t.id === currentTaskId);
+  if (!task) return;
+
+  if (!task.messages || task.messages.length === 0) {
+    task.title = msgText.length > 20 ? msgText.substring(0, 20) + '...' : msgText;
+    renderTaskList();
+  }
+
+  if (!task.messages) task.messages = [];
+  task.messages.push({ role: 'user', text: msgText });
+
+  input.value = ''; input.style.height = 'auto';
+  setChatLayout(); renderMessages();
+  isProcessing = true;
+  updateSendButton();
+
+  const assistantMsg = { role: 'assistant', text: '', thinking: '', tools: [], processCollapsed: false };
+  task.messages.push(assistantMsg);
+  renderMessages();
+
+  simulateAssistant(task, assistantMsg, getDemoResponse(msgText, currentMode));
+}
+
+function simulateAssistant(task, msg, response) {
+  // Phase 1: show thinking
+  let i = 0;
+  const thinkText = response.thinking;
+  function typeThinking() {
+    if (i < thinkText.length) {
+      msg.thinking = thinkText.substring(0, i + 1);
+      renderMessages();
+      i++;
+      setTimeout(typeThinking, 20 + Math.random() * 30);
+    } else {
+      if (inputMode === 'Plan' && response.planQuestions && response.planQuestions.length > 0) {
+        setTimeout(startPlanQuestions, 300);
+      } else if (inputMode === 'Plan' && response.planGenerated) {
+        setTimeout(showPlanGenerated, 300);
+      } else {
+        setTimeout(startTools, 300);
+      }
+    }
+  }
+  typeThinking();
+
+  // Plan: interactive question flow
+  function startPlanQuestions() {
+    let qIdx = 0;
+    function showNextQuestion() {
+      if (qIdx >= response.planQuestions.length) {
+        setTimeout(showPlanGenerated, 200);
+        return;
+      }
+      const q = response.planQuestions[qIdx];
+      msg.planQuestion = { question: q.question, options: q.options, input_type: q.input_type || 'select', answer: null };
+      msg.planQuestions = msg.planQuestions || [];
+      msg.processCollapsed = false;
+      renderMessages();
+
+      planPending = { type: 'plan_question', resolve: (answer) => {
+        planPending = null;
+        msg.planQuestion.answer = answer;
+        msg.planQuestions.push({ question: q.question, answer: answer });
+        msg.planQuestion = null;
+        qIdx++;
+        renderMessages();
+        setTimeout(showNextQuestion, 300);
+      }};
+    }
+    showNextQuestion();
+  }
+
+  // Plan: show generated plan, wait for confirm/edit/reject
+  function showPlanGenerated() {
+    msg.planGenerated = response.planGenerated;
+    msg.planStatus = 'pending';
+    msg.planEditing = false;
+    msg.processCollapsed = false;
+    renderMessages();
+
+    planPending = { type: 'plan_confirm', resolve: (action) => {
+      planPending = null;
+      if (action === 'confirm') {
+        msg.planStatus = 'confirmed';
+        msg.planEditing = false;
+        renderMessages();
+        setTimeout(autoExecuteTools, 400);
+      } else if (action === 'reject') {
+        msg.planStatus = 'rejected';
+        msg.processCollapsed = true;
+        isProcessing = false;
+        updateSendButton();
+        renderMessages();
+      }
+    }};
+  }
+
+  // Plan: auto-execute tools after plan confirmed (no per-step pause)
+  function autoExecuteTools() {
+    if (!response.tools || response.tools.length === 0) {
+      finish();
+      return;
+    }
+    let toolIdx = 0;
+    function runNext() {
+      if (toolIdx >= response.tools.length) {
+        setTimeout(finish, 200);
+        return;
+      }
+      const tool = response.tools[toolIdx];
+      tool.status = 'running';
+      msg.tools.push(tool);
+      renderMessages();
+      setTimeout(() => {
+        tool.status = 'done';
+        tool.result = tool._result;
+        renderMessages();
+        toolIdx++;
+        setTimeout(runNext, 300 + Math.random() * 400);
+      }, 600 + Math.random() * 500);
+    }
+    runNext();
+  }
+
+  // Phase 2: execute tools one by one
+  function startTools() {
+    if (!response.tools || response.tools.length === 0) {
+      finish();
+      return;
+    }
+    let toolIdx = 0;
+    function runNextTool() {
+      if (toolIdx >= response.tools.length) {
+        setTimeout(finish, 200);
+        return;
+      }
+      const tool = response.tools[toolIdx];
+
+      if (inputMode === 'Build') {
+        tool.status = 'pending';
+        msg.tools.push(tool);
+        msg.processCollapsed = false;
+        renderMessages();
+
+        const msgIdx = task.messages.indexOf(msg);
+        pendingTool = { taskId: task.id, msgIndex: msgIdx, toolIndex: toolIdx, resolve: null };
+        pendingTool.resolve = (action) => {
+          pendingTool = null;
+          if (action === 'confirm') {
+            tool.status = 'running';
+            renderMessages();
+            setTimeout(() => {
+              tool.status = 'done';
+              tool.result = tool._result;
+              renderMessages();
+              toolIdx++;
+              setTimeout(runNextTool, 300 + Math.random() * 400);
+            }, 500 + Math.random() * 700);
+          } else if (action === 'skip') {
+            const ti = msg.tools.indexOf(tool);
+            if (ti >= 0) msg.tools.splice(ti, 1);
+            toolIdx++;
+            renderMessages();
+            setTimeout(runNextTool, 100);
+          } else if (action === 'stop') {
+            msg.processCollapsed = true;
+            isProcessing = false;
+            updateSendButton();
+            renderMessages();
+          }
+        };
+        return;
+      }
+
+      tool.status = 'running';
+      msg.tools.push(tool);
+      renderMessages();
+      setTimeout(() => {
+        tool.status = 'done';
+        tool.result = tool._result;
+        renderMessages();
+        toolIdx++;
+        setTimeout(runNextTool, 300 + Math.random() * 400);
+      }, 500 + Math.random() * 700);
+    }
+    runNextTool();
+  }
+
+  // Phase 3: final result
+  function finish() {
+    msg.text = response.finalText;
+    msg.processCollapsed = true;
+    renderMessages();
+    isProcessing = false;
+    updateSendButton();
+    updateTaskTime(task);
+
+    // Process next queued message if any
+    if (messageQueue.length > 0) {
+      setTimeout(() => {
+        const nextText = messageQueue.shift();
+        renderQueue();
+        sendMessage(nextText);
+      }, 300);
+    }
+  }
+}
+
+function updateToolStatus(msg) {
+  // No longer needed with new rendering approach - kept for compatibility
+}
+
+function updateTaskTime(task) { task.time = '刚才'; renderTaskList(); }
+
+// Build mode tool confirmation handlers
+function confirmTool(msgIdx, toolIdx) {
+  if (!pendingTool) return;
+  pendingTool.resolve('confirm');
+}
+
+function skipTool(msgIdx, toolIdx) {
+  if (!pendingTool) return;
+  pendingTool.resolve('skip');
+}
+
+function stopTools(msgIdx, toolIdx) {
+  if (!pendingTool) return;
+  pendingTool.resolve('stop');
+}
+
+// Plan mode handlers
+function selectPlanOption(btn, msgIdx) {
+  const block = document.getElementById('planQuestion_' + msgIdx);
+  if (!block) return;
+  block.querySelectorAll('.plan-option').forEach(o => o.classList.remove('selected'));
+  btn.classList.add('selected');
+  const answerBtn = document.getElementById('planAnswerBtn_' + msgIdx);
+  if (answerBtn) answerBtn.disabled = false;
+}
+
+function updatePlanAnswerBtn(msgIdx) {
+  const input = document.getElementById('planTextInput_' + msgIdx);
+  const btn = document.getElementById('planAnswerBtn_' + msgIdx);
+  if (btn) btn.disabled = !(input && input.value.trim());
+}
+
+function answerPlanQuestion(msgIdx) {
+  if (!planPending || planPending.type !== 'plan_question') return;
+  const task = tasks.find(t => t.id === currentTaskId);
+  if (!task) return;
+  const msg = task.messages[msgIdx];
+  if (!msg || !msg.planQuestion) return;
+
+  let answer;
+  if (msg.planQuestion.input_type === 'text') {
+    const input = document.getElementById('planTextInput_' + msgIdx);
+    answer = input ? input.value.trim() : '';
+    if (!answer) return;
+  } else {
+    const block = document.getElementById('planQuestion_' + msgIdx);
+    const selected = block ? block.querySelector('.plan-option.selected') : null;
+    if (!selected) return;
+    answer = selected.dataset.value;
+  }
+  planPending.resolve(answer);
+}
+
+function confirmPlan(msgIdx) {
+  if (!planPending || planPending.type !== 'plan_confirm') return;
+  planPending.resolve('confirm');
+}
+
+function editPlan(msgIdx) {
+  if (!planPending || planPending.type !== 'plan_confirm') return;
+  const task = tasks.find(t => t.id === currentTaskId);
+  if (!task) return;
+  const msg = task.messages[msgIdx];
+  if (!msg) return;
+  msg.planEditing = true;
+  currentEditingPlanMsgIdx = msgIdx;
+  openPlanEditorPanel(msg.planGenerated);
+  renderMessages();
+}
+
+function openPlanEditorPanel(planText) {
+  const panel = document.getElementById('planEditorPanel');
+  const main = document.getElementById('mainContent');
+  panel.classList.add('open');
+  main.classList.add('shrunk');
+  const ta = document.getElementById('planEditorTextarea');
+  ta.value = planText;
+  setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 350);
+}
+
+function closePlanEditor() {
+  if (currentEditingPlanMsgIdx != null) {
+    const task = tasks.find(t => t.id === currentTaskId);
+    if (task) {
+      const msg = task.messages[currentEditingPlanMsgIdx];
+      if (msg) msg.planEditing = false;
+    }
+    currentEditingPlanMsgIdx = null;
+  }
+  const panel = document.getElementById('planEditorPanel');
+  const main = document.getElementById('mainContent');
+  panel.classList.remove('open');
+  main.classList.remove('shrunk');
+  renderMessages();
+}
+
+function savePlanFromEditor() {
+  const ta = document.getElementById('planEditorTextarea');
+  const newText = ta ? ta.value.trim() : '';
+  if (!newText) return;
+
+  if (currentEditingPlanMsgIdx != null) {
+    const task = tasks.find(t => t.id === currentTaskId);
+    if (task) {
+      const msg = task.messages[currentEditingPlanMsgIdx];
+      if (msg) {
+        msg.planGenerated = newText;
+        msg.planEditing = false;
+      }
+    }
+    currentEditingPlanMsgIdx = null;
+  }
+  const panel = document.getElementById('planEditorPanel');
+  const main = document.getElementById('mainContent');
+  panel.classList.remove('open');
+  main.classList.remove('shrunk');
+  renderMessages();
+}
+
+function onPlanEditorInput() {
+  // enable/disable save button based on content
+  const ta = document.getElementById('planEditorTextarea');
+  const btn = document.getElementById('planEditorSaveBtn');
+  if (btn) btn.disabled = !(ta && ta.value.trim());
+}
+
+// Legacy inline edit functions (kept for compatibility, no longer used)
+function savePlanEdit(msgIdx) { closePlanEditor(); }
+function cancelPlanEdit(msgIdx) { closePlanEditor(); }
+
+function rejectPlan(msgIdx) {
+  if (!planPending || planPending.type !== 'plan_confirm') return;
+  planPending.resolve('reject');
+}
+
+function getDemoResponse(text, mode) {
+  const isCode = mode === 'code';
+
+  // Plan mode: questions → plan → auto-execute
+  if (inputMode === 'Plan') {
+    const planQuestions = isCode ? [
+      { question: '你希望使用哪种包管理工具？', options: ['npm', 'yarn', 'pnpm'], input_type: 'select' },
+      { question: '是否需要配置 TypeScript？', options: ['是，需要严格模式', '是，基础配置即可', '不需要'], input_type: 'select' },
+    ] : [
+      { question: '数据来源是什么？', options: ['本地文件导入', '数据库连接', '第三方 API 接口'], input_type: 'select' },
+      { question: '报告的交付格式？', options: ['Markdown 文档', 'HTML 页面', 'PDF 报告'], input_type: 'select' },
+    ];
+    const planText = isCode
+      ? '## React 项目搭建方案\n\n1. 使用所选包管理工具初始化 Vite + React + TS 项目\n2. 配置 TypeScript（根据选择调整严格程度）\n3. 搭建 src/components, pages, hooks, utils 目录结构\n4. 安装 React Router + Tailwind CSS 依赖\n5. 配置 ESLint + Prettier 代码规范\n6. 创建入口文件及基础布局组件\n7. 编写项目 README'
+      : '## 数据分析报告方案\n\n1. 从选定数据源读取原始数据\n2. 数据清洗与去重预处理\n3. 关键指标统计分析（均值/方差/趋势）\n4. 生成可视化图表（折线图/柱状图/饼图）\n5. 按选定格式输出分析报告\n6. 归档原始数据与结果';
+    const planTools = isCode ? [
+      { name: '创建项目', command: 'npm create vite@latest my-app -- --template react-ts', detail: '初始化 Vite + React + TS 项目', _result: '项目创建成功，28 个文件已生成', status: 'running' },
+      { name: '安装依赖', command: 'npm install react-router-dom tailwindcss @tailwindcss/vite', detail: '安装核心依赖包', _result: '已安装 12 个包', status: 'running' },
+      { name: '创建目录', command: 'mkdir -p src/{components,pages,hooks,utils}', detail: '搭建项目目录结构', _result: '目录结构已创建', status: 'running' },
+      { name: '写入配置', command: 'cat > tailwind.config.ts << EOF\n...\nEOF', detail: 'Tailwind + ESLint 配置文件', _result: '配置文件已写入', status: 'running' },
+    ] : [
+      { name: '搜索数据', command: 'find /data -name "*.csv" -type f', detail: '搜索数据源文件', _result: '找到 3 个 CSV 文件', status: 'running' },
+      { name: '清洗数据', command: 'python clean.py --input /data/source.csv --drop-dupes', detail: '数据清洗与去重', _result: '清洗完成，保留 12,450 行有效数据', status: 'running' },
+      { name: '分析数据', command: 'python analyze.py --input /data/clean.csv --charts', detail: '统计分析与图表生成', _result: '5 个图表已生成，关键指标已计算', status: 'running' },
+      { name: '生成报告', command: 'pandoc analysis.md -o report.md --to gfm', detail: '生成最终交付报告', _result: '报告已生成: /output/report.md', status: 'running' },
+    ];
+    return {
+      thinking: isCode
+        ? '用户想要搭建一个 React 项目。这是一个多步骤任务，需要先确认技术选型偏好，然后制定详细方案。让我先问几个关键问题确认需求，确保方案符合预期。'
+        : '用户想要做数据分析报告。需要先了解数据来源和交付格式，然后制定完整的分析流程。让我先问几个关键问题确认需求细节。',
+      planQuestions, planGenerated: planText, tools: planTools,
+      finalText: isCode
+        ? 'React 项目搭建完成！\n\n项目已就绪，包含 TypeScript + Tailwind CSS + React Router，目录结构清晰，代码规范配置到位。执行 `npm run dev` 即可开始开发。'
+        : '数据分析报告已生成！\n\n报告路径: /output/report.md，包含 5 个可视化图表和完整的关键指标分析。'
+    };
+  }
+
+  // Ask / Build mode
+  return {
+    thinking: isCode
+      ? '用户想要分析和处理代码。需要先读取文件结构了解项目组织，然后进行代码分析找出潜在问题，最后给出优化建议。'
+      : '用户想要处理文档相关任务。需要先在工作空间搜索相关文件，然后提取关键内容，最后生成处理结果。',
+    tools: [
+      { name: isCode ? '读取文件结构' : '文件搜索', command: isCode ? 'ls -laR /projects --max-depth=3' : 'find /home/user/documents -name "*.doc*" -type f', detail: isCode ? '扫描项目目录' : '在工作空间搜索相关文件', _result: isCode ? '找到 12 个源文件，3 个配置文件' : '找到 5 个相关文档', status: 'running' },
+      { name: isCode ? '代码分析' : '内容提取', command: isCode ? 'rg "def |class |import " --files-with-matches analyzer.py' : 'python -c "import docx; print(docx.Document(\'report.docx\').paragraphs)"', detail: isCode ? 'analyzer.py (234行)' : '提取关键信息', _result: isCode ? '检测到 2 个潜在优化点' : '已提取核心内容', status: 'running' },
+      { name: isCode ? 'Shell 执行' : '文档生成', command: isCode ? 'python analyzer.py --check --verbose' : 'pandoc report.docx -o report.md --to gfm', detail: isCode ? 'python analyzer.py --check' : '生成处理结果', _result: '执行成功', status: 'running' }
+    ],
+    finalText: isCode
+      ? '任务完成！以下是分析结果：\n\n<strong>项目结构</strong>：12 个源文件，结构清晰\n<strong>代码质量</strong>：检测到 2 个可优化点\n - analyzer.py:234 可考虑拆分长函数\n - utils.py:56 建议增加异常处理\n\n需要我详细说明或进一步处理吗？'
+      : '任务完成！已为你整理了相关内容：\n\n<strong>相关文件</strong>：5 个文档\n<strong>核心内容</strong>：已提取摘要\n\n需要我进一步分析或生成报告吗？'
+  };
+}
+
+function updateSendButton() {
+  const btn = document.getElementById('sendBtn');
+  const hasContent = document.getElementById('chatInput').value.trim().length > 0;
+  // During processing, allow sending to queue; when idle, require content
+  btn.style.opacity = hasContent ? '1' : '0.4';
+  btn.style.pointerEvents = hasContent ? 'auto' : 'none';
+}
+
+// ===== MESSAGE QUEUE =====
+function renderQueue() {
+  const container = document.getElementById('queueContainer');
+  if (!container) return;
+  if (messageQueue.length === 0) {
+    container.classList.remove('show');
+    container.innerHTML = '';
+    return;
+  }
+  container.classList.add('show');
+  container.innerHTML = messageQueue.map((text, i) => `
+    <div class="queue-item">
+      <span class="q-badge">等待中 ${i + 1}</span>
+      <span class="q-text">${text.length > 60 ? text.substring(0, 60) + '...' : text}</span>
+      <button class="q-remove" onclick="removeFromQueue(${i})" title="移除">×</button>
+    </div>
+  `).join('');
+}
+
+function removeFromQueue(index) {
+  messageQueue.splice(index, 1);
+  renderQueue();
+  updateSendButton();
+}
+
+// ===== QUICK ACTIONS =====
+function quickSend(text) {
+  document.getElementById('chatInput').value = text;
+  sendMessage(text);
+}
+
+// ===== MODE =====
+function switchMode(mode, btn) {
+  currentMode = mode;
+  document.querySelectorAll('.quick-action').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+}
+
+let inputMode = 'Build';
+function selectInputMode(mode, item, e) {
+  e.stopPropagation();
+  inputMode = mode;
+  document.getElementById('inputModeVal').textContent = mode;
+  document.querySelectorAll('#inputModeDropdown .dropdown-item').forEach(d => d.classList.remove('selected'));
+  item.classList.add('selected');
+  document.getElementById('inputModeDropdown').classList.remove('show');
+}
+
+// ===== CONFIG PANEL =====
+let currentConfig = 'skills';
+
+function openConfig(type) {
+  currentConfig = type;
+  document.getElementById('configPanel').classList.add('show');
+  document.getElementById('mainContent').style.display = 'none';
+  document.querySelectorAll('.config-nav').forEach(el => el.classList.remove('active'));
+  const titles = { skills: 'Skills 配置', mcp: 'MCP 配置', memory: '记忆配置' };
+  document.getElementById('configTitle').textContent = titles[type];
+  document.getElementById('btn' + type.charAt(0).toUpperCase() + type.slice(1)).classList.add('active');
+  renderConfigContent(type);
+}
+
+function closeConfig() {
+  document.getElementById('configPanel').classList.remove('show');
+  document.getElementById('mainContent').style.display = 'flex';
+  document.querySelectorAll('.config-nav').forEach(el => el.classList.remove('active'));
+}
+
+function renderConfigContent(type) {
+  const container = document.getElementById('configContent');
+  if (type === 'skills') renderSkillsInConfig(container);
+  else if (type === 'mcp') renderMcpInConfig(container);
+  else if (type === 'memory') renderMemoryInConfig(container);
+}
+
+let skillsTab = 'hub';
+
+function renderSkillsInConfig(container) {
+  container.innerHTML = `
+    <div class="skill-tabs">
+      <div class="skill-tabs-left">
+        <button class="skill-tab ${skillsTab==='hub'?'active':''}" onclick="switchSkillsTab('hub')">Hub</button>
+        <button class="skill-tab ${skillsTab==='installed'?'active':''}" onclick="switchSkillsTab('installed')">已安装</button>
+        <button class="skill-tab ${skillsTab==='custom'?'active':''}" onclick="switchSkillsTab('custom')">自己添加</button>
+      </div>
+      <div class="hub-search">
+        <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);"><circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/></svg>
+        <input class="hub-search-input" type="text" placeholder="搜索 Skill..." oninput="filterHubSkills()">
+      </div>
+    </div>
+    <div id="skillsTabContent"></div>
+  `;
+  renderSkillsTabContent();
+}
+
+function switchSkillsTab(tab) {
+  skillsTab = tab;
+  const container = document.getElementById('configContent');
+  renderSkillsInConfig(container);
+}
+
+function renderSkillsTabContent() {
+  const content = document.getElementById('skillsTabContent');
+  if (!content) return;
+  if (skillsTab === 'hub') renderHubSkills(content);
+  else if (skillsTab === 'installed') renderInstalledSkills(content);
+  else if (skillsTab === 'custom') renderCustomSkills(content);
+}
+
+function renderHubSkills(content) {
+  const input = document.querySelector('.hub-search-input');
+  const filter = (input ? input.value : '').toLowerCase();
+  let rows = '';
+  const filtered = hubSkills.filter(s =>
+    !filter || s.name.toLowerCase().includes(filter) || s.desc.toLowerCase().includes(filter) || s.category.toLowerCase().includes(filter)
+  );
+  filtered.forEach(s => {
+    const installed = installedSkillIds.includes(s.id);
+    rows += '<div class="skill-card">' +
+      '<div class="s-icon">' + s.icon + '</div>' +
+      '<div class="s-info">' +
+        '<div class="s-name">' + s.name + '</div>' +
+        '<div class="s-desc">' + s.desc + '</div>' +
+        '<span class="s-badge builtin">' + s.category + '</span>' +
+      '</div>' +
+      '<div class="s-action">' +
+        '<button class="s-install' + (installed ? ' installed' : '') + '" data-sid="' + s.id + '" data-action="' + (installed ? 'uninstall' : 'install') + '" onclick="event.stopPropagation();handleSkillAction(this)">' + (installed ? '已安装' : '安装') + '</button>' +
+      '</div>' +
+    '</div>';
+  });
+  content.innerHTML = '<div class="skill-grid">' + (rows || '<div style="color:var(--text-muted);font-size:13px;padding:12px 0;">未找到匹配的 Skill</div>') + '</div>';
+}
+
+function filterHubSkills() {
+  if (skillsTab === 'hub') renderSkillsTabContent();
+}
+
+function refreshHubSkills() {
+  if (skillsTab === 'hub') renderSkillsTabContent();
+}
+
+function renderInstalledSkills(content) {
+  const installedHub = hubSkills.filter(s => installedSkillIds.includes(s.id));
+  content.innerHTML = `
+    <div class="skill-section-label">Hub 已安装</div>
+    <div class="skill-grid">
+      ${installedHub.length > 0 ? installedHub.map(s => `
+        <div class="skill-card enabled">
+          <div class="s-icon">${s.icon}</div>
+          <div class="s-info">
+            <div class="s-name">${s.name}</div>
+            <div class="s-desc">${s.desc}</div>
+            <span class="s-badge builtin">${s.category}</span>
+          </div>
+          <div class="s-action">
+            <button class="s-install installed" data-sid="${s.id}" data-action="uninstall" onclick="event.stopPropagation();handleSkillAction(this)">卸载</button>
+          </div>
+        </div>
+      `).join('') : '<div style="color:var(--text-muted);font-size:13px;padding:12px 0;">暂无已安装的 Hub Skill</div>'}
+    </div>
+    <div class="skill-section-label" style="margin-top:20px;">内置 Skills</div>
+    <div class="skill-grid">
+      ${builtinSkills.map(s => `
+        <div class="skill-card enabled">
+          <div class="s-icon">${s.icon}</div>
+          <div class="s-info">
+            <div class="s-name">${s.name}</div>
+            <div class="s-desc">${s.desc}</div>
+            <span class="s-badge builtin">内置</span>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderCustomSkills(content) {
+  content.innerHTML = `
+    <div class="custom-actions">
+      <button class="custom-action-btn" onclick="uploadSkill()">
+        <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 10V2M4 6l4-4 4 4"/><path d="M2 12v2h12v-2"/></svg>
+        上传 Skill
+      </button>
+      <button class="custom-action-btn" onclick="createSkill()">
+        <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>
+        自己创建
+      </button>
+    </div>
+    <div class="skill-grid">
+      ${customSkills.length > 0 ? customSkills.map(s => `
+        <div class="skill-card enabled">
+          <div class="s-icon">${s.icon}</div>
+          <div class="s-info">
+            <div class="s-name">${s.name}</div>
+            <div class="s-desc">${s.desc}</div>
+            <span class="s-badge ${s.source==='create'?'builtin':'mcp'}">${s.source==='create'?'自建':'上传 · '+s.fileName}</span>
+          </div>
+          <div class="s-action">
+            <button class="s-install installed" onclick="event.stopPropagation();deleteCustomSkill('${s.id}')">删除</button>
+          </div>
+        </div>
+      `).join('') : '<div style="color:var(--text-muted);font-size:13px;padding:12px 0;">暂无自定义 Skill，点击上方按钮添加</div>'}
+    </div>
+  `;
+}
+
+function handleSkillAction(btn) {
+  const id = btn.dataset.sid;
+  const action = btn.dataset.action;
+  if (action === 'install') {
+    if (!installedSkillIds.includes(id)) installedSkillIds.push(id);
+    btn.textContent = '已安装'; btn.className = 's-install installed';
+    btn.dataset.action = 'uninstall';
+    showToast('已安装');
+  } else {
+    installedSkillIds = installedSkillIds.filter(x => x !== id);
+    if (skillsTab === 'installed') { renderSkillsTabContent(); return; }
+    btn.textContent = '安装'; btn.className = 's-install';
+    btn.dataset.action = 'install';
+    showToast('已卸载');
+  }
+  if (skillsTab === 'hub') refreshHubSkills();
+}
+
+function uploadSkill() {
+  showToast('模拟: 打开文件选择器...');
+  const newSkill = { id: 'c' + Date.now(), name: '新上传的 Skill', desc: '通过文件上传添加的自定义 Skill', icon: '📦', source: 'upload', fileName: 'custom-skill.skill', time: '刚才' };
+  customSkills.unshift(newSkill);
+  if (skillsTab === 'custom') renderSkillsTabContent();
+}
+
+function createSkill() {
+  document.getElementById('modalTitle').textContent = '创建 Skill';
+  document.getElementById('modalInput').value = '';
+  document.getElementById('modalInput').placeholder = '输入 Skill 名称...';
+  modalTarget = { type: 'createSkill' };
+  document.getElementById('editModal').classList.add('show');
+  setTimeout(() => document.getElementById('modalInput').focus(), 100);
+}
+
+function deleteCustomSkill(id) {
+  customSkills = customSkills.filter(s => s.id !== id);
+  renderSkillsTabContent();
+  showToast('已删除');
+}
+
+
+function renderMcpInConfig(container) {
+  container.innerHTML = `
+    <div class="skill-tabs">
+      <div class="skill-tabs-left">
+        <button class="skill-tab ${mcpTab==='hub'?'active':''}" onclick="switchMcpTab('hub')">Hub</button>
+        <button class="skill-tab ${mcpTab==='installed'?'active':''}" onclick="switchMcpTab('installed')">已安装</button>
+        <button class="skill-tab ${mcpTab==='custom'?'active':''}" onclick="switchMcpTab('custom')">自己添加</button>
+      </div>
+      <div class="hub-search">
+        <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);"><circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/></svg>
+        <input class="hub-search-input" type="text" placeholder="搜索 MCP..." oninput="filterMcpHub()">
+      </div>
+    </div>
+    <div id="mcpTabContent"></div>
+  `;
+  renderMcpTabContent();
+}
+
+function switchMcpTab(tab) {
+  mcpTab = tab;
+  const container = document.getElementById('configContent');
+  renderMcpInConfig(container);
+}
+
+function renderMcpTabContent() {
+  const content = document.getElementById('mcpTabContent');
+  if (!content) return;
+  if (mcpTab === 'hub') renderMcpHub(content);
+  else if (mcpTab === 'installed') renderMcpInstalled(content);
+  else if (mcpTab === 'custom') renderMcpCustom(content);
+}
+
+function renderMcpHub(content) {
+  const input = document.querySelector('#configContent .hub-search-input');
+  const filter = (input ? input.value : '').toLowerCase();
+  let rows = '';
+  const filtered = mcpHub.filter(s =>
+    !filter || s.name.toLowerCase().includes(filter) || s.desc.toLowerCase().includes(filter) || s.category.toLowerCase().includes(filter)
+  );
+  filtered.forEach(s => {
+    const installed = installedMcpIds.includes(s.id);
+    rows += '<div class="skill-card">' +
+      '<div class="s-icon">' + s.icon + '</div>' +
+      '<div class="s-info">' +
+        '<div class="s-name">' + s.name + '</div>' +
+        '<div class="s-desc">' + s.desc + '</div>' +
+        '<span class="s-badge mcp">' + s.category + '</span>' +
+      '</div>' +
+      '<div class="s-action">' +
+        '<button class="s-install' + (installed ? ' installed' : '') + '" data-sid="' + s.id + '" data-action="' + (installed ? 'uninstall' : 'install') + '" onclick="event.stopPropagation();handleMcpAction(this)">' + (installed ? '已安装' : '安装') + '</button>' +
+      '</div>' +
+    '</div>';
+  });
+  content.innerHTML = '<div class="skill-grid">' + (rows || '<div style="color:var(--text-muted);font-size:13px;padding:12px 0;">未找到匹配的 MCP</div>') + '</div>';
+}
+
+function filterMcpHub() {
+  if (mcpTab === 'hub') renderMcpTabContent();
+}
+
+function refreshMcpHub() {
+  if (mcpTab === 'hub') renderMcpTabContent();
+}
+
+function renderMcpInstalled(content) {
+  const installedHub = mcpHub.filter(s => installedMcpIds.includes(s.id));
+  content.innerHTML = `
+    <div class="skill-section-label">Hub 已安装</div>
+    <div class="skill-grid">
+      ${installedHub.length > 0 ? installedHub.map(s => `
+        <div class="skill-card enabled">
+          <div class="s-icon">${s.icon}</div>
+          <div class="s-info">
+            <div class="s-name">${s.name}</div>
+            <div class="s-desc">${s.desc}</div>
+            <span class="s-badge mcp">${s.category}</span>
+          </div>
+          <div class="s-action">
+            <button class="s-install installed" data-sid="${s.id}" data-action="uninstall" onclick="event.stopPropagation();handleMcpAction(this)">卸载</button>
+          </div>
+        </div>
+      `).join('') : '<div style="color:var(--text-muted);font-size:13px;padding:12px 0;">暂无已安装的 Hub MCP</div>'}
+    </div>
+  `;
+}
+
+function renderMcpCustom(content) {
+  content.innerHTML = `
+    <div class="custom-actions">
+      <button class="custom-action-btn" onclick="uploadMcp()">
+        <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 10V2M4 6l4-4 4 4"/><path d="M2 12v2h12v-2"/></svg>
+        上传 MCP
+      </button>
+      <button class="custom-action-btn" onclick="createMcp()">
+        <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>
+        自己创建
+      </button>
+    </div>
+    <div class="skill-grid">
+      ${customMcps.length > 0 ? customMcps.map(s => `
+        <div class="skill-card enabled">
+          <div class="s-icon">${s.icon}</div>
+          <div class="s-info">
+            <div class="s-name">${s.name}</div>
+            <div class="s-desc">${s.desc}</div>
+            <span class="s-badge ${s.source==='create'?'builtin':'mcp'}">${s.source==='create'?'自建':'上传 · '+s.fileName}</span>
+          </div>
+          <div class="s-action">
+            <button class="s-install installed" onclick="event.stopPropagation();deleteCustomMcp('${s.id}')">删除</button>
+          </div>
+        </div>
+      `).join('') : '<div style="color:var(--text-muted);font-size:13px;padding:12px 0;">暂无自定义 MCP，点击上方按钮添加</div>'}
+    </div>
+  `;
+}
+
+function handleMcpAction(btn) {
+  const id = btn.dataset.sid;
+  const action = btn.dataset.action;
+  if (action === 'install') {
+    if (!installedMcpIds.includes(id)) installedMcpIds.push(id);
+    btn.textContent = '已安装'; btn.className = 's-install installed';
+    btn.dataset.action = 'uninstall';
+    showToast('MCP 已安装');
+  } else {
+    installedMcpIds = installedMcpIds.filter(x => x !== id);
+    if (mcpTab === 'installed') { renderMcpTabContent(); return; }
+    btn.textContent = '安装'; btn.className = 's-install';
+    btn.dataset.action = 'install';
+    showToast('MCP 已卸载');
+  }
+  if (mcpTab === 'hub') refreshMcpHub();
+}
+
+function uploadMcp() {
+  showToast('模拟: 打开文件选择器...');
+  const newMcp = { id: 'cm' + Date.now(), name: '新上传的 MCP', desc: '通过文件上传添加的自定义 MCP', icon: '📦', source: 'upload', fileName: 'custom-mcp.json', time: '刚才' };
+  customMcps.unshift(newMcp);
+  if (mcpTab === 'custom') renderMcpTabContent();
+}
+
+function createMcp() {
+  document.getElementById('modalTitle').textContent = '创建 MCP';
+  document.getElementById('modalInput').value = '';
+  document.getElementById('modalInput').placeholder = '输入 MCP 名称...';
+  modalTarget = { type: 'createMcp' };
+  document.getElementById('editModal').classList.add('show');
+  setTimeout(() => document.getElementById('modalInput').focus(), 100);
+}
+
+function deleteCustomMcp(id) {
+  customMcps = customMcps.filter(s => s.id !== id);
+  renderMcpTabContent();
+  showToast('MCP 已删除');
+}
+
+function renderMemoryInConfig(container) {
+  container.innerHTML = `
+    <div class="skill-section-label">聊天记忆</div>
+    <div class="memory-list" id="memoryList"></div>
+    <div class="skill-section-label" style="margin-top:20px;">Rules</div>
+    <div class="rules-list" id="rulesList"></div>
+  `;
+  renderMemoryItems();
+  renderRulesItems();
+}
+
+// Memory data
+let memoryItems = [
+  { id: 'm1', text: '用户偏好简洁回复，不要冗余解释', time: '3天前' },
+  { id: 'm2', text: '项目使用 TypeScript + React + Tailwind CSS 技术栈', time: '1周前' },
+  { id: 'm3', text: '用户是高级前端工程师，熟悉 React 生态', time: '2周前' },
+];
+
+let rulesItems = [
+  { id: 'r1', text: '所有 API 调用需要统一的错误处理', time: '1周前' },
+  { id: 'r2', text: '组件命名使用 PascalCase，文件与组件同名', time: '2周前' },
+];
+
+function renderMemoryItems() {
+  const list = document.getElementById('memoryList');
+  if (!list) return;
+  list.innerHTML = memoryItems.map(m => `
+    <div class="memory-item">
+      <div class="mem-text">${m.text}</div>
+      <div class="mem-time">${m.time}</div>
+      <button class="mem-edit" onclick="editMemory('${m.id}')" title="编辑">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 14h2l8-8-2-2-8 8v2z"/><path d="M12 3l2 2"/></svg>
+      </button>
+      <button class="mem-delete" onclick="deleteMemory('${m.id}')" title="删除">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 4 14 4 12 16 4 16 2 4"/><line x1="6" y1="7" x2="6" y2="12"/><line x1="10" y1="7" x2="10" y2="12"/></svg>
+      </button>
+    </div>
+  `).join('');
+}
+
+function renderRulesItems() {
+  const list = document.getElementById('rulesList');
+  if (!list) return;
+  list.innerHTML = rulesItems.map(r => `
+    <div class="memory-item">
+      <div class="mem-text">${r.text}</div>
+      <div class="mem-time">${r.time}</div>
+      <button class="mem-edit" onclick="editRule('${r.id}')" title="编辑">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 14h2l8-8-2-2-8 8v2z"/><path d="M12 3l2 2"/></svg>
+      </button>
+      <button class="mem-delete" onclick="deleteRule('${r.id}')" title="删除">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 4 14 4 12 16 4 16 2 4"/><line x1="6" y1="7" x2="6" y2="12"/><line x1="10" y1="7" x2="10" y2="12"/></svg>
+      </button>
+    </div>
+  `).join('');
+}
+
+// Modal state
+let modalTarget = null; // { type: 'memory'|'rule', id: string }
+
+function openModal(type, id) {
+  const item = (type === 'memory' ? memoryItems : rulesItems).find(x => x.id === id);
+  if (!item) return;
+  modalTarget = { type, id };
+  document.getElementById('modalTitle').textContent = type === 'memory' ? '编辑记忆' : '编辑规则';
+  document.getElementById('modalInput').value = item.text;
+  document.getElementById('editModal').classList.add('show');
+  setTimeout(() => document.getElementById('modalInput').focus(), 100);
+}
+
+function closeModal() {
+  document.getElementById('editModal').classList.remove('show');
+  modalTarget = null;
+}
+
+function confirmModal() {
+  if (!modalTarget) return;
+  if (modalTarget.type === 'createSkill') {
+    const name = document.getElementById('modalInput').value.trim();
+    if (!name) { closeModal(); return; }
+    customSkills.unshift({ id: 'c' + Date.now(), name, desc: '自定义创建的 Skill', icon: '✨', source: 'create', time: '刚才' });
+    if (skillsTab === 'custom') renderSkillsTabContent();
+    showToast('Skill 已创建');
+    closeModal();
+    return;
+  }
+  if (modalTarget.type === 'createMcp') {
+    const name = document.getElementById('modalInput').value.trim();
+    if (!name) { closeModal(); return; }
+    customMcps.unshift({ id: 'cm' + Date.now(), name, desc: '自定义创建的 MCP', icon: '🔧', source: 'create', time: '刚才' });
+    if (mcpTab === 'custom') renderMcpTabContent();
+    showToast('MCP 已创建');
+    closeModal();
+    return;
+  }
+  const newText = document.getElementById('modalInput').value.trim();
+  if (!newText) { closeModal(); return; }
+  const list = modalTarget.type === 'memory' ? memoryItems : rulesItems;
+  const item = list.find(x => x.id === modalTarget.id);
+  if (item) { item.text = newText; }
+  if (modalTarget.type === 'memory') renderMemoryItems(); else renderRulesItems();
+  showToast(modalTarget.type === 'memory' ? '记忆已更新' : '规则已更新');
+  closeModal();
+}
+
+function editMemory(id) { openModal('memory', id); }
+function deleteMemory(id) {
+  memoryItems = memoryItems.filter(m => m.id !== id);
+  renderMemoryItems();
+  showToast('记忆已删除');
+}
+
+function editRule(id) { openModal('rule', id); }
+function deleteRule(id) {
+  rulesItems = rulesItems.filter(r => r.id !== id);
+  renderRulesItems();
+  showToast('规则已删除');
+}
+
+
+// ===== DROPDOWNS =====
+function toggleDropdown(id) {
+  event.stopPropagation();
+  document.querySelectorAll('.dropdown').forEach(d => { if (d.id !== id) d.classList.remove('show'); });
+  document.getElementById(id).classList.toggle('show');
+}
+
+function selectWs(path, item, e) {
+  e.stopPropagation();
+  document.getElementById('wsVal').textContent = path === 'browse' ? '选择目录...' : path;
+  document.querySelectorAll('#wsDropdown .dropdown-item').forEach(d => d.classList.remove('selected'));
+  item.classList.add('selected');
+  document.getElementById('wsDropdown').classList.remove('show');
+  if (path === 'browse') {
+    showToast('模拟: 打开系统目录选择器...');
+    setTimeout(() => { document.getElementById('wsVal').textContent = '/home/user/selected-folder'; }, 1000);
+  }
+}
+
+function selectModel(model, item, e) {
+  e.stopPropagation();
+  document.getElementById('mdVal').textContent = model;
+  document.querySelectorAll('#mdDropdown .dropdown-item').forEach(d => d.classList.remove('selected'));
+  item.classList.add('selected');
+  document.getElementById('mdDropdown').classList.remove('show');
+  showToast(`模型已切换: ${model}`);
+}
+
+// ===== CONTEXT MENU =====
+function taskContextMenu(e, taskId) {
+  e.preventDefault();
+  const menu = document.getElementById('ctxMenu');
+  menu.innerHTML = `
+    <div class="ctx-menu-item" onclick="renameTask('${taskId}')">重命名</div>
+    <div class="ctx-menu-item" onclick="duplicateTask('${taskId}')">复制任务</div>
+    <div class="ctx-menu-item danger" onclick="deleteTask('${taskId}')">删除任务</div>
+  `;
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
+  menu.classList.add('show');
+  setTimeout(() => {
+    const closeCtx = (ev) => { if (!ev.target.closest('.ctx-menu')) { menu.classList.remove('show'); document.removeEventListener('click', closeCtx); } };
+    document.addEventListener('click', closeCtx);
+  }, 10);
+}
+
+function renameTask(id) {
+  document.getElementById('ctxMenu').classList.remove('show');
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  const newName = prompt('重命名任务:', task.title);
+  if (newName && newName.trim()) { task.title = newName.trim(); renderTaskList(); showToast('任务已重命名'); }
+}
+
+function duplicateTask(id) {
+  document.getElementById('ctxMenu').classList.remove('show');
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  tasks.unshift({ id: 'task-' + Date.now(), title: task.title + ' (副本)', time: '刚才', active: false, messages: task.messages ? JSON.parse(JSON.stringify(task.messages)) : [] });
+  renderTaskList(); showToast('任务已复制');
+}
+
+function deleteTask(id) {
+  document.getElementById('ctxMenu').classList.remove('show');
+  tasks = tasks.filter(t => t.id !== id);
+  if (currentTaskId === id) {
+    currentTaskId = tasks.length > 0 ? tasks[0].id : null;
+    if (currentTaskId) { tasks[0].active = true; switchTask(currentTaskId); } else { newTask(); }
+  }
+  renderTaskList(); showToast('任务已删除');
+}
+
+// ===== HELPERS =====
+function handleKeyDown(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
+function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 80) + 'px'; }
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg; toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// ===== START =====
+init();
+setChatLayout();
+</script>
+</body>
+</html>

@@ -10,10 +10,10 @@ interface StoredSettings {
 }
 
 const defaults: StoredSettings = {
-  apiBaseUrl: 'http://localhost:8080',
+  apiBaseUrl: '',
   apiKey: '',
-  model: 'gpt-4',
-  workspacePath: '',
+  model: 'deepseek-v4-pro',
+  workspacePath: '/projects/data-report',
   fullAccess: false
 }
 

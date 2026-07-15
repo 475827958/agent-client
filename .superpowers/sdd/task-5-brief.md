@@ -1,95 +1,51 @@
-### Task 5: IPC Client & Settings Store
+### Task 5: Build mode API integration
 
 **Files:**
-- Create: `src/renderer/src/services/ipcClient.ts`
-- Create: `src/renderer/src/stores/settingsStore.ts`
+- Modify: `src/renderer/src/stores/chatStore.ts`
 
 **Interfaces:**
-- Consumes: `ElectronAPI` from Task 2, preload from Task 4
-- Produces: `ipcClient` service, `useSettingsStore` Zustand store
+- Consumes: `buildApi` from `../services/api`
+- Produces: `confirmTool()`, `skipTool()`, `stopTools()` call real API
 
-- [ ] **Step 1: Create IPC client service**
+- [ ] **Step 1: Implement Build mode methods**
 
-`src/renderer/src/services/ipcClient.ts`:
+```ts
+confirmTool: () => {
+  const taskStore = useTaskStore.getState()
+  const task = taskStore.getCurrentTask()
+  if (!task) return
 
-```typescript
-import type { Settings } from '../types'
+  buildApi.confirm(task.id).catch((err) => {
+    console.error('Build confirm failed:', err)
+  })
+},
 
-function getAPI() {
-  if (!window.electronAPI) {
-    // Return mock for dev in browser (non-Electron context)
-    return {
-      file: {
-        glob: async () => [],
-        read: async () => '',
-        grep: async () => [],
-        write: async () => {},
-        edit: async () => {}
-      },
-      workspace: {
-        select: async () => null
-      },
-      settings: {
-        save: async () => {},
-        load: async () => ({
-          apiBaseUrl: 'http://localhost:8080',
-          apiKey: '',
-          model: 'gpt-4',
-          workspacePath: '',
-          fullAccess: false
-        })
-      }
-    }
-  }
-  return window.electronAPI
-}
+skipTool: () => {
+  const taskStore = useTaskStore.getState()
+  const task = taskStore.getCurrentTask()
+  if (!task) return
 
-export const ipcClient = getAPI()
+  buildApi.skip(task.id).catch((err) => {
+    console.error('Build skip failed:', err)
+  })
+},
+
+stopTools: () => {
+  const taskStore = useTaskStore.getState()
+  const task = taskStore.getCurrentTask()
+  if (!task) return
+
+  buildApi.abort(task.id).catch((err) => {
+    console.error('Build abort failed:', err)
+  })
+},
 ```
 
-- [ ] **Step 2: Create settings store**
-
-`src/renderer/src/stores/settingsStore.ts`:
-
-```typescript
-import { create } from 'zustand'
-import type { Settings } from '../types'
-import { DEFAULT_SETTINGS } from '../types'
-import { ipcClient } from '../services/ipcClient'
-
-interface SettingsState {
-  settings: Settings
-  isLoaded: boolean
-  load: () => Promise<void>
-  save: (settings: Partial<Settings>) => Promise<void>
-}
-
-export const useSettingsStore = create<SettingsState>((set, get) => ({
-  settings: DEFAULT_SETTINGS,
-  isLoaded: false,
-
-  load: async () => {
-    try {
-      const saved = await ipcClient.settings.load()
-      set({ settings: { ...DEFAULT_SETTINGS, ...saved }, isLoaded: true })
-    } catch {
-      set({ isLoaded: true })
-    }
-  },
-
-  save: async (partial: Partial<Settings>) => {
-    const updated = { ...get().settings, ...partial }
-    set({ settings: updated })
-    await ipcClient.settings.save(updated)
-  }
-}))
-```
-
-- [ ] **Step 3: Commit**
+- [ ] **Step 2: Commit**
 
 ```bash
-git add src/renderer/src/services/ipcClient.ts src/renderer/src/stores/settingsStore.ts
-git commit -m "feat: add IPC client and settings store"
+git add src/renderer/src/stores/chatStore.ts
+git commit -m "feat: integrate Build mode with real buildApi endpoints"
 ```
 
 ---
