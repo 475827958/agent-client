@@ -46,6 +46,7 @@ export interface Message {
 // ===== Task (replaces Conversation) =====
 export interface Task {
   id: string
+  sessionId: string
   title: string
   time: string
   active: boolean

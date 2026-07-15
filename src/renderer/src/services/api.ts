@@ -4,6 +4,40 @@ import { parseNDJSONStream } from './ndjson'
 
 const DEFAULT_BASE_URL = '/api'
 
+// ===== Session management =====
+
+export interface CreateSessionResponse {
+  session_id: string
+}
+
+export async function createSession(): Promise<string> {
+  const settings = useSettingsStore.getState().settings
+  const baseUrl = settings.apiBaseUrl || DEFAULT_BASE_URL
+  const url = `${baseUrl}/sessions`
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: settings.apiKey ? `Bearer ${settings.apiKey}` : ''
+    }
+  })
+
+  if (!response.ok) {
+    const errBody = await response.text().catch(() => '')
+    let msg = `Create session error: ${response.status} ${response.statusText}`
+    try {
+      const parsed = JSON.parse(errBody)
+      if (parsed.message) msg = parsed.message
+      if (parsed.error) msg = parsed.error
+    } catch {}
+    throw new Error(msg)
+  }
+
+  const data: CreateSessionResponse = await response.json()
+  return data.session_id
+}
+
 // ===== Main chat channel =====
 
 export interface ChatStreamOptions {

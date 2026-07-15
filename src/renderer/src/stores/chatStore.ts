@@ -270,6 +270,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const task = taskStore.getCurrentTask()
     if (!task) return
 
+    if (!task.sessionId) {
+      taskStore.addMessage({
+        id: genMsgId(),
+        role: 'assistant',
+        content: '**Error:** 会话未创建，请重新创建任务',
+        timestamp: Date.now()
+      })
+      return
+    }
+
     const modeStore = useModeStore.getState()
     const inputMode = modeStore.inputMode
     const sceneMode = modeStore.sceneMode
@@ -307,7 +317,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     // Fire the API call (async, runs in background via NDJSON stream)
     sendChatMessage({
-      sessionId: task.id,
+      sessionId: task.sessionId,
       content: text,
       mode: inputMode,
       sceneMode: sceneMode,
@@ -351,7 +361,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const handleEvent = createEventHandler(taskStore, set, lastSeqRef)
 
     reconnectStream(
-      task.id,
+      task.sessionId,
       task.lastSeq + 1,
       handleEvent,
       (err) => {
@@ -376,7 +386,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const task = taskStore.getCurrentTask()
     if (!task) return
 
-    buildApi.confirm(task.id).catch((err) => {
+    buildApi.confirm(task.sessionId).catch((err) => {
       console.error('Build confirm failed:', err)
     })
   },
@@ -386,7 +396,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const task = taskStore.getCurrentTask()
     if (!task) return
 
-    buildApi.skip(task.id).catch((err) => {
+    buildApi.skip(task.sessionId).catch((err) => {
       console.error('Build skip failed:', err)
     })
   },
@@ -396,7 +406,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const task = taskStore.getCurrentTask()
     if (!task) return
 
-    buildApi.abort(task.id).catch((err) => {
+    buildApi.abort(task.sessionId).catch((err) => {
       console.error('Build abort failed:', err)
     })
   },
@@ -422,7 +432,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }))
 
     // Call API (fire-and-forget — stream handles the rest)
-    planApi.confirm(task.id).catch((err) => {
+    planApi.confirm(task.sessionId).catch((err) => {
       console.error('Plan confirm failed:', err)
       // Revert on failure
       taskStore.updateLastAssistantMessage((m) => ({
@@ -454,7 +464,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       processCollapsed: true
     }))
 
-    planApi.reject(task.id).catch((err) => {
+    planApi.reject(task.sessionId).catch((err) => {
       console.error('Plan reject failed:', err)
     })
   },
@@ -489,7 +499,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     // Call API
     if (task) {
-      planApi.edit(task.id, newText).catch((err) => {
+      planApi.edit(task.sessionId, newText).catch((err) => {
         console.error('Plan edit API failed:', err)
       })
     }

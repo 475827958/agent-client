@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Task, Message } from '../types'
+import { createSession } from '../services/api'
 
 let nextId = 1
 function genId(): string {
@@ -16,6 +17,7 @@ function formatTime(ts: number): string {
 const DEMO_TASKS: Task[] = [
   {
     id: 'task-1',
+    sessionId: '',
     title: '新建任务',
     time: '刚才',
     active: true,
@@ -24,6 +26,7 @@ const DEMO_TASKS: Task[] = [
   },
   {
     id: 'task-2',
+    sessionId: '',
     title: '分析 data-report 项目',
     time: '2小时前',
     active: false,
@@ -46,6 +49,7 @@ const DEMO_TASKS: Task[] = [
   },
   {
     id: 'task-3',
+    sessionId: '',
     title: '编写数据分析脚本',
     time: '2小时前',
     active: false,
@@ -54,6 +58,7 @@ const DEMO_TASKS: Task[] = [
   },
   {
     id: 'task-4',
+    sessionId: '',
     title: '修复支付模块 Bug',
     time: '昨天',
     active: false,
@@ -66,7 +71,7 @@ interface TaskState {
   tasks: Task[]
   currentTaskId: string | null
 
-  create: () => string
+  create: () => Promise<string>
   delete: (id: string) => void
   select: (id: string) => void
   rename: (id: string, title: string) => void
@@ -81,11 +86,11 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   tasks: DEMO_TASKS,
   currentTaskId: 'task-1',
 
-  create: () => {
+  create: async () => {
     const state = get()
-    // Dedup: if an empty "新建任务" already exists, just select it
+    // Dedup: if an empty "新建任务" already exists with a valid sessionId, just select it
     const existing = state.tasks.find(
-      t => t.title === '新建任务' && t.messages.length === 0
+      t => t.title === '新建任务' && t.messages.length === 0 && t.sessionId
     )
     if (existing) {
       set((s) => ({
@@ -96,13 +101,28 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
 
     const id = genId()
+    // Create local task placeholder first
     set((s) => ({
       tasks: [
-        { id, title: '新建任务', time: '刚才', active: false, messages: [], lastSeq: 0 },
+        { id, sessionId: '', title: '新建任务', time: '刚才', active: false, messages: [], lastSeq: 0 },
         ...s.tasks.map((t) => ({ ...t, active: false }))
       ],
       currentTaskId: id
     }))
+
+    // Call API to create server-side session
+    try {
+      const sessionId = await createSession()
+      set((s) => ({
+        tasks: s.tasks.map((t) =>
+          t.id === id ? { ...t, sessionId } : t
+        )
+      }))
+    } catch (err) {
+      console.error('Failed to create session:', err)
+      // Task exists locally but has no server session — sendChatMessage will fail
+    }
+
     return id
   },
 
@@ -141,6 +161,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       tasks: [
         {
           id: newId,
+          sessionId: '',
           title: task.title + ' (副本)',
           time: '刚才',
           active: false,
