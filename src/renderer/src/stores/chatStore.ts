@@ -4,6 +4,7 @@ import { sendChatMessage, reconnectStream, planApi, buildApi } from '../services
 import { useTaskStore } from './taskStore'
 import { useQueueStore } from './queueStore'
 import { useModeStore } from './modeStore'
+import { useSettingsStore } from './settingsStore'
 
 let msgIdCounter = 100
 function genMsgId(): string {
@@ -301,14 +302,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const lastSeqRef = { current: 0 }
     const handleEvent = createEventHandler(taskStore, set, lastSeqRef)
 
+    // Read settings for workspace/model
+    const settings = useSettingsStore.getState().settings
+
     // Fire the API call (async, runs in background via NDJSON stream)
     sendChatMessage({
       sessionId: task.id,
       content: text,
       mode: inputMode,
       sceneMode: sceneMode,
-      workspace: '',  // Will be wired from settings in Task 7
-      model: '',      // Will be wired from settings in Task 7
+      workspace: settings.workspacePath,
+      model: settings.model,
       onEvent: handleEvent,
       onError: (err) => {
         taskStore.updateLastAssistantMessage((m) => ({
