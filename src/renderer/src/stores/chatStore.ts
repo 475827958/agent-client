@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { Message, ServerEvent } from '../types'
-import { sendChatMessage, reconnectStream } from '../services/api'
+import { sendChatMessage, reconnectStream, planApi, buildApi } from '../services/api'
 import { useTaskStore } from './taskStore'
 import { useQueueStore } from './queueStore'
 import { useModeStore } from './modeStore'
@@ -359,15 +359,33 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   // ===== BUILD MODE =====
   confirmTool: () => {
-    // Implemented in Task 5
+    const taskStore = useTaskStore.getState()
+    const task = taskStore.getCurrentTask()
+    if (!task) return
+
+    buildApi.confirm(task.id).catch((err) => {
+      console.error('Build confirm failed:', err)
+    })
   },
 
   skipTool: () => {
-    // Implemented in Task 5
+    const taskStore = useTaskStore.getState()
+    const task = taskStore.getCurrentTask()
+    if (!task) return
+
+    buildApi.skip(task.id).catch((err) => {
+      console.error('Build skip failed:', err)
+    })
   },
 
   stopTools: () => {
-    // Implemented in Task 5
+    const taskStore = useTaskStore.getState()
+    const task = taskStore.getCurrentTask()
+    if (!task) return
+
+    buildApi.abort(task.id).catch((err) => {
+      console.error('Build abort failed:', err)
+    })
   },
 
   // ===== PLAN MODE =====
@@ -380,15 +398,52 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   confirmPlan: () => {
-    // Implemented in Task 4
+    const taskStore = useTaskStore.getState()
+    const task = taskStore.getCurrentTask()
+    if (!task) return
+
+    // Optimistically update local state
+    taskStore.updateLastAssistantMessage((m) => ({
+      ...m,
+      planStatus: 'confirmed'
+    }))
+
+    // Call API (fire-and-forget — stream handles the rest)
+    planApi.confirm(task.id).catch((err) => {
+      console.error('Plan confirm failed:', err)
+      // Revert on failure
+      taskStore.updateLastAssistantMessage((m) => ({
+        ...m,
+        planStatus: 'pending'
+      }))
+    })
   },
 
-  editPlan: (_msgIdx: number) => {
-    // Implemented in Task 4
+  editPlan: (msgIdx: number) => {
+    const taskStore = useTaskStore.getState()
+    const task = taskStore.getCurrentTask()
+    if (!task) return
+    const msg = task.messages[msgIdx]
+    if (!msg?.planGenerated) return
+
+    taskStore.updateLastAssistantMessage((m) => ({ ...m, planEditing: true }))
+    set({ currentEditingPlanMsgIdx: msgIdx })
   },
 
   rejectPlan: () => {
-    // Implemented in Task 4
+    const taskStore = useTaskStore.getState()
+    const task = taskStore.getCurrentTask()
+    if (!task) return
+
+    taskStore.updateLastAssistantMessage((m) => ({
+      ...m,
+      planStatus: 'rejected',
+      processCollapsed: true
+    }))
+
+    planApi.reject(task.id).catch((err) => {
+      console.error('Plan reject failed:', err)
+    })
   },
 
   // ===== PLAN EDITOR =====
@@ -405,8 +460,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ currentEditingPlanMsgIdx: null })
   },
 
-  savePlanFromEditor: (_newText: string) => {
-    // Implemented in Task 4
+  savePlanFromEditor: (newText: string) => {
+    const idx = get().currentEditingPlanMsgIdx
+    const taskStore = useTaskStore.getState()
+    const task = taskStore.getCurrentTask()
+
+    if (idx != null) {
+      taskStore.updateLastAssistantMessage((m) => ({
+        ...m,
+        planGenerated: newText,
+        planEditing: false
+      }))
+    }
+    set({ currentEditingPlanMsgIdx: null })
+
+    // Call API
+    if (task) {
+      planApi.edit(task.id, newText).catch((err) => {
+        console.error('Plan edit API failed:', err)
+      })
+    }
   },
 
   cancelPlanEdit: () => {
