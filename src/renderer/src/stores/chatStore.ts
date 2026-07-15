@@ -345,15 +345,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const task = taskStore.getCurrentTask()
     if (!task || task.lastSeq === 0) return
 
+    set({ isProcessing: true })
+
     const lastSeqRef = { current: task.lastSeq }
     const handleEvent = createEventHandler(taskStore, set, lastSeqRef)
 
     reconnectStream(
       task.id,
-      task.lastSeq,
+      task.lastSeq + 1,
       handleEvent,
       (err) => {
-        console.error('Reconnect error:', err)
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m,
+          content: m.content || `**Reconnect Error:** ${err.message}`,
+          isStreaming: false,
+          processCollapsed: true
+        }))
+        taskStore.updateTaskSeq(lastSeqRef.current)
+        set({ isProcessing: false })
       },
       () => {
         taskStore.updateTaskSeq(lastSeqRef.current)
