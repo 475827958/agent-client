@@ -42,7 +42,7 @@ export function AppLayout() {
 
       {/* Main chat area */}
       <main
-        className={`flex-1 flex flex-col bg-[#f8fafc] my-2 mr-2 rounded-[14px] shadow-lg relative overflow-hidden border border-[#e2e8f0] transition-all ${
+        className={`flex-1 flex flex-col bg-[#f8fafc] shadow-lg relative overflow-hidden border border-[#e2e8f0] transition-all ${
           isPlanEditorOpen ? 'mr-1' : ''
         }`}
       >

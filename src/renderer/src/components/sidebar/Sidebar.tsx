@@ -18,7 +18,7 @@ export function Sidebar({ onOpenConfig, activeConfig }: Props) {
   const duplicate = useTaskStore((s) => s.duplicate)
 
   return (
-    <aside className="w-[252px] min-w-[252px] bg-sidebar-bg text-sidebar-text flex flex-col p-5 gap-0.5 border-r border-sidebar-border">
+    <aside className="w-[252px] min-w-[252px] bg-sidebar-bg text-sidebar-text flex flex-col p-5 gap-0.5 border-r border-sidebar-border h-full">
       {/* Brand */}
       <div className="flex items-center gap-2.5 px-2.5 pb-6 text-lg font-bold text-[#0f172a] tracking-[-0.4px]">
         <svg width="30" height="30" viewBox="0 0 30 30" fill="none" className="flex-shrink-0">
@@ -78,7 +78,7 @@ export function Sidebar({ onOpenConfig, activeConfig }: Props) {
       <div className="text-[10px] font-semibold uppercase tracking-[0.6px] text-sidebar-text-dim pt-4 pb-1 px-2.5">
         工作任务
       </div>
-      <div className="flex flex-col gap-px max-h-[320px] overflow-y-auto flex-1">
+      <div className="flex flex-col gap-px overflow-y-auto flex-1 min-h-0">
         {tasks.map((t) => (
           <div
             key={t.id}

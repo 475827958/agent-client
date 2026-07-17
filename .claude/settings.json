@@ -159,7 +159,9 @@
       "Bash(find /c/Users/csybo/AppData/Roaming -name \"config.json\" -path \"*agent*\" 2>/dev/null | head -5; find /c/Users/csybo/AppData/Roaming -name \"config.json\" -path \"*electron*\" 2>/dev/null | head -5)",
       "Read(//c/Users/csybo/AppData/Roaming/**)",
       "Read(//c/Users/csybo/AppData/Roaming/agent-desktop/**)",
-      "Bash(rm \"C:/Users/csybo/AppData/Roaming/agent-desktop/config.json\" && echo \"deleted\")"
+      "Bash(rm \"C:/Users/csybo/AppData/Roaming/agent-desktop/config.json\" && echo \"deleted\")",
+      "Bash(git remote *)",
+      "Bash(git push *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\csybo\\AppData\\Roaming\\agent-desktop"
