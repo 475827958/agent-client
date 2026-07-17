@@ -1,59 +1,81 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { useTaskStore } from '../../stores/taskStore'
-import { useChatStore } from '../../stores/chatStore'
 import { useModeStore } from '../../stores/modeStore'
 import { MessageItem } from './MessageItem'
 
-export function MessageList() {
+interface Props {
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>
+}
+
+export function MessageList({ scrollContainerRef }: Props) {
   const task = useTaskStore((s) => s.getCurrentTask())
-  const containerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const isAtBottomRef = useRef(true)
   const prevMsgCountRef = useRef(task?.messages.length ?? 0)
+  const prevSegCountRef = useRef(0)
 
   const isStreaming = task?.messages.some((m) => m.isStreaming) ?? false
 
   // Track whether the user is at the bottom of the scroll container
   const handleScroll = useCallback(() => {
-    const el = containerRef.current
+    const el = scrollContainerRef.current
     if (!el) return
     const threshold = 80
     isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < threshold
-  }, [])
+  }, [scrollContainerRef])
+
+  // Attach scroll listener to the external scroll container
+  useEffect(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    el.addEventListener('scroll', handleScroll, { passive: true })
+    return () => el.removeEventListener('scroll', handleScroll)
+  }, [scrollContainerRef, handleScroll])
 
   // Auto-scroll to bottom on every content change while user is at the bottom
   // Uses ResizeObserver for efficient detection of content growth
   useEffect(() => {
-    const el = containerRef.current
+    const el = scrollContainerRef.current
     if (!el) return
 
     const ro = new ResizeObserver(() => {
       if (isAtBottomRef.current) {
-        bottomRef.current?.scrollIntoView({ behavior: 'auto' })
+        bottomRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' })
       }
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
+  }, [scrollContainerRef])
 
   // When a new message is added, force-scroll to bottom regardless of position
   useEffect(() => {
     const count = task?.messages.length ?? 0
     if (count > prevMsgCountRef.current) {
       isAtBottomRef.current = true
-      // Use setTimeout to ensure the DOM has painted the new message
       requestAnimationFrame(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
       })
     }
     prevMsgCountRef.current = count
   }, [task?.messages.length])
 
+  // When segments are added to messages (e.g. plan.question), force-scroll to bottom
+  const totalSegs = task?.messages.reduce((sum, m) => sum + (m.segments?.length ?? 0), 0) ?? 0
+  useEffect(() => {
+    if (totalSegs > prevSegCountRef.current) {
+      isAtBottomRef.current = true
+      requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' })
+      })
+    }
+    prevSegCountRef.current = totalSegs
+  }, [totalSegs])
+
   // When streaming starts, force-scroll to bottom
   useEffect(() => {
     if (isStreaming) {
       isAtBottomRef.current = true
-      bottomRef.current?.scrollIntoView({ behavior: 'auto' })
+      bottomRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' })
     }
   }, [isStreaming])
 
@@ -94,11 +116,7 @@ export function MessageList() {
   }
 
   return (
-    <div
-      ref={containerRef}
-      onScroll={handleScroll}
-      className="flex-1 flex flex-col gap-5 min-h-0 overflow-y-auto"
-    >
+    <div className="flex flex-col gap-5">
       {task.messages.map((msg, idx) => (
         <MessageItem key={msg.id} message={msg} msgIndex={idx} />
       ))}

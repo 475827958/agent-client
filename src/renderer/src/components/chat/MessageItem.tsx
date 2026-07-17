@@ -312,22 +312,36 @@ function SegmentsView({
               ) : (
                 <>
                   <div className="flex flex-col gap-1.5 mb-2.5">
-                    {options.map(opt => (
-                      <button
-                        key={opt}
-                        onClick={() => {
-                          onSelectValue(opt)
-                          onSelectOption(msgIndex, opt)
-                        }}
-                        className={`px-3 py-2 border border-[#bae6fd] rounded-md text-[13px] text-[#0f172a] cursor-pointer bg-white text-left transition-colors hover:border-[#0ea5e9] hover:bg-[#f0f9ff] ${
-                          selectedPlanValue === opt ? 'border-[#0ea5e9] bg-[#e0f2fe] text-[#0369a1] font-medium' : ''
-                        }`}
-                      >
-                        {opt}
-                      </button>
-                    ))}
+                    {options.map(opt => {
+                      const isSelected = selectedPlanValue === opt
+                      return (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() => {
+                            onSelectValue(opt)
+                            onSelectOption(msgIndex, opt)
+                          }}
+                          className={`px-3 py-2 border rounded-md text-[13px] text-left cursor-pointer flex items-center gap-2 ${
+                            isSelected
+                              ? 'border-[#0ea5e9] bg-[#0ea5e9]/10 text-[#0369a1] font-semibold shadow-[0_0_0_1px_#0ea5e9]'
+                              : 'border-[#bae6fd] bg-white text-[#0f172a] hover:border-[#0ea5e9] hover:bg-[#f0f9ff]'
+                          }`}
+                        >
+                          <span className={`flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-none ${
+                            isSelected ? 'border-[#0ea5e9] bg-[#0ea5e9]' : 'border-[#94a3b8]'
+                          }`}>
+                            {isSelected && (
+                              <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="3"><path d="M3 8l4 4 6-8"/></svg>
+                            )}
+                          </span>
+                          {opt}
+                        </button>
+                      )
+                    })}
                   </div>
                   <button
+                    type="button"
                     onClick={() => {
                       onSubmitAnswer(msgIndex, selectedPlanValue || undefined)
                       onSelectValue('')
