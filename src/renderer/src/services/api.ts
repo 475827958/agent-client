@@ -30,9 +30,29 @@ export interface CreateSessionRequest {
 
 export interface CreateSessionResponse {
   id: string
+  title: string
+  mode: string
+  scene_mode: string
+  model: string
+  workspace: string
+  client_tools_count: number
+  mcp_servers_count: number
+  created_at: string
 }
 
 export const CLIENT_TOOLS = [
+  {
+    name: 'bash',
+    description: '执行 shell 命令',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        command: { type: 'string', description: 'The shell command to execute' },
+        timeout_ms: { type: 'number', description: 'Timeout in milliseconds, default 120000' }
+      },
+      required: ['command']
+    }
+  },
   {
     name: 'read_file',
     description: 'Read the contents of a file at the given path',
@@ -94,7 +114,7 @@ export const CLIENT_TOOLS = [
   }
 ]
 
-export async function createSession(req: CreateSessionRequest): Promise<string> {
+export async function createSession(req: CreateSessionRequest): Promise<CreateSessionResponse> {
   const settings = useSettingsStore.getState().settings
   const baseUrl = settings.apiBaseUrl || DEFAULT_BASE_URL
   const url = `${baseUrl}/sessions`
@@ -115,12 +135,12 @@ export async function createSession(req: CreateSessionRequest): Promise<string> 
       const parsed = JSON.parse(errBody)
       if (parsed.message) msg = parsed.message
       if (parsed.error) msg = parsed.error
-    } catch {}
+    } catch { }
     throw new Error(msg)
   }
 
   const data: CreateSessionResponse = await response.json()
-  return data.id
+  return data
 }
 
 // ===== Main chat channel =====
@@ -171,7 +191,7 @@ export async function sendChatMessage(opts: ChatStreamOptions): Promise<void> {
         const parsed = JSON.parse(errBody)
         if (parsed.message) msg = parsed.message
         if (parsed.error) msg = parsed.error
-      } catch {}
+      } catch { }
       throw new Error(msg)
     }
 
@@ -232,7 +252,7 @@ export async function reconnectStream(
 
 // ===== Plan actions =====
 
-async function planAction(sessionId: string, action: 'confirm' | 'edit' | 'reject', body?: Record<string, unknown>): Promise<void> {
+async function planAction(sessionId: string, action: 'confirm' | 'edit' | 'reject' | 'answer', body?: Record<string, unknown>): Promise<void> {
   const settings = useSettingsStore.getState().settings
   const baseUrl = settings.apiBaseUrl || DEFAULT_BASE_URL
   const url = `${baseUrl}/sessions/${sessionId}/plan/${action}`
@@ -255,7 +275,8 @@ async function planAction(sessionId: string, action: 'confirm' | 'edit' | 'rejec
 export const planApi = {
   confirm: (sessionId: string) => planAction(sessionId, 'confirm'),
   edit: (sessionId: string, planText: string) => planAction(sessionId, 'edit', { plan_text: planText }),
-  reject: (sessionId: string) => planAction(sessionId, 'reject')
+  reject: (sessionId: string) => planAction(sessionId, 'reject'),
+  answer: (sessionId: string, answer: string) => planAction(sessionId, 'answer', { answer })
 }
 
 // ===== Build actions =====

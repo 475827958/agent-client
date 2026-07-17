@@ -158,7 +158,7 @@ const defaults = {
   apiBaseUrl: "",
   apiKey: "",
   model: "deepseek-v4-pro",
-  workspacePath: "",
+  workspacePath: "/projects/data-report",
   fullAccess: false
 };
 function registerSettings() {

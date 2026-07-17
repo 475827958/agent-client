@@ -15,59 +15,6 @@ function formatTime(ts: number): string {
   return `${h}:${m}`
 }
 
-const DEMO_TASKS: Task[] = [
-  {
-    id: genUUID(),
-    sessionId: '',
-    title: '新建任务',
-    time: '刚才',
-    active: true,
-    messages: [],
-    lastSeq: 0
-  },
-  {
-    id: genUUID(),
-    sessionId: '',
-    title: '分析 data-report 项目',
-    time: '2小时前',
-    active: false,
-    lastSeq: 0,
-    messages: [
-      {
-        id: 'msg-1', role: 'user', content: '帮我分析 /projects/data-report 目录下的代码结构，然后写一份 README', timestamp: Date.now() - 7200000
-      },
-      {
-        id: 'msg-2', role: 'assistant', content: '分析完成。该项目是一个数据分析工具：\n\n- **main.py** — 入口文件，加载配置并启动分析器\n- **analyzer.py** — 核心数据分析模块\n- **config.yaml** — 项目配置\n- **utils.py** — 工具函数\n\n需要我继续生成 README 吗？',
-        thinking: '用户想要分析项目目录结构并生成 README。需要先列出目录了解文件结构，再读取关键文件理解代码逻辑，最后总结分析结果。',
-        processCollapsed: true,
-        tools: [
-          { id: 't1', name: '列出目录', command: 'ls -laR /projects/data-report/', detail: '/projects/data-report/', result: 'data-report/\n├── main.py\n├── analyzer.py\n├── config.yaml\n└── utils.py', status: 'done' },
-          { id: 't2', name: '读取文件', command: 'cat /projects/data-report/main.py', detail: 'main.py', result: 'def main():\n    config = load_config("config.yaml")\n    analyzer = DataAnalyzer(config)\n    analyzer.run()', status: 'done' }
-        ],
-        timestamp: Date.now() - 7200000
-      }
-    ]
-  },
-  {
-    id: genUUID(),
-    sessionId: '',
-    title: '编写数据分析脚本',
-    time: '2小时前',
-    active: false,
-    lastSeq: 0,
-    messages: []
-  },
-  {
-    id: genUUID(),
-    sessionId: '',
-    title: '修复支付模块 Bug',
-    time: '昨天',
-    active: false,
-    lastSeq: 0,
-    messages: []
-  }
-]
-
 interface TaskState {
   tasks: Task[]
   currentTaskId: string | null
@@ -84,8 +31,8 @@ interface TaskState {
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
-  tasks: DEMO_TASKS,
-  currentTaskId: DEMO_TASKS[0].id,
+  tasks: [],
+  currentTaskId: null,
 
   create: async () => {
     const state = get()
@@ -116,7 +63,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       const modeStore = useModeStore.getState()
       const settings = useSettingsStore.getState().settings
 
-      const sessionId = await createSession({
+      const data = await createSession({
         id,
         scene_mode: modeStore.sceneMode,
         workspace: settings.workspacePath,
@@ -125,10 +72,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         client_tools: CLIENT_TOOLS
       })
 
-      console.log('Created session:', sessionId)
+      console.log('Created session:', data.id)
       set((s) => ({
         tasks: s.tasks.map((t) =>
-          t.id === id ? { ...t, sessionId } : t
+          t.id === id ? { ...t, sessionId: data.id } : t
         )
       }))
     } catch (err) {

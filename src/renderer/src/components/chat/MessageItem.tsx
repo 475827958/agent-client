@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react'
-import type { Message, PlanQuestion } from '../../types'
+import type { Message, PlanEvent, MessageSegment } from '../../types'
 import { useChatStore } from '../../stores/chatStore'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface Props {
   message: Message
@@ -29,7 +30,7 @@ export function MessageItem({ message, msgIndex }: Props) {
       <div className="flex gap-3 max-w-[740px] self-end flex-row-reverse animate-[msgIn_0.2s_ease-out]">
         <div className="w-[30px] h-[30px] rounded-md bg-[#f0fdf4] text-[#047857] flex items-center justify-center text-[13px] font-semibold flex-shrink-0">Z</div>
         <div className="bg-[#ecfdf5] text-[#064e3b] rounded-[14px_14px_4px_14px] py-3 px-4 text-sm leading-relaxed">
-          <ReactMarkdown>{message.content}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
         </div>
       </div>
     )
@@ -47,57 +48,6 @@ export function MessageItem({ message, msgIndex }: Props) {
       <div className="w-[30px] h-[30px] rounded-md bg-[#f0fdf4] text-[#a7f3d0] flex items-center justify-center text-[15px] font-semibold flex-shrink-0">AI</div>
 
       <div className="bg-white border border-[#e2e8f0] rounded-[14px_14px_14px_4px] py-3 px-4 text-sm leading-relaxed text-[#0f172a] min-w-0 flex-1">
-        {/* Plan: generated plan block */}
-        {message.planGenerated && (
-          <div className={`mt-0 -mx-1 mb-3 p-4 rounded-[10px] border border-l-[3px] ${
-            message.planStatus === 'confirmed'
-              ? 'bg-[#ecfdf5] border-[#a7f3d0] border-l-[#10b981]'
-              : message.planStatus === 'rejected'
-              ? 'bg-[#fef2f2] border-[#fecaca] border-l-[#ef4444]'
-              : 'bg-[#f0fdf4] border-[#a7f3d0] border-l-[#10b981]'
-          }`}>
-            <div className="text-[10px] font-semibold text-[#047857] uppercase tracking-wider mb-2">执行计划</div>
-            <div className="text-[13px] text-[#0f172a] leading-relaxed whitespace-pre-wrap mb-3 bg-white p-3 rounded-md border border-[#e2e8f0]">
-              {message.planGenerated}
-            </div>
-            {message.planStatus === 'pending' && (
-              message.planEditing ? (
-                <div className="flex gap-2">
-                  <span className="text-xs text-[#0369a1] font-medium flex items-center gap-1.5">
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 14h2l8-8-2-2-8 8v2z"/><path d="M12 3l2 2"/></svg>
-                    正在右侧面板编辑计划...
-                  </span>
-                </div>
-              ) : (
-                <div className="flex gap-2 flex-wrap">
-                  <button onClick={() => confirmPlan()} className="px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white border border-[#0f172a] hover:bg-[#334155] transition-colors cursor-pointer">确认计划</button>
-                  <button onClick={() => editPlan(msgIndex)} className="px-[18px] py-[7px] rounded-md text-xs font-medium bg-white text-[#64748b] border border-[#e2e8f0] hover:bg-[#f1f5f9] hover:text-[#0f172a] transition-colors cursor-pointer">编辑</button>
-                  <button onClick={() => rejectPlan()} className="px-[18px] py-[7px] rounded-md text-xs font-medium bg-white text-[#b91c1c] border border-[#fecaca] hover:bg-[#fef2f2] transition-colors cursor-pointer">拒绝</button>
-                </div>
-              )
-            )}
-            {message.planStatus === 'confirmed' && <span className="text-xs text-[#047857] font-medium">计划已确认，正在自动执行...</span>}
-            {message.planStatus === 'rejected' && <span className="text-xs text-[#b91c1c] font-medium">计划已取消</span>}
-          </div>
-        )}
-
-        {/* Plan: question block */}
-        {message.planQuestion && !message.planQuestion.answer && (
-          <PlanQuestionBlock
-            question={message.planQuestion}
-            msgIndex={msgIndex}
-            selectedValue={selectedPlanValue}
-            onSelectValue={setSelectedPlanValue}
-            textAnswer={planTextAnswer}
-            onTextAnswer={setPlanTextAnswer}
-            onSelectOption={(msgIdx, val) => selectPlanOption(msgIdx, val)}
-            onSubmit={(msgIdx, textAnswer) => {
-              answerPlanQuestion(msgIdx, textAnswer)
-              setSelectedPlanValue(null)
-              setPlanTextAnswer('')
-            }}
-          />
-        )}
 
         {/* Thinking + Tools section */}
         {hasThinking && (
@@ -157,11 +107,29 @@ export function MessageItem({ message, msgIndex }: Props) {
           </div>
         )}
 
-        {/* Final text */}
-        {message.content && (
-          <div className="mt-1 prose-sm max-w-none text-[#0f172a]">
-            <ReactMarkdown>{message.content}</ReactMarkdown>
-          </div>
+        {/* Segments: text chunks and plan events interleaved in arrival order */}
+        {message.segments && message.segments.length > 0 ? (
+          <SegmentsView
+            segments={message.segments}
+            msgIndex={msgIndex}
+            selectedPlanValue={selectedPlanValue}
+            onSelectValue={setSelectedPlanValue}
+            textAnswer={planTextAnswer}
+            onTextAnswer={setPlanTextAnswer}
+            onConfirmPlan={confirmPlan}
+            onEditPlan={editPlan}
+            onRejectPlan={rejectPlan}
+            onSelectOption={selectPlanOption}
+            onSubmitAnswer={answerPlanQuestion}
+            planStatus={message.planStatus}
+            planEditing={message.planEditing}
+          />
+        ) : (
+          message.content && (
+            <div className="mt-1 prose-sm max-w-none text-[#0f172a]">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+            </div>
+          )
         )}
 
         {/* Streaming indicator */}
@@ -173,84 +141,190 @@ export function MessageItem({ message, msgIndex }: Props) {
   )
 }
 
-// Plan question sub-component
-function PlanQuestionBlock({
-  question,
+// Renders text chunks and plan events interleaved in arrival order
+function SegmentsView({
+  segments,
   msgIndex,
-  selectedValue,
+  selectedPlanValue,
   onSelectValue,
   textAnswer,
   onTextAnswer,
+  onConfirmPlan,
+  onEditPlan,
+  onRejectPlan,
   onSelectOption,
-  onSubmit
+  onSubmitAnswer,
+  planStatus,
+  planEditing
 }: {
-  question: PlanQuestion
+  segments: MessageSegment[]
   msgIndex: number
-  selectedValue: string | null
+  selectedPlanValue: string | null
   onSelectValue: (v: string) => void
   textAnswer: string
   onTextAnswer: (v: string) => void
-  onSelectOption: (msgIdx: number, val: string) => void
-  onSubmit: (msgIdx: number, textAnswer?: string) => void
+  onConfirmPlan: () => void
+  onEditPlan: (msgIdx: number) => void
+  onRejectPlan: () => void
+  onSelectOption: (msgIdx: number, v: string) => void
+  onSubmitAnswer: (msgIdx: number, textAnswer?: string) => void
+  planStatus?: string
+  planEditing?: boolean
 }) {
-  const isConfirm = question.input_type === 'confirm'
-  const options = isConfirm ? ['是 / 确定', '否 / 取消'] : (question.options || [])
-
   return (
-    <div className="mt-3 p-4 bg-[#f0f9ff] border border-[#bae6fd] rounded-[10px] border-l-[3px] border-l-[#0ea5e9]">
-      <div className="text-[10px] font-semibold text-[#0369a1] uppercase tracking-wider mb-1.5">需求澄清</div>
-      <div className="text-sm font-medium text-[#0f172a] mb-3 leading-relaxed">{question.question}</div>
+    <>
+      {segments.map((seg, i) => {
+        // Text segment — render markdown
+        if (seg.type === 'text') {
+          return (
+            <div key={`txt-${i}`} className="mt-1 mb-2 prose-sm max-w-none text-[#0f172a]">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{seg.content}</ReactMarkdown>
+            </div>
+          )
+        }
 
-      {question.input_type === 'text' ? (
-        <>
-          <textarea
-            className="w-full px-3 py-2 border border-[#bae6fd] rounded-md text-[13px] text-[#0f172a] outline-none resize-y mb-2.5 focus:border-[#0ea5e9] focus:shadow-[0_0_0_3px_rgba(14,165,233,0.15)] transition-colors"
-            placeholder="输入你的回答..."
-            rows={2}
-            value={textAnswer}
-            onChange={(e) => onTextAnswer(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && textAnswer.trim()) {
-                e.preventDefault()
-                onSubmit(msgIndex, textAnswer)
-              }
-            }}
-          />
-          <button
-            onClick={() => onSubmit(msgIndex, textAnswer)}
-            disabled={!textAnswer.trim()}
-            className="px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white hover:bg-[#334155] transition-colors border-none cursor-pointer disabled:opacity-40"
-          >
-            提交
-          </button>
-        </>
-      ) : (
-        <>
-          <div className="flex flex-col gap-1.5 mb-3">
-            {options.map(opt => (
-              <button
-                key={opt}
-                onClick={() => {
-                  onSelectValue(opt)
-                  onSelectOption(msgIndex, opt)
-                }}
-                className={`px-3.5 py-2.5 border border-[#bae6fd] rounded-md text-[13px] text-[#0f172a] cursor-pointer bg-white text-left transition-colors hover:border-[#0ea5e9] hover:bg-[#f0f9ff] ${
-                  selectedValue === opt ? 'border-[#0ea5e9] bg-[#e0f2fe] text-[#0369a1] font-medium' : ''
-                }`}
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => onSubmit(msgIndex, selectedValue || undefined)}
-            disabled={!selectedValue}
-            className="px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white hover:bg-[#334155] transition-colors border-none cursor-pointer disabled:opacity-40"
-          >
-            提交
-          </button>
-        </>
-      )}
-    </div>
+        // Plan event segments
+        const event = seg as PlanEvent
+
+        if (event.type === 'generated') {
+          return (
+            <div key={event.id} className="mt-0 -mx-1 mb-1 p-4 rounded-[10px] border border-l-[3px] bg-[#f0fdf4] border-[#a7f3d0] border-l-[#10b981]">
+              <div className="text-[10px] font-semibold text-[#047857] uppercase tracking-wider mb-2">执行计划</div>
+              {planStatus === 'pending' && !planEditing && (
+                <div className="flex gap-2 flex-wrap">
+                  <button onClick={() => onConfirmPlan()} className="px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white border border-[#0f172a] hover:bg-[#334155] transition-colors cursor-pointer">确认计划</button>
+                  <button onClick={() => onEditPlan(msgIndex)} className="px-[18px] py-[7px] rounded-md text-xs font-medium bg-white text-[#64748b] border border-[#e2e8f0] hover:bg-[#f1f5f9] hover:text-[#0f172a] transition-colors cursor-pointer">编辑</button>
+                  <button onClick={() => onRejectPlan()} className="px-[18px] py-[7px] rounded-md text-xs font-medium bg-white text-[#b91c1c] border border-[#fecaca] hover:bg-[#fef2f2] transition-colors cursor-pointer">拒绝</button>
+                </div>
+              )}
+              {planEditing && (
+                <span className="text-xs text-[#0369a1] font-medium flex items-center gap-1.5">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 14h2l8-8-2-2-8 8v2z"/><path d="M12 3l2 2"/></svg>
+                  正在右侧面板编辑计划...
+                </span>
+              )}
+            </div>
+          )
+        }
+
+        if (event.type === 'confirmed') {
+          return (
+            <div key={event.id} className="-mx-1 mb-1 p-3 rounded-[10px] border border-l-[3px] bg-[#ecfdf5] border-[#a7f3d0] border-l-[#10b981]">
+              <span className="text-xs text-[#047857] font-medium bg-[#d1fae5] px-2.5 py-1 rounded-md inline-flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 8l4 4 6-8"/></svg>
+                计划已确认，正在自动执行...
+              </span>
+            </div>
+          )
+        }
+
+        if (event.type === 'rejected') {
+          return (
+            <div key={event.id} className="-mx-1 mb-1 p-3 rounded-[10px] border border-l-[3px] bg-[#fef2f2] border-[#fecaca] border-l-[#ef4444]">
+              <span className="text-xs text-[#b91c1c] font-medium bg-[#fee2e2] px-2.5 py-1 rounded-md inline-flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+                计划已取消
+              </span>
+            </div>
+          )
+        }
+
+        if (event.type === 'edited') {
+          return (
+            <div key={event.id} className="-mx-1 mb-1 p-3 rounded-[10px] border border-l-[3px] bg-[#f0fdf4] border-[#a7f3d0] border-l-[#10b981]">
+              <span className="text-xs text-[#0369a1] font-medium bg-[#dbeafe] px-2.5 py-1 rounded-md inline-flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 14h2l8-8-2-2-8 8v2z"/><path d="M12 3l2 2"/></svg>
+                计划已编辑
+              </span>
+            </div>
+          )
+        }
+
+        if (event.type === 'question') {
+          const isConfirm = event.input_type === 'confirm'
+          const options = isConfirm ? ['是 / 确定', '否 / 取消'] : (event.options || [])
+
+          if (event.answer) {
+            return (
+              <div key={event.id} className="mb-1.5 p-3 bg-[#f0f9ff] border border-[#bae6fd] rounded-[8px]">
+                <div className="text-[10px] font-semibold text-[#0369a1] uppercase tracking-wider mb-1">需求澄清</div>
+                <div className="text-xs text-[#0f172a] mb-1.5 leading-relaxed">{event.question}</div>
+                <div className="text-xs text-[#0369a1] font-medium bg-white border border-[#bae6fd] rounded-md px-2.5 py-1.5 inline-block">
+                  回答: {event.answer}
+                </div>
+              </div>
+            )
+          }
+
+          return (
+            <div key={event.id} className="mb-1.5 p-3 bg-[#f0f9ff] border border-[#bae6fd] rounded-[8px]">
+              <div className="text-[10px] font-semibold text-[#0369a1] uppercase tracking-wider mb-1">需求澄清</div>
+              <div className="text-xs text-[#0f172a] mb-2.5 leading-relaxed">{event.question}</div>
+
+              {event.input_type === 'text' ? (
+                <>
+                  <textarea
+                    className="w-full px-3 py-2 border border-[#bae6fd] rounded-md text-[13px] text-[#0f172a] outline-none resize-y mb-2 focus:border-[#0ea5e9] focus:shadow-[0_0_0_3px_rgba(14,165,233,0.15)] transition-colors"
+                    placeholder="输入你的回答..."
+                    rows={2}
+                    value={textAnswer}
+                    onChange={(e) => onTextAnswer(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey && textAnswer.trim()) {
+                        e.preventDefault()
+                        onSelectValue(textAnswer.trim())
+                        onSubmitAnswer(msgIndex, textAnswer.trim())
+                        onTextAnswer('')
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      onSubmitAnswer(msgIndex, textAnswer.trim())
+                      onTextAnswer('')
+                    }}
+                    disabled={!textAnswer.trim()}
+                    className="px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white hover:bg-[#334155] transition-colors border-none cursor-pointer disabled:opacity-40"
+                  >
+                    提交
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-1.5 mb-2.5">
+                    {options.map(opt => (
+                      <button
+                        key={opt}
+                        onClick={() => {
+                          onSelectValue(opt)
+                          onSelectOption(msgIndex, opt)
+                        }}
+                        className={`px-3 py-2 border border-[#bae6fd] rounded-md text-[13px] text-[#0f172a] cursor-pointer bg-white text-left transition-colors hover:border-[#0ea5e9] hover:bg-[#f0f9ff] ${
+                          selectedPlanValue === opt ? 'border-[#0ea5e9] bg-[#e0f2fe] text-[#0369a1] font-medium' : ''
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => {
+                      onSubmitAnswer(msgIndex, selectedPlanValue || undefined)
+                      onSelectValue('')
+                    }}
+                    disabled={!selectedPlanValue}
+                    className="px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white hover:bg-[#334155] transition-colors border-none cursor-pointer disabled:opacity-40"
+                  >
+                    提交
+                  </button>
+                </>
+              )}
+            </div>
+          )
+        }
+
+        return null
+      })}
+    </>
   )
 }

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Sidebar } from '../sidebar/Sidebar'
 import { ChatPanel } from '../chat/ChatPanel'
 import { PlanEditorPanel } from '../chat/PlanEditorPanel'
@@ -6,7 +6,6 @@ import { SkillsConfig } from '../config/SkillsConfig'
 import { McpConfig } from '../config/McpConfig'
 import { MemoryConfig } from '../config/MemoryConfig'
 import { useChatStore } from '../../stores/chatStore'
-import { useTaskStore } from '../../stores/taskStore'
 
 type ConfigPage = 'skills' | 'mcp' | 'memory'
 

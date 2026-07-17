@@ -7,8 +7,12 @@ import { useModeStore } from './modeStore'
 import { useSettingsStore } from './settingsStore'
 
 let msgIdCounter = 100
+let planEventIdCounter = 1
 function genMsgId(): string {
   return `msg-${Date.now()}-${msgIdCounter++}`
+}
+function genPlanEventId(): string {
+  return `pe-${Date.now()}-${planEventIdCounter++}`
 }
 
 // ===== Shared event handler factory =====
@@ -33,10 +37,22 @@ function createEventHandler(
         break
 
       case 'agent.text':
-        taskStore.updateLastAssistantMessage((m) => ({
-          ...m,
-          content: m.content + event.delta
-        }))
+        taskStore.updateLastAssistantMessage((m) => {
+          const segs = m.segments || []
+          const last = segs[segs.length - 1]
+          let newSegments: typeof segs
+          if (last?.type === 'text') {
+            newSegments = [...segs]
+            newSegments[newSegments.length - 1] = { ...last, content: last.content + event.delta }
+          } else {
+            newSegments = [...segs, { type: 'text' as const, content: event.delta }]
+          }
+          return {
+            ...m,
+            content: m.content + event.delta,
+            segments: newSegments
+          }
+        })
         break
 
       // ---- Tool Calls (agent-initiated) ----
@@ -98,15 +114,63 @@ function createEventHandler(
       case 'plan.generated':
         taskStore.updateLastAssistantMessage((m) => ({
           ...m,
-          planGenerated: event.plan_text,
-          planStatus: 'pending'
+          planStatus: 'pending',
+          segments: [
+            ...(m.segments || []),
+            {
+              id: genPlanEventId(),
+              timestamp: Date.now(),
+              type: 'generated' as const
+            }
+          ]
+        }))
+        break
+
+      case 'plan.question':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m,
+          segments: [
+            ...(m.segments || []),
+            {
+              id: genPlanEventId(),
+              timestamp: Date.now(),
+              type: 'question' as const,
+              question: event.question,
+              options: event.options,
+              input_type: event.input_type,
+              answer: null
+            }
+          ]
+        }))
+        break
+
+      case 'plan.question_timeout':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m,
+          segments: [
+            ...(m.segments || []),
+            {
+              id: genPlanEventId(),
+              timestamp: Date.now(),
+              type: 'question' as const,
+              answer: '(超时)'
+            }
+          ]
         }))
         break
 
       case 'plan.confirmed':
         taskStore.updateLastAssistantMessage((m) => ({
           ...m,
-          planStatus: 'confirmed'
+          planStatus: 'confirmed',
+          segments: [
+            ...(m.segments || []),
+            {
+              id: genPlanEventId(),
+              timestamp: Date.now(),
+              type: 'confirmed' as const
+            }
+          ]
         }))
         break
 
@@ -114,14 +178,29 @@ function createEventHandler(
         taskStore.updateLastAssistantMessage((m) => ({
           ...m,
           planStatus: 'rejected',
-          processCollapsed: true
+          processCollapsed: true,
+          segments: [
+            ...(m.segments || []),
+            {
+              id: genPlanEventId(),
+              timestamp: Date.now(),
+              type: 'rejected' as const
+            }
+          ]
         }))
         break
 
       case 'plan.edited':
         taskStore.updateLastAssistantMessage((m) => ({
           ...m,
-          planGenerated: event.new_plan_text
+          segments: [
+            ...(m.segments || []),
+            {
+              id: genPlanEventId(),
+              timestamp: Date.now(),
+              type: 'edited' as const
+            }
+          ]
         }))
         break
 
@@ -275,6 +354,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         id: genMsgId(),
         role: 'assistant',
         content: '**Error:** 会话未创建，请重新创建任务',
+        segments: [],
         timestamp: Date.now()
       })
       return
@@ -304,6 +384,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       tools: [],
       processCollapsed: false,
       isStreaming: true,
+      segments: [],
       timestamp: Date.now()
     }
     taskStore.addMessage(assistantMsg)
@@ -416,8 +497,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // UI-side only — selection tracking lives in the DOM
   },
 
-  answerPlanQuestion: (_msgIdx: number, _textAnswer?: string) => {
-    // Will be handled by plan question events from server
+  answerPlanQuestion: (_msgIdx: number, textAnswer?: string) => {
+    const taskStore = useTaskStore.getState()
+    const task = taskStore.getCurrentTask()
+    if (!task) return
+
+    const answer = textAnswer || '已选择'
+    // Update the last unanswered question in segments
+    taskStore.updateLastAssistantMessage((m) => {
+      const segs = m.segments || []
+      const updated = segs.map((s, i) => {
+        // Find last unanswered question
+        const isLastUnanswered =
+          s.type === 'question' &&
+          s.answer === null &&
+          !segs.slice(i + 1).some(q => q.type === 'question' && q.answer === null)
+        return isLastUnanswered ? { ...s, answer } : s
+      })
+      return { ...m, segments: updated }
+    })
+
+    planApi.answer(task.sessionId, answer).catch((err) => {
+      console.error('Plan answer failed:', err)
+    })
   },
 
   confirmPlan: () => {
@@ -428,17 +530,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // Optimistically update local state
     taskStore.updateLastAssistantMessage((m) => ({
       ...m,
-      planStatus: 'confirmed'
+      planStatus: 'confirmed',
+      segments: [
+        ...(m.segments || []),
+        {
+          id: genPlanEventId(),
+          timestamp: Date.now(),
+          type: 'confirmed' as const
+        }
+      ]
     }))
 
     // Call API (fire-and-forget — stream handles the rest)
     planApi.confirm(task.sessionId).catch((err) => {
       console.error('Plan confirm failed:', err)
       // Revert on failure
-      taskStore.updateLastAssistantMessage((m) => ({
-        ...m,
-        planStatus: 'pending'
-      }))
+      taskStore.updateLastAssistantMessage((m) => {
+        const events = m.segments || []
+        // Remove our optimistic confirmed event (last one)
+        const reverted = events.filter((e, i) =>
+          !(i === events.length - 1 && e.type === 'confirmed')
+        )
+        return { ...m, planStatus: 'pending', segments: reverted }
+      })
     })
   },
 
@@ -446,8 +560,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const taskStore = useTaskStore.getState()
     const task = taskStore.getCurrentTask()
     if (!task) return
-    const msg = task.messages[msgIdx]
-    if (!msg?.planGenerated) return
 
     taskStore.updateLastAssistantMessage((m) => ({ ...m, planEditing: true }))
     set({ currentEditingPlanMsgIdx: msgIdx })
@@ -461,7 +573,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     taskStore.updateLastAssistantMessage((m) => ({
       ...m,
       planStatus: 'rejected',
-      processCollapsed: true
+      processCollapsed: true,
+      segments: [
+        ...(m.segments || []),
+        {
+          id: genPlanEventId(),
+          timestamp: Date.now(),
+          type: 'rejected' as const
+        }
+      ]
     }))
 
     planApi.reject(task.sessionId).catch((err) => {
@@ -491,8 +611,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (idx != null) {
       taskStore.updateLastAssistantMessage((m) => ({
         ...m,
-        planGenerated: newText,
-        planEditing: false
+        planEditing: false,
+        segments: [
+          ...(m.segments || []),
+          {
+            id: genPlanEventId(),
+            timestamp: Date.now(),
+            type: 'edited' as const
+          }
+        ]
       }))
     }
     set({ currentEditingPlanMsgIdx: null })

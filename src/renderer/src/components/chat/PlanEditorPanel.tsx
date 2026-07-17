@@ -1,26 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { useChatStore } from '../../stores/chatStore'
-import { useTaskStore } from '../../stores/taskStore'
 
 export function PlanEditorPanel() {
   const currentEditingPlanMsgIdx = useChatStore((s) => s.currentEditingPlanMsgIdx)
   const savePlanFromEditor = useChatStore((s) => s.savePlanFromEditor)
   const closePlanEditor = useChatStore((s) => s.closePlanEditor)
-  const task = useTaskStore((s) => s.getCurrentTask())
 
   const [text, setText] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const isOpen = currentEditingPlanMsgIdx != null
-
-  // Load plan text from the message when panel opens
-  useEffect(() => {
-    if (isOpen && currentEditingPlanMsgIdx != null && task) {
-      const msg = task.messages[currentEditingPlanMsgIdx]
-      if (msg?.planGenerated) {
-        setText(msg.planGenerated)
-      }
-    }
-  }, [isOpen, currentEditingPlanMsgIdx])
 
   // Focus textarea after open animation
   useEffect(() => {
@@ -28,7 +16,6 @@ export function PlanEditorPanel() {
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.focus()
-          textareaRef.current.setSelectionRange(textareaRef.current.value.length, textareaRef.current.value.length)
         }
       }, 350)
     }

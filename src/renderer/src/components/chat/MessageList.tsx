@@ -49,7 +49,7 @@ export function MessageList() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto flex flex-col gap-5 scroll-smooth min-h-0">
+    <div className="flex-1 flex flex-col gap-5 scroll-smooth min-h-0">
       {task.messages.map((msg, idx) => (
         <MessageItem key={msg.id} message={msg} msgIndex={idx} />
       ))}

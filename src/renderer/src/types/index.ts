@@ -14,19 +14,21 @@ export interface ToolCall {
 }
 
 // ===== Plan =====
-export interface PlanQuestion {
-  question: string
+export interface PlanEvent {
+  id: string
+  timestamp: number
+  type: 'generated' | 'question' | 'confirmed' | 'rejected' | 'edited'
+  question?: string
   options?: string[]
-  input_type: 'select' | 'text' | 'confirm'
-  answer: string | null
-}
-
-export interface PlanQA {
-  question: string
-  answer: string
+  input_type?: 'select' | 'text' | 'confirm'
+  answer?: string | null
 }
 
 // ===== Message =====
+export type MessageSegment =
+  | { type: 'text'; content: string }
+  | PlanEvent
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -34,9 +36,7 @@ export interface Message {
   thinking?: string
   tools?: ToolCall[]
   processCollapsed?: boolean
-  planQuestion?: PlanQuestion | null
-  planQuestions?: PlanQA[]
-  planGenerated?: string
+  segments?: MessageSegment[]
   planStatus?: 'pending' | 'confirmed' | 'rejected'
   planEditing?: boolean
   isStreaming?: boolean
@@ -207,8 +207,17 @@ export type ServerEvent =
       type: 'plan.generated'
       seq: number
       message_id: string
-      plan_text: string
     }
+  | {
+      type: 'plan.question'
+      seq: number
+      message_id: string
+      question: string
+      options?: string[]
+      input_type: 'select' | 'text' | 'confirm'
+      context?: string
+    }
+  | { type: 'plan.question_timeout'; seq: number; message_id: string }
   | { type: 'plan.confirmed'; seq: number; message_id: string }
   | { type: 'plan.rejected'; seq: number; message_id: string }
   | { type: 'plan.edited'; seq: number; message_id: string; new_plan_text: string }

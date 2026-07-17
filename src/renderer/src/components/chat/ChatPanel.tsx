@@ -25,8 +25,8 @@ export function ChatPanel() {
         </div>
       )}
 
-      {/* Messages with center max-width constraint */}
-      <div className={`flex flex-col flex-1 min-h-0 overflow-hidden ${hasMessages ? '' : 'justify-center'}`}>
+      {/* Messages — scrollbar at full width, content constrained */}
+      <div className={`flex flex-col flex-1 min-h-0 overflow-y-auto ${hasMessages ? '' : 'justify-center'}`}>
         <div className={`flex flex-col ${hasMessages ? 'flex-1 min-h-0' : ''} max-w-[768px] w-full mx-auto px-6 gap-4`}>
           <MessageList />
         </div>
