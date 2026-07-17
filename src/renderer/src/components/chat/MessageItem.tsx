@@ -3,6 +3,7 @@ import type { Message, PlanEvent, MessageSegment } from '../../types'
 import { useChatStore } from '../../stores/chatStore'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { TypewriterText } from './TypewriterText'
 
 interface Props {
   message: Message
@@ -112,6 +113,7 @@ export function MessageItem({ message, msgIndex }: Props) {
           <SegmentsView
             segments={message.segments}
             msgIndex={msgIndex}
+            isStreaming={message.isStreaming ?? false}
             selectedPlanValue={selectedPlanValue}
             onSelectValue={setSelectedPlanValue}
             textAnswer={planTextAnswer}
@@ -125,11 +127,13 @@ export function MessageItem({ message, msgIndex }: Props) {
             planEditing={message.planEditing}
           />
         ) : (
-          message.content && (
+          message.content && message.isStreaming ? (
+            <TypewriterText text={message.content} isStreaming={true} />
+          ) : message.content ? (
             <div className="mt-1 prose-sm max-w-none text-[#0f172a]">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
             </div>
-          )
+          ) : null
         )}
 
         {/* Streaming indicator */}
@@ -145,6 +149,7 @@ export function MessageItem({ message, msgIndex }: Props) {
 function SegmentsView({
   segments,
   msgIndex,
+  isStreaming,
   selectedPlanValue,
   onSelectValue,
   textAnswer,
@@ -159,6 +164,7 @@ function SegmentsView({
 }: {
   segments: MessageSegment[]
   msgIndex: number
+  isStreaming: boolean
   selectedPlanValue: string | null
   onSelectValue: (v: string) => void
   textAnswer: string
@@ -171,11 +177,25 @@ function SegmentsView({
   planStatus?: string
   planEditing?: boolean
 }) {
+  // Find the index of the last text segment (for typewriter animation)
+  const lastTextSegIdx = (() => {
+    for (let i = segments.length - 1; i >= 0; i--) {
+      if (segments[i].type === 'text') return i
+    }
+    return -1
+  })()
+
   return (
     <>
       {segments.map((seg, i) => {
-        // Text segment — render markdown
+        // Text segment — use typewriter for the last one during streaming
         if (seg.type === 'text') {
+          const isLastText = i === lastTextSegIdx
+
+          if (isLastText && isStreaming) {
+            return <TypewriterText key={`txt-${i}`} text={seg.content} isStreaming={true} />
+          }
+
           return (
             <div key={`txt-${i}`} className="mt-1 mb-2 prose-sm max-w-none text-[#0f172a]">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{seg.content}</ReactMarkdown>

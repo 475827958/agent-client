@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useCallback } from 'react'
 import { useTaskStore } from '../../stores/taskStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useModeStore } from '../../stores/modeStore'
@@ -6,11 +6,56 @@ import { MessageItem } from './MessageItem'
 
 export function MessageList() {
   const task = useTaskStore((s) => s.getCurrentTask())
+  const containerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const isAtBottomRef = useRef(true)
+  const prevMsgCountRef = useRef(task?.messages.length ?? 0)
 
+  const isStreaming = task?.messages.some((m) => m.isStreaming) ?? false
+
+  // Track whether the user is at the bottom of the scroll container
+  const handleScroll = useCallback(() => {
+    const el = containerRef.current
+    if (!el) return
+    const threshold = 80
+    isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < threshold
+  }, [])
+
+  // Auto-scroll to bottom on every content change while user is at the bottom
+  // Uses ResizeObserver for efficient detection of content growth
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = containerRef.current
+    if (!el) return
+
+    const ro = new ResizeObserver(() => {
+      if (isAtBottomRef.current) {
+        bottomRef.current?.scrollIntoView({ behavior: 'auto' })
+      }
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // When a new message is added, force-scroll to bottom regardless of position
+  useEffect(() => {
+    const count = task?.messages.length ?? 0
+    if (count > prevMsgCountRef.current) {
+      isAtBottomRef.current = true
+      // Use setTimeout to ensure the DOM has painted the new message
+      requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+      })
+    }
+    prevMsgCountRef.current = count
   }, [task?.messages.length])
+
+  // When streaming starts, force-scroll to bottom
+  useEffect(() => {
+    if (isStreaming) {
+      isAtBottomRef.current = true
+      bottomRef.current?.scrollIntoView({ behavior: 'auto' })
+    }
+  }, [isStreaming])
 
   const sceneMode = useModeStore((s) => s.sceneMode)
   const setSceneMode = useModeStore((s) => s.setSceneMode)
@@ -49,7 +94,11 @@ export function MessageList() {
   }
 
   return (
-    <div className="flex-1 flex flex-col gap-5 scroll-smooth min-h-0">
+    <div
+      ref={containerRef}
+      onScroll={handleScroll}
+      className="flex-1 flex flex-col gap-5 min-h-0 overflow-y-auto"
+    >
       {task.messages.map((msg, idx) => (
         <MessageItem key={msg.id} message={msg} msgIndex={idx} />
       ))}

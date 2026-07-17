@@ -161,7 +161,8 @@
       "Read(//c/Users/csybo/AppData/Roaming/agent-desktop/**)",
       "Bash(rm \"C:/Users/csybo/AppData/Roaming/agent-desktop/config.json\" && echo \"deleted\")",
       "Bash(git remote *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(node -e \"console.log\\(require\\('d:/MyProject/project_money/agent/agent-electron-app/node_modules/electron/package.json'\\).version\\)\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\csybo\\AppData\\Roaming\\agent-desktop"
