@@ -1,5 +1,12 @@
+# 前端端本地运行所需标准最小环境
+Nodejs >= 18.18.2  
+npm 8.9.2  
+
+# 开发环境
+Visual Studio Code
+
 # 运行方式
-cd d:/MyProject/project_money/agent/agent-electron-app
+cd agent-electron-app
 
 # 开发模式
 npm run dev
