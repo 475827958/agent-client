@@ -7,7 +7,9 @@ const api = {
     grep: (pattern: string, dirPath: string) => ipcRenderer.invoke('file:grep', pattern, dirPath),
     write: (path: string, content: string) => ipcRenderer.invoke('file:write', path, content),
     edit: (path: string, oldStr: string, newStr: string) =>
-      ipcRenderer.invoke('file:edit', path, oldStr, newStr)
+      ipcRenderer.invoke('file:edit', path, oldStr, newStr),
+    exec: (command: string, timeoutMs?: number) =>
+      ipcRenderer.invoke('file:exec', command, timeoutMs)
   },
   workspace: {
     select: () => ipcRenderer.invoke('workspace:select')

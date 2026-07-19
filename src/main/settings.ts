@@ -13,7 +13,7 @@ const defaults: StoredSettings = {
   apiBaseUrl: '',
   apiKey: '',
   model: 'deepseek-v4-pro',
-  workspacePath: '/projects/data-report',
+  workspacePath: '',
   fullAccess: false
 }
 

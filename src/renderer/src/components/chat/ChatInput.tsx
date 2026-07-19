@@ -3,10 +3,10 @@ import { useChatStore } from '../../stores/chatStore'
 import { useModeStore } from '../../stores/modeStore'
 import { useQueueStore } from '../../stores/queueStore'
 import { useSettingsStore } from '../../stores/settingsStore'
+import { ipcClient } from '../../services/ipcClient'
 import type { AppMode } from '../../types'
 
 const MODELS = ['deepseek-v4-pro']
-const WORKSPACES = ['/projects/data-report', '/projects/my-app', '/home/user/documents']
 
 interface SlashCommand {
   command: string
@@ -116,12 +116,16 @@ export function ChatInput() {
 
   const handleSend = useCallback(() => {
     if (!text.trim() || isProcessing) return
+    if (!settings.workspacePath) {
+      alert('请先选择工作空间（workspace）目录')
+      return
+    }
     sendMessage(text.trim())
     setText('')
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
     }
-  }, [text, isProcessing, sendMessage])
+  }, [text, isProcessing, settings.workspacePath, sendMessage])
 
   const autoResize = (el: HTMLTextAreaElement) => {
     el.style.height = 'auto'
@@ -133,6 +137,20 @@ export function ChatInput() {
     setMdDropdown(false)
     setModeDropdown(false)
   }
+
+  const handleSelectWorkspace = useCallback(async () => {
+    setWsDropdown(false)
+    const selected = await ipcClient.workspace.select()
+    if (selected) {
+      saveSettings({ workspacePath: selected })
+    } else {
+      // Browser fallback: Electron dialog not available, use prompt to input path
+      const pasted = window.prompt('请输入工作空间目录路径：', settings.workspacePath || '')
+      if (pasted && pasted.trim()) {
+        saveSettings({ workspacePath: pasted.trim() })
+      }
+    }
+  }, [saveSettings, settings.workspacePath])
 
   return (
     <div className="flex-shrink-0 flex flex-col gap-2.5 px-6 pb-4 pt-3">
@@ -172,9 +190,8 @@ export function ChatInput() {
               key={cmd.command}
               onClick={() => insertCommand(cmd)}
               onMouseEnter={() => setSelectedCmdIdx(idx)}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left border-none bg-transparent cursor-pointer transition-colors ${
-                idx === selectedCmdIdx ? 'bg-[#f0fdf4]' : 'hover:bg-[#f8fafc]'
-              } ${idx !== 0 ? 'border-t border-[#f1f5f9]' : ''}`}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left border-none bg-transparent cursor-pointer transition-colors ${idx === selectedCmdIdx ? 'bg-[#f0fdf4]' : 'hover:bg-[#f8fafc]'
+                } ${idx !== 0 ? 'border-t border-[#f1f5f9]' : ''}`}
             >
               <span className="text-[13px] font-semibold text-[#047857] w-[70px] flex-shrink-0">
                 {cmd.command}
@@ -257,7 +274,9 @@ export function ChatInput() {
             >
               <path d="M2 5h3l1.5-2h4L12 5h2a1 1 0 011 1v7a1 1 0 01-1 1H3a1 1 0 01-1-1V6a1 1 0 011-1z" />
             </svg>
-            <span className="font-medium text-[#64748b] text-[11px]">{settings.workspacePath}</span>
+            <span title={settings.workspacePath || ''} className="font-medium text-[#64748b] text-[11px]">
+              {settings.workspacePath || '请选择工作空间...'}
+            </span>
             <svg
               className="w-3.5 h-3.5 text-[#94a3b8]"
               viewBox="0 0 16 16"
@@ -270,30 +289,20 @@ export function ChatInput() {
           </button>
           {wsDropdown && (
             <div className="absolute bottom-full left-0 mb-1.5 bg-white border border-[#e2e8f0] rounded-[10px] shadow-lg min-w-[220px] p-1 z-[100]">
-              {WORKSPACES.map((ws) => (
-                <div
-                  key={ws}
-                  onClick={() => {
-                    saveSettings({ workspacePath: ws })
-                    closeAllDropdowns()
-                  }}
-                  className={`px-3 py-2 rounded-md text-[13px] cursor-pointer flex items-center gap-2 text-[#0f172a] hover:bg-[#f1f5f9] transition-colors ${
-                    settings.workspacePath === ws
-                      ? 'bg-[#f0fdf4] text-[#047857] font-medium'
-                      : ''
-                  }`}
-                >
-                  {settings.workspacePath === ws && (
-                    <span className="ml-auto text-[#a7f3d0] font-semibold">✓</span>
-                  )}
-                  {ws}
-                </div>
-              ))}
-              <div className="h-px bg-[#e2e8f0] mx-2 my-1" />
               <div
-                onClick={() => closeAllDropdowns()}
-                className="px-3 py-2 rounded-md text-[13px] cursor-pointer text-[#0f172a] hover:bg-[#f1f5f9] transition-colors"
+                onClick={handleSelectWorkspace}
+                className="px-3 py-2 rounded-md text-[13px] cursor-pointer flex items-center gap-2 text-[#0f172a] hover:bg-[#f1f5f9] transition-colors"
               >
+                <svg
+                  className="w-3.5 h-3.5 text-[#94a3b8]"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                >
+                  <path d="M2 5h3l1.5-2h4L12 5h2a1 1 0 011 1v7a1 1 0 01-1 1H3a1 1 0 01-1-1V6a1 1 0 011-1z" />
+                </svg>
                 浏览选择目录...
               </div>
             </div>
@@ -343,11 +352,10 @@ export function ChatInput() {
                     saveSettings({ model: m })
                     closeAllDropdowns()
                   }}
-                  className={`px-3 py-2 rounded-md text-[13px] cursor-pointer flex items-center gap-2 text-[#0f172a] hover:bg-[#f1f5f9] transition-colors ${
-                    settings.model === m
+                  className={`px-3 py-2 rounded-md text-[13px] cursor-pointer flex items-center gap-2 text-[#0f172a] hover:bg-[#f1f5f9] transition-colors ${settings.model === m
                       ? 'bg-[#f0fdf4] text-[#047857] font-medium'
                       : ''
-                  }`}
+                    }`}
                 >
                   {settings.model === m && (
                     <span className="ml-auto text-[#a7f3d0] font-semibold">✓</span>
@@ -392,11 +400,10 @@ export function ChatInput() {
                     setInputMode(m)
                     closeAllDropdowns()
                   }}
-                  className={`px-3 py-2 rounded-md text-[13px] cursor-pointer flex items-center gap-2 text-[#0f172a] hover:bg-[#f1f5f9] transition-colors ${
-                    inputMode === m
+                  className={`px-3 py-2 rounded-md text-[13px] cursor-pointer flex items-center gap-2 text-[#0f172a] hover:bg-[#f1f5f9] transition-colors ${inputMode === m
                       ? 'bg-[#f0fdf4] text-[#047857] font-medium'
                       : ''
-                  }`}
+                    }`}
                 >
                   {inputMode === m && (
                     <span className="ml-auto text-[#a7f3d0] font-semibold">✓</span>

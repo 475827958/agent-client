@@ -2,14 +2,14 @@ import type { Settings } from '../types'
 
 function getAPI() {
   if (!window.electronAPI) {
-    // Return mock for dev in browser (non-Electron context)
     return {
       file: {
         glob: async () => [],
         read: async () => '',
         grep: async () => [],
         write: async () => {},
-        edit: async () => {}
+        edit: async () => {},
+        exec: async () => ({ stdout: '', stderr: '', exit_code: 0 })
       },
       workspace: {
         select: async () => null
@@ -22,7 +22,7 @@ function getAPI() {
           model: 'deepseek-v4-pro',
           workspacePath: '',
           fullAccess: false
-        })
+        } as Settings)
       }
     }
   }

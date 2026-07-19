@@ -54,9 +54,12 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 const electron = require("electron");
 const path = require("path");
 const promises = require("fs/promises");
+const child_process = require("child_process");
+const util = require("util");
 const Store = require("electron-store");
+const execAsync = util.promisify(child_process.exec);
 function globToRegex(pattern) {
-  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*\*\//g, "<<<DOUBLESTAR>>>").replace(/\*/g, "[^/\\\\]*").replace(/<<<DOUBLESTAR>>>/g, "(.*/)?");
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*\*\//g, "\0").replace(/\*/g, "[^/\\\\]*").replace(/\x00/g, "(.*/)?");
   return new RegExp(`^${escaped}$`);
 }
 async function globFiles(basePath, pattern) {
@@ -83,24 +86,39 @@ async function globFiles(basePath, pattern) {
   await walk(basePath);
   return results;
 }
+function guardPath(workspaceRoot, targetPath) {
+  const fullPath = path.resolve(workspaceRoot, targetPath);
+  if (!fullPath.startsWith(path.resolve(workspaceRoot))) {
+    throw new Error("Access outside workspace is not allowed");
+  }
+  return fullPath;
+}
 function registerFileOps(workspacePath) {
+  const ws = () => {
+    const p = workspacePath();
+    if (!p) throw new Error("No workspace selected");
+    return p;
+  };
   electron.ipcMain.handle("file:glob", async (_event, pattern) => {
-    const base = workspacePath();
-    if (!base) throw new Error("No workspace selected");
-    return globFiles(base, pattern);
+    return globFiles(ws(), pattern);
   });
   electron.ipcMain.handle("file:read", async (_event, filePath) => {
-    const base = workspacePath();
-    if (!base) throw new Error("No workspace selected");
-    const fullPath = path.resolve(base, filePath);
-    if (!fullPath.startsWith(path.resolve(base))) throw new Error("Path traversal denied");
-    return promises.readFile(fullPath, "utf-8");
+    return promises.readFile(guardPath(ws(), filePath), "utf-8");
+  });
+  electron.ipcMain.handle("file:write", async (_event, filePath, content) => {
+    const fullPath = guardPath(ws(), filePath);
+    await (await import("fs/promises")).mkdir(path.dirname(fullPath), { recursive: true });
+    return promises.writeFile(fullPath, content, "utf-8");
+  });
+  electron.ipcMain.handle("file:edit", async (_event, filePath, oldStr, newStr) => {
+    const fullPath = guardPath(ws(), filePath);
+    const content = await promises.readFile(fullPath, "utf-8");
+    if (!content.includes(oldStr)) throw new Error("old_string not found in file");
+    return promises.writeFile(fullPath, content.replace(oldStr, newStr), "utf-8");
   });
   electron.ipcMain.handle("file:grep", async (_event, pattern, dirPath) => {
-    const base = workspacePath();
-    if (!base) throw new Error("No workspace selected");
-    const searchDir = path.resolve(base, dirPath || ".");
-    if (!searchDir.startsWith(path.resolve(base))) throw new Error("Path traversal denied");
+    const base = ws();
+    const searchDir = guardPath(base, dirPath || ".");
     const results = [];
     const regex = new RegExp(pattern, "g");
     async function search(dir) {
@@ -128,23 +146,20 @@ function registerFileOps(workspacePath) {
     await search(searchDir);
     return results;
   });
-  electron.ipcMain.handle("file:write", async (_event, filePath, content) => {
-    const base = workspacePath();
-    if (!base) throw new Error("No workspace selected");
-    const fullPath = path.resolve(base, filePath);
-    if (!fullPath.startsWith(path.resolve(base))) throw new Error("Path traversal denied");
-    await (await import("fs/promises")).mkdir(path.dirname(fullPath), { recursive: true });
-    return promises.writeFile(fullPath, content, "utf-8");
-  });
-  electron.ipcMain.handle("file:edit", async (_event, filePath, oldStr, newStr) => {
-    const base = workspacePath();
-    if (!base) throw new Error("No workspace selected");
-    const fullPath = path.resolve(base, filePath);
-    if (!fullPath.startsWith(path.resolve(base))) throw new Error("Path traversal denied");
-    const content = await promises.readFile(fullPath, "utf-8");
-    if (!content.includes(oldStr)) throw new Error("old_string not found in file");
-    const newContent = content.replace(oldStr, newStr);
-    return promises.writeFile(fullPath, newContent, "utf-8");
+  electron.ipcMain.handle("file:exec", async (_event, command, timeoutMs = 12e4) => {
+    const cwd = path.resolve(ws());
+    const { stdout, stderr } = await execAsync(command, {
+      cwd,
+      timeout: Math.min(timeoutMs, 3e5),
+      maxBuffer: 10 * 1024 * 1024,
+      shell: process.platform === "win32" ? "cmd.exe" : "/bin/bash",
+      env: { ...process.env, HOME: cwd, USERPROFILE: cwd }
+    });
+    return {
+      stdout: stdout || "",
+      stderr: stderr || "",
+      exit_code: 0
+    };
   });
   electron.ipcMain.handle("workspace:select", async () => {
     const result = await electron.dialog.showOpenDialog({
@@ -158,7 +173,7 @@ const defaults = {
   apiBaseUrl: "",
   apiKey: "",
   model: "deepseek-v4-pro",
-  workspacePath: "/projects/data-report",
+  workspacePath: "",
   fullAccess: false
 };
 function registerSettings() {

@@ -136,6 +136,7 @@ export interface ElectronAPI {
     grep: (pattern: string, path: string) => Promise<string[]>
     write: (path: string, content: string) => Promise<void>
     edit: (path: string, oldStr: string, newStr: string) => Promise<void>
+    exec: (command: string, timeoutMs?: number) => Promise<{ stdout: string; stderr: string; exit_code: number }>
   }
   workspace: {
     select: () => Promise<string | null>

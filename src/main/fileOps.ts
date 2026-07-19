@@ -1,13 +1,17 @@
 import { ipcMain, dialog } from 'electron'
-import { readFile, writeFile, readdir, stat } from 'fs/promises'
+import { readFile, writeFile, readdir } from 'fs/promises'
 import { join, resolve, dirname } from 'path'
+import { exec as cpExec } from 'child_process'
+import { promisify } from 'util'
+
+const execAsync = promisify(cpExec)
 
 function globToRegex(pattern: string): RegExp {
   const escaped = pattern
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    .replace(/\*\*\//g, '<<<DOUBLESTAR>>>')
+    .replace(/\*\*\//g, '\x00')
     .replace(/\*/g, '[^/\\\\]*')
-    .replace(/<<<DOUBLESTAR>>>/g, '(.*/)?')
+    .replace(/\x00/g, '(.*/)?')
   return new RegExp(`^${escaped}$`)
 }
 
@@ -22,7 +26,6 @@ async function globFiles(basePath: string, pattern: string): Promise<string[]> {
         const fullPath = join(dir, entry.name)
         const relativePath = fullPath.replace(basePath, '').replace(/^[/\\]/, '')
         if (entry.isDirectory()) {
-          // skip node_modules, .git
           if (entry.name === 'node_modules' || entry.name === '.git') continue
           await walk(fullPath)
         } else if (entry.isFile()) {
@@ -40,28 +43,45 @@ async function globFiles(basePath: string, pattern: string): Promise<string[]> {
   return results
 }
 
+function guardPath(workspaceRoot: string, targetPath: string): string {
+  const fullPath = resolve(workspaceRoot, targetPath)
+  if (!fullPath.startsWith(resolve(workspaceRoot))) {
+    throw new Error('Access outside workspace is not allowed')
+  }
+  return fullPath
+}
+
 export function registerFileOps(workspacePath: () => string): void {
+  const ws = () => {
+    const p = workspacePath()
+    if (!p) throw new Error('No workspace selected')
+    return p
+  }
+
   ipcMain.handle('file:glob', async (_event, pattern: string) => {
-    const base = workspacePath()
-    if (!base) throw new Error('No workspace selected')
-    return globFiles(base, pattern)
+    return globFiles(ws(), pattern)
   })
 
   ipcMain.handle('file:read', async (_event, filePath: string) => {
-    const base = workspacePath()
-    if (!base) throw new Error('No workspace selected')
-    const fullPath = resolve(base, filePath)
-    // security: ensure path is within workspace
-    if (!fullPath.startsWith(resolve(base))) throw new Error('Path traversal denied')
-    return readFile(fullPath, 'utf-8')
+    return readFile(guardPath(ws(), filePath), 'utf-8')
+  })
+
+  ipcMain.handle('file:write', async (_event, filePath: string, content: string) => {
+    const fullPath = guardPath(ws(), filePath)
+    await (await import('fs/promises')).mkdir(dirname(fullPath), { recursive: true })
+    return writeFile(fullPath, content, 'utf-8')
+  })
+
+  ipcMain.handle('file:edit', async (_event, filePath: string, oldStr: string, newStr: string) => {
+    const fullPath = guardPath(ws(), filePath)
+    const content = await readFile(fullPath, 'utf-8')
+    if (!content.includes(oldStr)) throw new Error('old_string not found in file')
+    return writeFile(fullPath, content.replace(oldStr, newStr), 'utf-8')
   })
 
   ipcMain.handle('file:grep', async (_event, pattern: string, dirPath: string) => {
-    const base = workspacePath()
-    if (!base) throw new Error('No workspace selected')
-    const searchDir = resolve(base, dirPath || '.')
-    if (!searchDir.startsWith(resolve(base))) throw new Error('Path traversal denied')
-
+    const base = ws()
+    const searchDir = guardPath(base, dirPath || '.')
     const results: string[] = []
     const regex = new RegExp(pattern, 'g')
 
@@ -77,7 +97,7 @@ export function registerFileOps(workspacePath: () => string): void {
             const content = await readFile(fullPath, 'utf-8')
             const lines = content.split('\n')
             const relativePath = fullPath.replace(base, '').replace(/^[/\\]/, '')
-            lines.forEach((line, i) => {
+            lines.forEach((line: string, i: number) => {
               if (regex.test(line)) {
                 results.push(`${relativePath}:${i + 1}: ${line.trim()}`)
               }
@@ -93,27 +113,21 @@ export function registerFileOps(workspacePath: () => string): void {
     return results
   })
 
-  ipcMain.handle('file:write', async (_event, filePath: string, content: string) => {
-    const base = workspacePath()
-    if (!base) throw new Error('No workspace selected')
-    const fullPath = resolve(base, filePath)
-    if (!fullPath.startsWith(resolve(base))) throw new Error('Path traversal denied')
+  ipcMain.handle('file:exec', async (_event, command: string, timeoutMs: number = 120000) => {
+    const cwd = resolve(ws())
+    const { stdout, stderr } = await execAsync(command, {
+      cwd,
+      timeout: Math.min(timeoutMs, 300000),
+      maxBuffer: 10 * 1024 * 1024,
+      shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/bash',
+      env: { ...process.env, HOME: cwd, USERPROFILE: cwd }
+    })
 
-    // ensure parent directory exists
-    await (await import('fs/promises')).mkdir(dirname(fullPath), { recursive: true })
-    return writeFile(fullPath, content, 'utf-8')
-  })
-
-  ipcMain.handle('file:edit', async (_event, filePath: string, oldStr: string, newStr: string) => {
-    const base = workspacePath()
-    if (!base) throw new Error('No workspace selected')
-    const fullPath = resolve(base, filePath)
-    if (!fullPath.startsWith(resolve(base))) throw new Error('Path traversal denied')
-
-    const content = await readFile(fullPath, 'utf-8')
-    if (!content.includes(oldStr)) throw new Error('old_string not found in file')
-    const newContent = content.replace(oldStr, newStr)
-    return writeFile(fullPath, newContent, 'utf-8')
+    return {
+      stdout: stdout || '',
+      stderr: stderr || '',
+      exit_code: 0
+    }
   })
 
   ipcMain.handle('workspace:select', async () => {

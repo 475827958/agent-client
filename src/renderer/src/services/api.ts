@@ -1,8 +1,159 @@
 import type { ServerEvent, AppMode, SceneMode } from '../types'
 import { useSettingsStore } from '../stores/settingsStore'
 import { parseNDJSONStream } from './ndjson'
+import { ipcClient } from './ipcClient'
 
 const DEFAULT_BASE_URL = '/api'
+
+export interface ToolResult {
+  status: 'success' | 'error'
+  output?: string
+  error?: string
+  exit_code?: number
+  duration_ms: number
+}
+
+export function isClientTool(toolName: string): boolean {
+  return CLIENT_TOOLS.some(t => t.name === toolName)
+}
+
+/**
+ * Validate and resolve a path relative to workspaceRoot.
+ * Pure string logic — no Node deps, works in browser dev mode.
+ */
+function resolveWorkspacePath(workspaceRoot: string, targetPath: string): string {
+  const sep = workspaceRoot.includes('\\') ? '\\' : '/'
+  const isWin = sep === '\\'
+
+  // Absolute path: must start with workspaceRoot
+  if (targetPath.match(/^[A-Za-z]:[\\/]/) || targetPath.startsWith('/')) {
+    const target = isWin ? targetPath.replace(/\//g, '\\') : targetPath
+    const root = isWin
+      ? workspaceRoot.replace(/[\\/]+$/, '').replace(/\//g, '\\')
+      : workspaceRoot.replace(/[\\/]+$/, '')
+
+    const tLower = isWin ? target.toLowerCase() : target
+    const rLower = isWin ? root.toLowerCase() : root
+    if (!tLower.startsWith(rLower + (isWin ? '\\' : '/'))) {
+      throw new Error('Access outside workspace is not allowed')
+    }
+    return target
+  }
+
+  // Relative path: resolve from workspaceRoot, reject .. that escapes
+  const rootParts = workspaceRoot.replace(/[\\/]+$/, '').split(/[\\/]/)
+  const targetParts = targetPath.replace(/\\/g, '/').split('/')
+  const parts: string[] = []
+
+  for (const part of [...rootParts, ...targetParts]) {
+    if (part === '.' || part === '') continue
+    if (part === '..') {
+      if (parts.length <= rootParts.length) {
+        throw new Error('Access outside workspace is not allowed')
+      }
+      parts.pop()
+    } else {
+      parts.push(part)
+    }
+  }
+
+  if (parts.length < rootParts.length) {
+    throw new Error('Access outside workspace is not allowed')
+  }
+
+  return parts.join(sep)
+}
+
+export async function executeClientTool(
+  toolName: string,
+  input: Record<string, unknown>,
+  workspacePath: string
+): Promise<ToolResult> {
+  const start = Date.now()
+
+  try {
+    let output: string | undefined
+
+    switch (toolName) {
+      case 'read_file': {
+        const filePath = input.path as string
+        if (!filePath) throw new Error('Missing required parameter: path')
+        resolveWorkspacePath(workspacePath, filePath) // validate
+        output = await ipcClient.file.read(filePath)
+        break
+      }
+      case 'write_file': {
+        const filePath = input.path as string
+        const content = input.content as string
+        if (!filePath) throw new Error('Missing required parameter: path')
+        if (content === undefined) throw new Error('Missing required parameter: content')
+        resolveWorkspacePath(workspacePath, filePath)
+        await ipcClient.file.write(filePath, content)
+        output = 'File written successfully'
+        break
+      }
+      case 'edit_file': {
+        const filePath = input.path as string
+        const oldString = input.old_string as string
+        const newString = input.new_string as string
+        if (!filePath) throw new Error('Missing required parameter: path')
+        if (oldString === undefined) throw new Error('Missing required parameter: old_string')
+        if (newString === undefined) throw new Error('Missing required parameter: new_string')
+        resolveWorkspacePath(workspacePath, filePath)
+        await ipcClient.file.edit(filePath, oldString, newString)
+        output = 'File edited successfully'
+        break
+      }
+      case 'glob': {
+        const pattern = input.pattern as string
+        if (!pattern) throw new Error('Missing required parameter: pattern')
+        const files = await ipcClient.file.glob(pattern)
+        output = files.join('\n') || '(no matches)'
+        break
+      }
+      case 'grep': {
+        const pattern = input.pattern as string
+        if (!pattern) throw new Error('Missing required parameter: pattern')
+        const dirPath = (input.path as string) || '.'
+        resolveWorkspacePath(workspacePath, dirPath)
+        const lines = await ipcClient.file.grep(pattern, dirPath)
+        output = lines.join('\n') || '(no matches)'
+        break
+      }
+      case 'bash': {
+        const command = input.command as string
+        if (!command) throw new Error('Missing required parameter: command')
+        const timeoutMs = (input.timeout_ms as number) || 120000
+        const result = await ipcClient.file.exec(command, timeoutMs)
+        if (result.exit_code !== 0 && result.stderr) {
+          return {
+            status: 'error',
+            error: result.stderr,
+            output: result.stdout,
+            exit_code: result.exit_code,
+            duration_ms: Date.now() - start
+          }
+        }
+        output = result.stdout || result.stderr || '(no output)'
+        break
+      }
+      default:
+        throw new Error(`Unknown client tool: ${toolName}`)
+    }
+
+    return {
+      status: 'success',
+      output,
+      duration_ms: Date.now() - start
+    }
+  } catch (err: any) {
+    return {
+      status: 'error',
+      error: err?.message || String(err),
+      duration_ms: Date.now() - start
+    }
+  }
+}
 
 // ===== Session management =====
 
