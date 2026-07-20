@@ -185,6 +185,36 @@ function SegmentsView({
     return -1
   })()
 
+  // Track which text segments have finished their typewriter animation
+  const [doneTextIndices, setDoneTextIndices] = useState<Set<number>>(new Set())
+
+  const handleTextDone = useCallback((segIdx: number) => {
+    setDoneTextIndices((prev) => {
+      if (prev.has(segIdx)) return prev
+      const next = new Set(prev)
+      next.add(segIdx)
+      return next
+    })
+  }, [])
+
+  // A text segment is visually complete if it's not the last streaming text
+  // (renders as static markdown), or if its typewriter animation has finished.
+  const isTextComplete = (segIdx: number) => {
+    if (!isStreaming) return true
+    if (segIdx !== lastTextSegIdx) return true
+    return doneTextIndices.has(segIdx)
+  }
+
+  // Non-text segments should only show when all preceding text is complete
+  const canShowNonText = (nonTextIdx: number) => {
+    for (let j = 0; j < nonTextIdx; j++) {
+      if (segments[j].type === 'text' && !isTextComplete(j)) {
+        return false
+      }
+    }
+    return true
+  }
+
   return (
     <>
       {segments.map((seg, i) => {
@@ -193,7 +223,7 @@ function SegmentsView({
           const isLastText = i === lastTextSegIdx
 
           if (isLastText && isStreaming) {
-            return <TypewriterText key={`txt-${i}`} text={seg.content} isStreaming={true} />
+            return <TypewriterText key={`txt-${i}`} text={seg.content} isStreaming={true} onDone={() => handleTextDone(i)} />
           }
 
           return (
@@ -204,6 +234,8 @@ function SegmentsView({
         }
 
         // Plan event segments
+        if (!canShowNonText(i)) return null
+
         const event = seg as PlanEvent
 
         if (event.type === 'generated') {

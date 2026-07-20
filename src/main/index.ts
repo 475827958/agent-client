@@ -20,6 +20,9 @@ function createWindow(): void {
     }
   })
 
+  // 开发环境
+  mainWindow.webContents.openDevTools()
+
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })

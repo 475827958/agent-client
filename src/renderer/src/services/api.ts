@@ -270,6 +270,8 @@ export async function createSession(req: CreateSessionRequest): Promise<CreateSe
   const baseUrl = settings.apiBaseUrl || DEFAULT_BASE_URL
   const url = `${baseUrl}/sessions`
 
+  console.log('创建会话')
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {

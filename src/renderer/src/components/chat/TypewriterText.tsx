@@ -8,9 +8,10 @@ const TICK_MS = 33 // ~30fps for smooth animation without overloading React
 interface Props {
   text: string
   isStreaming: boolean
+  onDone?: () => void
 }
 
-export function TypewriterText({ text, isStreaming }: Props) {
+export function TypewriterText({ text, isStreaming, onDone }: Props) {
   const [revealedLen, setRevealedLen] = useState(() => {
     // If not streaming (e.g. re-mount of a completed message), show all immediately
     if (!isStreaming) return text.length
@@ -19,6 +20,8 @@ export function TypewriterText({ text, isStreaming }: Props) {
     return Math.max(0, Math.min(text.length, 200))
   })
   const timerRef = useRef<ReturnType<typeof setInterval>>()
+  const doneRef = useRef(onDone)
+  doneRef.current = onDone
 
   // Animate character reveal during streaming
   useEffect(() => {
@@ -46,6 +49,13 @@ export function TypewriterText({ text, isStreaming }: Props) {
       setRevealedLen(text.length)
     }
   }, [isStreaming, text.length])
+
+  // Notify parent when typewriter catches up to current text
+  useEffect(() => {
+    if (revealedLen >= text.length) {
+      doneRef.current?.()
+    }
+  }, [revealedLen, text.length])
 
   const displayText = text.slice(0, revealedLen)
   // Defer expensive markdown rendering to keep animation smooth
