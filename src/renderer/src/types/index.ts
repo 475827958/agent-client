@@ -28,6 +28,7 @@ export interface PlanEvent {
 // ===== Message =====
 export type MessageSegment =
   | { type: 'text'; content: string }
+  | { type: 'tool_call'; toolCall: ToolCall }
   | { type: 'system_status'; message: string }
   | PlanEvent
 

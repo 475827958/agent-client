@@ -125,7 +125,6 @@ export async function executeClientTool(
         if (!command) throw new Error('Missing required parameter: command')
         const timeoutMs = (input.timeout_ms as number) || 120000
         const result = await ipcClient.file.exec(command, timeoutMs)
-        console.log('bash', command, result)
         if (result.exit_code !== 0 && result.stderr) {
           return {
             status: 'error',

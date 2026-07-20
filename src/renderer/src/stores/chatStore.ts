@@ -15,9 +15,119 @@ function genPlanEventId(): string {
   return `pe-${Date.now()}-${planEventIdCounter++}`
 }
 
+// Rebuild `content` from text-type segments only, excluding tool_call markers.
+// This ensures raw tool call text that leaked through agent.text deltas is removed
+// once the structured tool event fires and inserts a tool_call marker segment.
+function rebuildContentFromSegments(
+  m: { content: string; segments?: Array<{ type: string; content?: string }> }
+): string {
+  if (!m.segments || m.segments.length === 0) return m.content
+  return m.segments
+    .filter(s => s.type === 'text')
+    .map(s => (s as { content: string }).content)
+    .join('')
+}
+
+// Clean the last text segment by removing tool call raw text.
+// Strategy: find any trailing JSON/XML artifact that mentions the tool name.
+function cleanLastTextSegment(
+  segs: Array<{ type: string; content?: string }>,
+  toolName: string
+) {
+  for (let i = segs.length - 1; i >= 0; i--) {
+    if (segs[i].type === 'text' && segs[i].content) {
+      const text = segs[i].content!
+      // Remove trailing JSON that contains the tool name
+      const cleaned = stripTrailingToolArtifact(text, toolName)
+      segs[i] = { ...segs[i], content: cleaned }
+      break
+    }
+  }
+}
+
+// Strip trailing text that looks like a tool call JSON/XML artifact.
+// Uses the known tool name for precise matching.
+function stripTrailingToolArtifact(text: string, toolName: string): string {
+  let result = text
+
+  // 1. Remove complete XML tool tags (anywhere)
+  result = result.replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, '')
+  result = result.replace(/<tool_use>[\s\S]*?<\/tool_use>/gi, '')
+  result = result.replace(/<function_calls>[\s\S]*?<\/function_calls>/gi, '')
+  result = result.replace(/<invoke\b[^>]*>[\s\S]*?<\/invoke>/gi, '')
+
+  // 2. Remove trailing unclosed tool XML tags
+  result = result.replace(/\s*<(?:tool_call|tool_use|function_calls|invoke)\b[\s\S]*$/gi, '')
+
+  // 3. Find the tool name in the text (case-insensitive) and trim from the last JSON/XML structure before it.
+  // This is the most reliable strategy: the raw tool text will contain the tool name.
+  {
+    const nameIdx = result.toLowerCase().indexOf(toolName.toLowerCase())
+    if (nameIdx >= 0) {
+      // Scan backwards from the tool name to find the start of the tool call artifact
+      // Look for common delimiters: {, <, newline+space, etc.
+      const before = result.slice(0, nameIdx)
+      // Find the last "natural text boundary" before the tool name
+      const boundaryMatch = before.match(/^(.*?)(?:\s*(?:\{|<(?:tool_call|tool_use|function_calls|invoke)\b))[\s\S]*$/i)
+      if (boundaryMatch) {
+        result = boundaryMatch[1].trimEnd()
+      }
+    }
+  }
+
+  // 4. Fallback: strip trailing unclosed JSON (brace counting)
+  if (result === text) {
+    let depth = 0
+    let lastUnclosed = -1
+    for (let i = result.length - 1; i >= 0; i--) {
+      if (result[i] === '}') depth++
+      else if (result[i] === '{') {
+        if (depth === 0) { lastUnclosed = i; break }
+        depth--
+      }
+    }
+    if (lastUnclosed >= 0) {
+      const tail = result.slice(lastUnclosed)
+      if (/"(?:name|tool_name|tool_call|input|command|arguments)"/.test(tail)) {
+        result = result.slice(0, lastUnclosed).trimEnd()
+      }
+    }
+  }
+
+  // 5. Fallback: strip complete trailing JSON object
+  if (result === text) {
+    const lastClose = result.lastIndexOf('}')
+    if (lastClose >= 0) {
+      let depth = 0, openPos = -1
+      for (let i = lastClose; i >= 0; i--) {
+        if (result[i] === '}') depth++
+        else if (result[i] === '{') {
+          depth--
+          if (depth === 0) { openPos = i; break }
+        }
+      }
+      if (openPos >= 0) {
+        const block = result.slice(openPos, lastClose + 1)
+        const after = result.slice(lastClose + 1).trim()
+        if (/"(?:name|tool_name|tool_call)"\s*:/.test(block) &&
+            (!after || /^(?:json|```|`)?\s*$/.test(after))) {
+          result = result.slice(0, openPos).trimEnd()
+        }
+      }
+    }
+  }
+
+  // 6. Remove markdown code fences wrapping tool JSON
+  result = result.replace(/\s*```(?:json)?\s*\{[\s\S]*?\}\s*```/g, '')
+
+  // 7. Clean excessive whitespace
+  result = result.replace(/\n{3,}/g, '\n\n')
+
+  return result.trim()
+}
+
 // ===== Shared event handler factory =====
 // Used by both sendMessage and reconnect to avoid code duplication.
-// lastSeqRef is a mutable object so the caller can read the final seq after the stream ends.
 
 function createEventHandler(
   taskStore: ReturnType<typeof useTaskStore.getState>,
@@ -45,6 +155,7 @@ function createEventHandler(
             newSegments = [...segs]
             newSegments[newSegments.length - 1] = { ...last, content: last.content + event.delta }
           } else {
+            // After a tool_call marker (or no segments), start a new text segment
             newSegments = [...segs, { type: 'text' as const, content: event.delta }]
           }
           return {
@@ -57,9 +168,17 @@ function createEventHandler(
 
       // ---- Tool Calls (agent-initiated) ----
       case 'agent.tool_call':
-        taskStore.updateLastAssistantMessage((m) => ({
-          ...m,
-          tools: [
+        taskStore.updateLastAssistantMessage((m) => {
+          const segs = m.segments || []
+          cleanLastTextSegment(segs, event.tool_name)
+          // Rebuild content from clean segments
+          m.content = rebuildContentFromSegments(m)
+          // Also clean thinking text
+          if (m.thinking) m.thinking = stripTrailingToolArtifact(m.thinking, event.tool_name)
+          m.segments = segs
+          // Insert tool_call marker for text ordering
+          m.segments.push({ type: 'tool_call' as const, toolCall: null as any })
+          m.tools = [
             ...(m.tools || []),
             {
               id: event.tool_call_id,
@@ -70,7 +189,8 @@ function createEventHandler(
                 : undefined
             }
           ]
-        }))
+          return { ...m }
+        })
         break
 
       case 'agent.tool_result':
@@ -90,36 +210,21 @@ function createEventHandler(
 
       // ---- Tool Requests (client-side, require user action) ----
       case 'client.tool_request':
-        taskStore.updateLastAssistantMessage((m) => ({
-          ...m,
-          tools: [
-            ...(m.tools || []),
-            {
-              id: event.request_id,
-              name: event.tool_name,
-              status: 'running' as const,
-              input: event.input,
-              command: event.input?.command as string | undefined,
-              detail: typeof event.input === 'object'
-                ? JSON.stringify(event.input).slice(0, 120)
-                : undefined
-            }
-          ]
-        }))
+        taskStore.updateLastAssistantMessage((m) => {
+          const segs = m.segments || []
+          cleanLastTextSegment(segs, event.tool_name)
+          m.content = rebuildContentFromSegments(m)
+          if (m.thinking) m.thinking = stripTrailingToolArtifact(m.thinking, event.tool_name)
+          m.segments = segs
+          m.segments.push({ type: 'tool_call' as const, toolCall: null as any })
+          return { ...m }
+        })
 
-        // Auto-execute client tools and submit result to /tool-result
+        // Auto-execute client tools silently and submit result to /tool-result
         {
           const task = taskStore.getCurrentTask()
           const workspace = useSettingsStore.getState().settings.workspacePath
           executeClientTool(event.tool_name, event.input, workspace).then((result) => {
-            taskStore.updateLastAssistantMessage((m) => ({
-              ...m,
-              tools: m.tools?.map((t) =>
-                t.id === event.request_id
-                  ? { ...t, status: 'done' as const, result: result.output || result.error || 'Done' }
-                  : t
-              )
-            }))
             if (task?.sessionId) {
               submitToolResult(task.sessionId, event.request_id, result)
             }
@@ -128,7 +233,6 @@ function createEventHandler(
         break
 
       case 'client.tool_timeout':
-        // Tool request timed out — could mark the tool as failed in the UI
         break
 
       // ---- Plan events ----
@@ -227,9 +331,14 @@ function createEventHandler(
 
       // ---- Build events ----
       case 'build.step_pending':
-        taskStore.updateLastAssistantMessage((m) => ({
-          ...m,
-          tools: [
+        taskStore.updateLastAssistantMessage((m) => {
+          const segs = m.segments || []
+          cleanLastTextSegment(segs, event.tool_name)
+          m.content = rebuildContentFromSegments(m)
+          if (m.thinking) m.thinking = stripTrailingToolArtifact(m.thinking, event.tool_name)
+          m.segments = segs
+          m.segments.push({ type: 'tool_call' as const, toolCall: null as any })
+          m.tools = [
             ...(m.tools || []),
             {
               id: event.tool_call_id,
@@ -239,7 +348,8 @@ function createEventHandler(
               detail: event.reasoning || JSON.stringify(event.input).slice(0, 120)
             }
           ]
-        }))
+          return { ...m }
+        })
         break
 
       case 'build.step_confirmed':
@@ -293,28 +403,22 @@ function createEventHandler(
         break
 
       case 'message.waiting_timeout':
-        // Server-side waiting timeout — could show a notification to the user
         break
 
       case 'message.queued':
-        // Server confirmed the message is queued; queue position is in event.queue_position
         break
 
       case 'message.start':
-        // Message processing started on server
         break
 
       case 'queue.updated':
-        // Server sent updated queue state
         break
 
       // ---- Session events ----
       case 'session.timeout':
-        // Session idle timeout warning — could show a toast notification
         break
 
       case 'session.recovered':
-        // Session recovered after reconnect — could show a brief indicator
         break
 
       case 'system.status':
@@ -328,11 +432,9 @@ function createEventHandler(
         break
 
       case 'heartbeat':
-        // Keep-alive heartbeat from server; no action needed
         break
 
       default:
-        // Exhaustiveness check — all ServerEvent types are handled above
         break
     }
   }
@@ -346,17 +448,14 @@ interface ChatState {
 
   sendMessage: (text: string) => void
   reconnect: () => void
-  // Build mode
   confirmTool: () => void
   skipTool: () => void
   stopTools: () => void
-  // Plan mode
   selectPlanOption: (msgIdx: number, value: string) => void
   answerPlanQuestion: (msgIdx: number, textAnswer?: string) => void
   confirmPlan: () => void
   editPlan: (msgIdx: number) => void
   rejectPlan: () => void
-  // Plan editor
   openPlanEditor: (msgIdx: number, planText: string) => void
   closePlanEditor: () => void
   savePlanFromEditor: (newText: string) => void
@@ -367,11 +466,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isProcessing: false,
   currentEditingPlanMsgIdx: null,
 
-  // ===== SEND =====
   sendMessage: (text: string) => {
     if (!text) return
 
-    // If already processing, queue the message
     if (get().isProcessing) {
       useQueueStore.getState().addToQueue(text)
       return
@@ -396,7 +493,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const inputMode = modeStore.inputMode
     const sceneMode = modeStore.sceneMode
 
-    // Add user message
     const userMsg: Message = {
       id: genMsgId(),
       role: 'user',
@@ -407,7 +503,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     set({ isProcessing: true })
 
-    // Create assistant placeholder message
     const assistantMsg: Message = {
       id: genMsgId(),
       role: 'assistant',
@@ -421,14 +516,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
     taskStore.addMessage(assistantMsg)
 
-    // Mutable ref so createEventHandler can update seq and we can read the final value
     const lastSeqRef = { current: 0 }
     const handleEvent = createEventHandler(taskStore, set, lastSeqRef)
 
-    // Read settings for workspace/model
     const settings = useSettingsStore.getState().settings
 
-    // Fire the API call (async, runs in background via NDJSON stream)
     sendChatMessage({
       sessionId: task.sessionId,
       content: text,
@@ -448,7 +540,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
         set({ isProcessing: false })
       },
       onDone: () => {
-        // Process next queued message if any
         const queueStore = useQueueStore.getState()
         if (queueStore.queue.length > 0) {
           setTimeout(() => {
@@ -462,7 +553,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     })
   },
 
-  // ===== RECONNECT =====
   reconnect: () => {
     const taskStore = useTaskStore.getState()
     const task = taskStore.getCurrentTask()
@@ -493,13 +583,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     )
   },
 
-  // ===== BUILD MODE =====
   confirmTool: () => {
     const taskStore = useTaskStore.getState()
     const task = taskStore.getCurrentTask()
     if (!task) return
 
-    // Find the first pending build step and confirm with tool_name
     const msg = task.messages[task.messages.length - 1]
     const pendingTool = msg?.tools?.find(t => t.status === 'pending')
     if (pendingTool) {
@@ -521,7 +609,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const task = taskStore.getCurrentTask()
     if (!task) return
 
-    // Remove pending build step
     taskStore.updateLastAssistantMessage((m) => ({
       ...m,
       tools: m.tools?.filter(t => t.status !== 'pending')
@@ -537,7 +624,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const task = taskStore.getCurrentTask()
     if (!task) return
 
-    // Remove all pending build steps
     taskStore.updateLastAssistantMessage((m) => ({
       ...m,
       tools: m.tools?.filter(t => t.status !== 'pending')
@@ -548,10 +634,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     })
   },
 
-  // ===== PLAN MODE =====
-  selectPlanOption: (_msgIdx: number, _value: string) => {
-    // UI-side only — selection tracking lives in the DOM
-  },
+  selectPlanOption: (_msgIdx: number, _value: string) => {},
 
   answerPlanQuestion: (_msgIdx: number, textAnswer?: string) => {
     const taskStore = useTaskStore.getState()
@@ -559,11 +642,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!task) return
 
     const answer = textAnswer || '已选择'
-    // Update the last unanswered question in segments
     taskStore.updateLastAssistantMessage((m) => {
       const segs = m.segments || []
       const updated = segs.map((s, i) => {
-        // Find last unanswered question
         const isLastUnanswered =
           s.type === 'question' &&
           s.answer === null &&
@@ -583,7 +664,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const task = taskStore.getCurrentTask()
     if (!task) return
 
-    // Optimistically update local state
     taskStore.updateLastAssistantMessage((m) => ({
       ...m,
       planStatus: 'confirmed',
@@ -597,13 +677,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       ]
     }))
 
-    // Call API (fire-and-forget — stream handles the rest)
     planApi.confirm(task.sessionId).catch((err) => {
       console.error('Plan confirm failed:', err)
-      // Revert on failure
       taskStore.updateLastAssistantMessage((m) => {
         const events = m.segments || []
-        // Remove our optimistic confirmed event (last one)
         const reverted = events.filter((e, i) =>
           !(i === events.length - 1 && e.type === 'confirmed')
         )
@@ -645,7 +722,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     })
   },
 
-  // ===== PLAN EDITOR =====
   openPlanEditor: (msgIdx: number, _planText: string) => {
     set({ currentEditingPlanMsgIdx: msgIdx })
   },
@@ -680,7 +756,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
     set({ currentEditingPlanMsgIdx: null })
 
-    // Call API
     if (task) {
       planApi.edit(task.sessionId, newText).catch((err) => {
         console.error('Plan edit API failed:', err)

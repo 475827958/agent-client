@@ -233,6 +233,12 @@ function SegmentsView({
           )
         }
 
+        // Tool call segment — used only as an ordering marker between text segments.
+        // The actual tool UI is rendered in the "思考与工具调用" collapsed section above.
+        if (seg.type === 'tool_call') {
+          return null
+        }
+
         // Plan event segments
         if (!canShowNonText(i)) return null
 
