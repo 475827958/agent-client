@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { Message, ServerEvent } from '../types'
-import { sendChatMessage, reconnectStream, planApi, buildApi, executeClientTool, isClientTool, submitToolResult } from '../services/api'
+import { sendChatMessage, reconnectStream, planApi, buildApi, executeClientTool, submitToolResult } from '../services/api'
 import { useTaskStore } from './taskStore'
 import { useQueueStore } from './queueStore'
 import { useModeStore } from './modeStore'
@@ -97,7 +97,9 @@ function createEventHandler(
             {
               id: event.request_id,
               name: event.tool_name,
-              status: 'pending' as const,
+              status: 'running' as const,
+              input: event.input,
+              command: event.input?.command as string | undefined,
               detail: typeof event.input === 'object'
                 ? JSON.stringify(event.input).slice(0, 120)
                 : undefined
@@ -105,8 +107,8 @@ function createEventHandler(
           ]
         }))
 
-        // Auto-execute client tools (read_file, write_file, edit_file, glob, grep)
-        if (isClientTool(event.tool_name)) {
+        // Auto-execute client tools and submit result to /tool-result
+        {
           const task = taskStore.getCurrentTask()
           const workspace = useSettingsStore.getState().settings.workspacePath
           executeClientTool(event.tool_name, event.input, workspace).then((result) => {
@@ -233,46 +235,11 @@ function createEventHandler(
               id: event.tool_call_id,
               name: event.tool_name,
               status: 'pending' as const,
+              command: event.input?.command as string | undefined,
               detail: event.reasoning || JSON.stringify(event.input).slice(0, 120)
             }
           ]
         }))
-
-        // If this is a client tool, auto-confirm and execute locally
-        if (isClientTool(event.tool_name)) {
-          const task = taskStore.getCurrentTask()
-
-          // Mark as running
-          taskStore.updateLastAssistantMessage((m) => ({
-            ...m,
-            tools: m.tools?.map((t) =>
-              t.id === event.tool_call_id ? { ...t, status: 'running' as const } : t
-            )
-          }))
-
-          // Auto-confirm the build step so the server doesn't block
-          if (task?.sessionId) {
-            buildApi.confirm(task.sessionId).catch((err) =>
-              console.error('Build auto-confirm failed:', err)
-            )
-          }
-
-          // Execute the client tool and submit the result
-          const workspace = useSettingsStore.getState().settings.workspacePath
-          executeClientTool(event.tool_name, event.input, workspace).then((result) => {
-            taskStore.updateLastAssistantMessage((m) => ({
-              ...m,
-              tools: m.tools?.map((t) =>
-                t.id === event.tool_call_id
-                  ? { ...t, status: 'done' as const, result: result.output || result.error || 'Done' }
-                  : t
-              )
-            }))
-            if (task?.sessionId) {
-              submitToolResult(task.sessionId, event.tool_call_id, result)
-            }
-          })
-        }
         break
 
       case 'build.step_confirmed':
@@ -348,6 +315,16 @@ function createEventHandler(
 
       case 'session.recovered':
         // Session recovered after reconnect — could show a brief indicator
+        break
+
+      case 'system.status':
+        taskStore.updateLastAssistantMessage((m) => ({
+          ...m,
+          segments: [
+            ...(m.segments || []),
+            { type: 'system_status' as const, message: event.message }
+          ]
+        }))
         break
 
       case 'heartbeat':
@@ -522,15 +499,33 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const task = taskStore.getCurrentTask()
     if (!task) return
 
-    buildApi.confirm(task.sessionId).catch((err) => {
-      console.error('Build confirm failed:', err)
-    })
+    // Find the first pending build step and confirm with tool_name
+    const msg = task.messages[task.messages.length - 1]
+    const pendingTool = msg?.tools?.find(t => t.status === 'pending')
+    if (pendingTool) {
+      taskStore.updateLastAssistantMessage((m) => ({
+        ...m,
+        tools: m.tools?.map((t) =>
+          t.id === pendingTool.id ? { ...t, status: 'running' as const } : t
+        )
+      }))
+
+      buildApi.confirm(task.sessionId, pendingTool.name).catch((err) => {
+        console.error('Build confirm failed:', err)
+      })
+    }
   },
 
   skipTool: () => {
     const taskStore = useTaskStore.getState()
     const task = taskStore.getCurrentTask()
     if (!task) return
+
+    // Remove pending build step
+    taskStore.updateLastAssistantMessage((m) => ({
+      ...m,
+      tools: m.tools?.filter(t => t.status !== 'pending')
+    }))
 
     buildApi.skip(task.sessionId).catch((err) => {
       console.error('Build skip failed:', err)
@@ -541,6 +536,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const taskStore = useTaskStore.getState()
     const task = taskStore.getCurrentTask()
     if (!task) return
+
+    // Remove all pending build steps
+    taskStore.updateLastAssistantMessage((m) => ({
+      ...m,
+      tools: m.tools?.filter(t => t.status !== 'pending')
+    }))
 
     buildApi.abort(task.sessionId).catch((err) => {
       console.error('Build abort failed:', err)

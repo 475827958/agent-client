@@ -1,10 +1,48 @@
 import { ipcMain, dialog } from 'electron'
 import { readFile, writeFile, readdir } from 'fs/promises'
+import { existsSync } from 'fs'
 import { join, resolve, dirname } from 'path'
-import { exec as cpExec } from 'child_process'
+import { exec as cpExec, execFile as cpExecFile } from 'child_process'
 import { promisify } from 'util'
 
 const execAsync = promisify(cpExec)
+const execFileAsync = promisify(cpExecFile)
+
+function resolveShell(): string {
+  if (process.platform !== 'win32') return '/bin/bash'
+
+  // Git Bash is needed on Windows to run Unix commands (ls, grep, etc.)
+  const gitBashPaths = [
+    'C:\\Program Files\\Git\\bin\\bash.exe',
+    'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
+  ]
+  for (const p of gitBashPaths) {
+    if (existsSync(p)) return p
+  }
+  return 'cmd.exe'
+}
+
+function decodeBuffer(buf: Buffer | string | undefined): string {
+  if (!buf) return ''
+  if (typeof buf === 'string') return buf
+  if (buf.length === 0) return ''
+  if (process.platform !== 'win32') return buf.toString('utf8')
+
+  // Try UTF-8 first (strict — invalid bytes → replacement chars).
+  // Fall back to GBK if UTF-8 produces too many replacement chars.
+  const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(buf)
+  const utf8Bad = (utf8.match(/�/g) || []).length
+  if (utf8Bad < utf8.length * 0.05) return utf8
+
+  // Likely GBK (cmd.exe or Windows-native tool output)
+  try {
+    const gbk = new TextDecoder('gbk', { fatal: false }).decode(buf)
+    const gbkBad = (gbk.match(/�/g) || []).length
+    if (gbkBad < gbk.length * 0.05) return gbk
+  } catch { /* TextDecoder('gbk') not available */ }
+
+  return utf8
+}
 
 function globToRegex(pattern: string): RegExp {
   const escaped = pattern
@@ -115,18 +153,57 @@ export function registerFileOps(workspacePath: () => string): void {
 
   ipcMain.handle('file:exec', async (_event, command: string, timeoutMs: number = 120000) => {
     const cwd = resolve(ws())
-    const { stdout, stderr } = await execAsync(command, {
-      cwd,
-      timeout: Math.min(timeoutMs, 300000),
-      maxBuffer: 10 * 1024 * 1024,
-      shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/bash',
-      env: { ...process.env, HOME: cwd, USERPROFILE: cwd }
-    })
+    const timeout = Math.min(timeoutMs, 300000)
+    const maxBuffer = 10 * 1024 * 1024
+    const env = {
+      ...process.env,
+      HOME: cwd,
+      USERPROFILE: cwd,
+      LANG: 'zh_CN.UTF-8',
+      LC_ALL: 'zh_CN.UTF-8'
+    }
 
-    return {
-      stdout: stdout || '',
-      stderr: stderr || '',
-      exit_code: 0
+    try {
+      let stdout: Buffer
+      let stderr: Buffer
+
+      const bashPath = resolveShell()
+      if (process.platform === 'win32' && bashPath.endsWith('bash.exe')) {
+        const result = await execFileAsync(bashPath, ['-c', command], {
+          cwd,
+          timeout,
+          maxBuffer,
+          encoding: 'buffer' as BufferEncoding,
+          env
+        }) as { stdout: Buffer; stderr: Buffer }
+        stdout = result.stdout
+        stderr = result.stderr
+      } else {
+        const result = await execAsync(command, {
+          cwd,
+          timeout,
+          maxBuffer,
+          shell: bashPath,
+          encoding: 'buffer' as BufferEncoding,
+          env
+        }) as { stdout: Buffer; stderr: Buffer }
+        stdout = result.stdout
+        stderr = result.stderr
+      }
+
+      return {
+        stdout: decodeBuffer(stdout),
+        stderr: decodeBuffer(stderr),
+        exit_code: 0
+      }
+    } catch (err: any) {
+      // Command failed — decode stderr/out buffers properly instead of
+      // letting Node's raw error message propagate through IPC.
+      return {
+        stdout: decodeBuffer(err.stdout),
+        stderr: decodeBuffer(err.stderr),
+        exit_code: err.code ?? 1
+      }
     }
   })
 

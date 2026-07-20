@@ -54,10 +54,39 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 const electron = require("electron");
 const path = require("path");
 const promises = require("fs/promises");
+const fs = require("fs");
 const child_process = require("child_process");
 const util = require("util");
 const Store = require("electron-store");
 const execAsync = util.promisify(child_process.exec);
+const execFileAsync = util.promisify(child_process.execFile);
+function resolveShell() {
+  if (process.platform !== "win32") return "/bin/bash";
+  const gitBashPaths = [
+    "C:\\Program Files\\Git\\bin\\bash.exe",
+    "C:\\Program Files (x86)\\Git\\bin\\bash.exe"
+  ];
+  for (const p of gitBashPaths) {
+    if (fs.existsSync(p)) return p;
+  }
+  return "cmd.exe";
+}
+function decodeBuffer(buf) {
+  if (!buf) return "";
+  if (typeof buf === "string") return buf;
+  if (buf.length === 0) return "";
+  if (process.platform !== "win32") return buf.toString("utf8");
+  const utf8 = new TextDecoder("utf-8", { fatal: false }).decode(buf);
+  const utf8Bad = (utf8.match(/�/g) || []).length;
+  if (utf8Bad < utf8.length * 0.05) return utf8;
+  try {
+    const gbk = new TextDecoder("gbk", { fatal: false }).decode(buf);
+    const gbkBad = (gbk.match(/�/g) || []).length;
+    if (gbkBad < gbk.length * 0.05) return gbk;
+  } catch {
+  }
+  return utf8;
+}
 function globToRegex(pattern) {
   const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*\*\//g, "\0").replace(/\*/g, "[^/\\\\]*").replace(/\x00/g, "(.*/)?");
   return new RegExp(`^${escaped}$`);
@@ -148,18 +177,53 @@ function registerFileOps(workspacePath) {
   });
   electron.ipcMain.handle("file:exec", async (_event, command, timeoutMs = 12e4) => {
     const cwd = path.resolve(ws());
-    const { stdout, stderr } = await execAsync(command, {
-      cwd,
-      timeout: Math.min(timeoutMs, 3e5),
-      maxBuffer: 10 * 1024 * 1024,
-      shell: process.platform === "win32" ? "cmd.exe" : "/bin/bash",
-      env: { ...process.env, HOME: cwd, USERPROFILE: cwd }
-    });
-    return {
-      stdout: stdout || "",
-      stderr: stderr || "",
-      exit_code: 0
+    const timeout = Math.min(timeoutMs, 3e5);
+    const maxBuffer = 10 * 1024 * 1024;
+    const env = {
+      ...process.env,
+      HOME: cwd,
+      USERPROFILE: cwd,
+      LANG: "zh_CN.UTF-8",
+      LC_ALL: "zh_CN.UTF-8"
     };
+    try {
+      let stdout;
+      let stderr;
+      const bashPath = resolveShell();
+      if (process.platform === "win32" && bashPath.endsWith("bash.exe")) {
+        const result = await execFileAsync(bashPath, ["-c", command], {
+          cwd,
+          timeout,
+          maxBuffer,
+          encoding: "buffer",
+          env
+        });
+        stdout = result.stdout;
+        stderr = result.stderr;
+      } else {
+        const result = await execAsync(command, {
+          cwd,
+          timeout,
+          maxBuffer,
+          shell: bashPath,
+          encoding: "buffer",
+          env
+        });
+        stdout = result.stdout;
+        stderr = result.stderr;
+      }
+      return {
+        stdout: decodeBuffer(stdout),
+        stderr: decodeBuffer(stderr),
+        exit_code: 0
+      };
+    } catch (err) {
+      return {
+        stdout: decodeBuffer(err.stdout),
+        stderr: decodeBuffer(err.stderr),
+        exit_code: err.code ?? 1
+      };
+    }
   });
   electron.ipcMain.handle("workspace:select", async () => {
     const result = await electron.dialog.showOpenDialog({

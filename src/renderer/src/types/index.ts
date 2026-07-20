@@ -10,6 +10,7 @@ export interface ToolCall {
   detail?: string
   result?: string
   _result?: string
+  input?: Record<string, unknown>
   status: 'pending' | 'running' | 'done'
 }
 
@@ -27,6 +28,7 @@ export interface PlanEvent {
 // ===== Message =====
 export type MessageSegment =
   | { type: 'text'; content: string }
+  | { type: 'system_status'; message: string }
   | PlanEvent
 
 export interface Message {
@@ -293,4 +295,9 @@ export type ServerEvent =
       seq: number
       current_message_id: string | null
       queue_size: number
+    }
+  | {
+      type: 'system.status'
+      seq: number
+      message: string
     }

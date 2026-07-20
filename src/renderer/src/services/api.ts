@@ -125,6 +125,7 @@ export async function executeClientTool(
         if (!command) throw new Error('Missing required parameter: command')
         const timeoutMs = (input.timeout_ms as number) || 120000
         const result = await ipcClient.file.exec(command, timeoutMs)
+        console.log('bash', command, result)
         if (result.exit_code !== 0 && result.stderr) {
           return {
             status: 'error',
@@ -434,7 +435,7 @@ export const planApi = {
 
 // ===== Build actions =====
 
-async function buildAction(sessionId: string, action: 'confirm' | 'skip' | 'abort'): Promise<void> {
+async function buildAction(sessionId: string, action: 'confirm' | 'skip' | 'abort', toolName?: string): Promise<void> {
   const settings = useSettingsStore.getState().settings
   const baseUrl = settings.apiBaseUrl || DEFAULT_BASE_URL
   const url = `${baseUrl}/sessions/${sessionId}/build/${action}`
@@ -444,7 +445,8 @@ async function buildAction(sessionId: string, action: 'confirm' | 'skip' | 'abor
     headers: {
       'Content-Type': 'application/json',
       Authorization: settings.apiKey ? `Bearer ${settings.apiKey}` : ''
-    }
+    },
+    body: toolName ? JSON.stringify({ tool_name: toolName }) : undefined
   })
 
   if (!response.ok) {
@@ -454,7 +456,7 @@ async function buildAction(sessionId: string, action: 'confirm' | 'skip' | 'abor
 }
 
 export const buildApi = {
-  confirm: (sessionId: string) => buildAction(sessionId, 'confirm'),
+  confirm: (sessionId: string, toolName?: string) => buildAction(sessionId, 'confirm', toolName),
   skip: (sessionId: string) => buildAction(sessionId, 'skip'),
   abort: (sessionId: string) => buildAction(sessionId, 'abort')
 }

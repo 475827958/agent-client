@@ -389,6 +389,15 @@ function SegmentsView({
           )
         }
 
+        if (seg.type === 'system_status') {
+          return (
+            <div key={`status-${i}`} className="mb-1.5 p-3 bg-[#fefce8] border border-[#fde68a] rounded-[8px]">
+              <div className="text-[10px] font-semibold text-[#a16207] uppercase tracking-wider mb-1">系统状态</div>
+              <div className="text-xs text-[#0f172a] leading-relaxed">{seg.message}</div>
+            </div>
+          )
+        }
+
         return null
       })}
     </>
