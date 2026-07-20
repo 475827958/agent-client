@@ -1581,7 +1581,7 @@ type StreamChunk =
       type: "message.error";
       seq: number;
       message_id: string;
-      error: string;
+      message: string;
       code: string;
       fatal: boolean;
       turn?: number;

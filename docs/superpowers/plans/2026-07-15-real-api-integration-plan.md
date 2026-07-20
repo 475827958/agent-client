@@ -498,7 +498,7 @@ sendMessage: (text: string) => {
         if (event.fatal) {
           taskStore.updateLastAssistantMessage((m) => ({
             ...m,
-            content: m.content || `**Error:** ${event.error}`,
+            content: m.content || `**Error:** ${event.message}`,
             isStreaming: false,
             processCollapsed: true
           }))
@@ -835,7 +835,7 @@ reconnect: () => {
         if (event.fatal) {
           taskStore.updateLastAssistantMessage((m) => ({
             ...m,
-            content: m.content || `**Error:** ${event.error}`,
+            content: m.content || `**Error:** ${event.message}`,
             isStreaming: false,
             processCollapsed: true
           }))
@@ -981,7 +981,7 @@ function createEventHandler(
         if (event.fatal) {
           taskStore.updateLastAssistantMessage((m) => ({
             ...m,
-            content: m.content || `**Error:** ${event.error}`,
+            content: m.content || `**Error:** ${event.message}`,
             isStreaming: false,
             processCollapsed: true
           }))

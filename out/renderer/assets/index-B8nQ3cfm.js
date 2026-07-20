@@ -8167,7 +8167,7 @@ function createEventHandler(taskStore, set, lastSeqRef) {
         if (event.fatal) {
           taskStore.updateLastAssistantMessage((m2) => ({
             ...m2,
-            content: m2.content || `**Error:** ${event.error}`,
+            content: m2.content || `**Error:** ${event.message}`,
             isStreaming: false,
             processCollapsed: true
           }));
