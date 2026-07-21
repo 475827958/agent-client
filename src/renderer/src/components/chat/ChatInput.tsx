@@ -441,7 +441,7 @@ export function ChatInput() {
     if (!ed) return
     const { text, files } = readEditor(ed)
     const trimmed = text.trim()
-    if (!trimmed || isProcessing) return
+    if (!trimmed) return
     if (!settings.workspacePath) {
       alert('请先选择工作空间（workspace）目录')
       return
@@ -566,7 +566,7 @@ export function ChatInput() {
         <div className="flex items-end gap-2">
           <div
             ref={editableRef}
-            contentEditable={!isProcessing}
+            contentEditable={true}
             suppressContentEditableWarning
             onInput={updateEmptyState}
             onKeyDown={handleKeyDown}
@@ -588,7 +588,6 @@ export function ChatInput() {
           />
           <button
             onClick={handleSend}
-            disabled={isProcessing}
             className="flex-shrink-0 w-[32px] h-[32px] rounded-full flex items-center justify-center border-none cursor-pointer transition-all"
             style={{
               backgroundColor: isEmptyRef.current ? '#f1f5f9' : '#a7f3d0',
@@ -597,7 +596,10 @@ export function ChatInput() {
             }}
           >
             {isProcessing ? (
-              <div className="w-[16px] h-[16px] border-[2px] border-[#047857] border-t-transparent rounded-full animate-spin" />
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
             ) : (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="19" x2="12" y2="5" />
@@ -694,7 +696,7 @@ export function ChatInput() {
         </div>
 
         <span className="ml-auto text-[11px] text-[#94a3b8]">
-          {isProcessing ? 'AI 正在处理中...' : 'Enter 发送 · Shift+Enter 换行'}
+          {isProcessing ? (queue.length > 0 ? `队列中 ${queue.length} 个待处理 · 输入将加入队列` : 'AI 正在处理中... Enter 加入队列') : 'Enter 发送 · Shift+Enter 换行'}
         </span>
       </div>
 
