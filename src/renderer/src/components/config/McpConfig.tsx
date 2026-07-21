@@ -1,19 +1,67 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useConfigStore } from '../../stores/configStore'
+import type { CreateCustomMcpRequest } from '../../types'
+
+function Spinner() {
+  return (
+    <svg className="w-4 h-4 animate-spin text-[#94a3b8]" viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="28" strokeDashoffset="8" />
+    </svg>
+  )
+}
 
 export function McpConfig() {
   const [tab, setTab] = useState<'hub' | 'installed' | 'custom'>('hub')
   const [search, setSearch] = useState('')
+  const [showCreate, setShowCreate] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+
   const {
-    mcpHub, installedMcpIds, customMcps,
-    installMcp, uninstallMcp, addCustomMcp, deleteCustomMcp
+    mcpHub, mcpHubLoading, mcpHubError,
+    installedMcps, installedLoading, installedError,
+    customMcps, customLoading, customError,
+    loadAllMcps,
+    installMcp, uninstallMcp, createCustomMcp, deleteCustomMcp
   } = useConfigStore()
 
-  const filtered = mcpHub.filter(s =>
-    !search || s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.desc.toLowerCase().includes(search.toLowerCase()) ||
+  useEffect(() => {
+    loadAllMcps()
+  }, [])
+
+  const installedIds = new Set(installedMcps.map((s) => s.server_id))
+
+  const filtered = mcpHub.filter((s) =>
+    !search || s.server_name.toLowerCase().includes(search.toLowerCase()) ||
+    s.description.toLowerCase().includes(search.toLowerCase()) ||
     s.category.toLowerCase().includes(search.toLowerCase())
   )
+
+  const handleInstall = async (serverId: string) => {
+    setActionError(null)
+    try {
+      await installMcp(serverId)
+    } catch (err: any) {
+      setActionError(err.message || '安装失败')
+    }
+  }
+
+  const handleUninstall = async (serverId: string) => {
+    setActionError(null)
+    try {
+      await uninstallMcp(serverId)
+    } catch (err: any) {
+      setActionError(err.message || '卸载失败')
+    }
+  }
+
+  const handleDeleteCustom = async (serverId: string) => {
+    setActionError(null)
+    try {
+      await deleteCustomMcp(serverId)
+    } catch (err: any) {
+      setActionError(err.message || '删除失败')
+    }
+  }
 
   return (
     <div>
@@ -46,103 +94,230 @@ export function McpConfig() {
         )}
       </div>
 
+      {actionError && (
+        <div className="mb-3 px-3 py-2 bg-[#fef2f2] border border-[#fecaca] rounded-md text-[13px] text-[#dc2626] flex items-center gap-2">
+          <span>{actionError}</span>
+          <button onClick={() => setActionError(null)} className="ml-auto text-[#94a3b8] hover:text-[#0f172a] cursor-pointer">&times;</button>
+        </div>
+      )}
+
+      {/* ── Hub Tab ── */}
       {tab === 'hub' && (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5">
-          {filtered.map(s => {
-            const installed = installedMcpIds.includes(s.id)
-            return (
-              <div key={s.id} className="bg-white border border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5 hover:border-[#cbd5e1] hover:shadow-sm transition-all">
-                <div className="w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg">{s.icon}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-sm text-[#0f172a]">{s.name}</div>
-                  <div className="text-xs text-[#94a3b8] mt-1">{s.desc}</div>
-                  <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 bg-[#fffbeb] text-[#b45309]">{s.category}</span>
-                </div>
-                <div className="flex-shrink-0 self-center">
-                  <button
-                    onClick={() => installed ? uninstallMcp(s.id) : installMcp(s.id)}
-                    className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors border cursor-pointer ${
-                      installed
-                        ? 'border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9]'
-                        : 'border-[#a7f3d0] text-[#047857] bg-[#f0fdf4] hover:bg-[#a7f3d0]'
-                    }`}
-                  >
-                    {installed ? '已安装' : '安装'}
-                  </button>
-                </div>
-              </div>
-            )
-          })}
-          {filtered.length === 0 && <div className="text-[#94a3b8] text-[13px] py-3">未找到匹配的 MCP</div>}
-        </div>
+        <>
+          {mcpHubLoading && <div className="flex items-center gap-2 text-[#94a3b8] text-[13px] py-4"><Spinner /> 加载 Hub 列表...</div>}
+          {mcpHubError && <div className="text-[#dc2626] text-[13px] py-3">{mcpHubError}</div>}
+          {!mcpHubLoading && !mcpHubError && (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5">
+              {filtered.map(s => {
+                const installed = installedIds.has(s.server_id)
+                return (
+                  <div key={s.server_id} className="bg-white border border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5 hover:border-[#cbd5e1] hover:shadow-sm transition-all">
+                    <div className="w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg">{s.icon}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm text-[#0f172a]">{s.server_name}</div>
+                      <div className="text-xs text-[#94a3b8] mt-1">{s.description}</div>
+                      <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 bg-[#fffbeb] text-[#b45309]">{s.category}</span>
+                    </div>
+                    <div className="flex-shrink-0 self-center">
+                      <button
+                        onClick={() => installed ? handleUninstall(s.server_id) : handleInstall(s.server_id)}
+                        className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors border cursor-pointer ${
+                          installed
+                            ? 'border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9]'
+                            : 'border-[#a7f3d0] text-[#047857] bg-[#f0fdf4] hover:bg-[#a7f3d0]'
+                        }`}
+                      >
+                        {installed ? '已安装' : '安装'}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+              {filtered.length === 0 && <div className="text-[#94a3b8] text-[13px] py-3">未找到匹配的 MCP</div>}
+            </div>
+          )}
+        </>
       )}
 
+      {/* ── Installed Tab ── */}
       {tab === 'installed' && (
-        <div>
-          <div className="text-[11px] font-semibold text-[#94a3b8] uppercase tracking-wider mb-2">Hub 已安装</div>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5">
-            {mcpHub.filter(s => installedMcpIds.includes(s.id)).map(s => (
-              <div key={s.id} className="bg-white border border-l-[3px] border-l-[#a7f3d0] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5">
-                <div className="w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg">{s.icon}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-sm text-[#0f172a]">{s.name}</div>
-                  <div className="text-xs text-[#94a3b8] mt-1">{s.desc}</div>
-                  <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 bg-[#fffbeb] text-[#b45309]">{s.category}</span>
-                </div>
-                <div className="flex-shrink-0 self-center">
-                  <button onClick={() => uninstallMcp(s.id)} className="px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9] cursor-pointer">卸载</button>
-                </div>
+        <>
+          {installedLoading && <div className="flex items-center gap-2 text-[#94a3b8] text-[13px] py-4"><Spinner /> 加载已安装列表...</div>}
+          {installedError && <div className="text-[#dc2626] text-[13px] py-3">{installedError}</div>}
+          {!installedLoading && !installedError && (
+            <div>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5">
+                {installedMcps.map(s => (
+                  <div key={s.server_id} className="bg-white border border-l-[3px] border-l-[#a7f3d0] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5">
+                    <div className="w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg">{s.icon}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm text-[#0f172a]">{s.server_name}</div>
+                      <div className="text-xs text-[#94a3b8] mt-1">{s.description}</div>
+                      <div className="flex gap-1.5 mt-1.5">
+                        <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#fffbeb] text-[#b45309]">{s.category}</span>
+                        <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#f1f5f9] text-[#64748b]">{s.transport}</span>
+                      </div>
+                    </div>
+                    <div className="flex-shrink-0 self-center">
+                      <button onClick={() => handleUninstall(s.server_id)} className="px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9] cursor-pointer">卸载</button>
+                    </div>
+                  </div>
+                ))}
+                {installedMcps.length === 0 && <div className="text-[#94a3b8] text-[13px] py-3">暂无已安装的 MCP，前往 Hub 安装</div>}
               </div>
-            ))}
-            {mcpHub.filter(s => installedMcpIds.includes(s.id)).length === 0 && <div className="text-[#94a3b8] text-[13px] py-3">暂无已安装的 Hub MCP</div>}
-          </div>
-        </div>
+            </div>
+          )}
+        </>
       )}
 
+      {/* ── Custom Tab ── */}
       {tab === 'custom' && (
-        <div>
+        <>
           <div className="flex gap-2 mb-5">
             <button
-              onClick={() => {
-                const name = prompt('输入 MCP 名称:')
-                if (name) addCustomMcp({ id: 'cm' + Date.now(), name, desc: '自定义创建的 MCP', icon: '🔧', source: 'create', time: '刚才' })
-              }}
-              className="flex items-center gap-1.5 px-4 py-2 border border-dashed border-[#e2e8f0] rounded-md text-[13px] text-[#64748b] hover:border-[#a7f3d0] hover:text-[#047857] hover:bg-[#f0fdf4] transition-colors cursor-pointer bg-white"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M8 10V2M4 6l4-4 4 4"/><path d="M2 12v2h12v-2"/></svg>
-              上传 MCP
-            </button>
-            <button
-              onClick={() => {
-                const name = prompt('输入 MCP 名称:')
-                if (name) addCustomMcp({ id: 'cm' + Date.now(), name, desc: '自定义创建的 MCP', icon: '🔧', source: 'create', time: '刚才' })
-              }}
+              onClick={() => setShowCreate(true)}
               className="flex items-center gap-1.5 px-4 py-2 border border-dashed border-[#e2e8f0] rounded-md text-[13px] text-[#64748b] hover:border-[#a7f3d0] hover:text-[#047857] hover:bg-[#f0fdf4] transition-colors cursor-pointer bg-white"
             >
               <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M8 3v10M3 8h10"/></svg>
-              自己创建
+              添加自定义 MCP
             </button>
           </div>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5">
-            {customMcps.map(s => (
-              <div key={s.id} className="bg-white border border-l-[3px] border-l-[#a7f3d0] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5">
-                <div className="w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg">{s.icon}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-sm text-[#0f172a]">{s.name}</div>
-                  <div className="text-xs text-[#94a3b8] mt-1">{s.desc}</div>
-                  <span className={`inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 ${s.source === 'create' ? 'bg-[#f0fdf4] text-[#047857]' : 'bg-[#fffbeb] text-[#b45309]'}`}>
-                    {s.source === 'create' ? '自建' : `上传 · ${s.fileName || ''}`}
-                  </span>
+
+          {customLoading && <div className="flex items-center gap-2 text-[#94a3b8] text-[13px] py-4"><Spinner /> 加载中...</div>}
+          {customError && <div className="text-[#dc2626] text-[13px] py-3">{customError}</div>}
+          {!customLoading && !customError && (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5">
+              {customMcps.map(s => (
+                <div key={s.server_id} className="bg-white border border-l-[3px] border-l-[#a7f3d0] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5">
+                  <div className="w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg">{s.icon}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm text-[#0f172a]">{s.server_name}</div>
+                    <div className="text-xs text-[#94a3b8] mt-1">{s.description}</div>
+                    <div className="flex gap-1.5 mt-1.5">
+                      <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#f0fdf4] text-[#047857]">自建</span>
+                      <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#f1f5f9] text-[#64748b]">{s.transport}</span>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 self-center">
+                    <button onClick={() => handleDeleteCustom(s.server_id)} className="px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9] cursor-pointer">删除</button>
+                  </div>
                 </div>
-                <div className="flex-shrink-0 self-center">
-                  <button onClick={() => deleteCustomMcp(s.id)} className="px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9] cursor-pointer">删除</button>
-                </div>
-              </div>
-            ))}
-            {customMcps.length === 0 && <div className="text-[#94a3b8] text-[13px] py-3">暂无自定义 MCP，点击上方按钮添加</div>}
-          </div>
-        </div>
+              ))}
+              {customMcps.length === 0 && <div className="text-[#94a3b8] text-[13px] py-3">暂无自定义 MCP，点击上方按钮添加</div>}
+            </div>
+          )}
+
+          {/* Create Modal */}
+          {showCreate && (
+            <CreateMcpModal
+              onClose={() => setShowCreate(false)}
+              onSubmit={async (req) => {
+                setActionError(null)
+                try {
+                  await createCustomMcp(req)
+                  setShowCreate(false)
+                } catch (err: any) {
+                  setActionError(err.message || '创建失败')
+                }
+              }}
+            />
+          )}
+        </>
       )}
+    </div>
+  )
+}
+
+function CreateMcpModal({ onClose, onSubmit }: {
+  onClose: () => void
+  onSubmit: (req: CreateCustomMcpRequest) => Promise<void>
+}) {
+  const [name, setName] = useState('')
+  const [desc, setDesc] = useState('')
+  const [transport, setTransport] = useState<string>('stdio')
+  const [command, setCommand] = useState('')
+  const [args, setArgs] = useState('')
+  const [url, setUrl] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!name.trim()) return
+    setSubmitting(true)
+    try {
+      const req: CreateCustomMcpRequest = {
+        server_name: name.trim(),
+        description: desc.trim() || undefined,
+        transport: transport || undefined,
+        command: transport === 'stdio' ? (command.trim() || null) : null,
+        args: transport === 'stdio' && args.trim() ? args.split(',').map(s => s.trim()).filter(Boolean) : [],
+        url: transport !== 'stdio' ? (url.trim() || null) : null
+      }
+      await onSubmit(req)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-lg p-6 w-[420px] max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-[15px] font-semibold text-[#0f172a]">添加自定义 MCP</h3>
+          <button onClick={onClose} className="text-[#94a3b8] hover:text-[#0f172a] cursor-pointer">
+            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+          </button>
+        </div>
+
+        <div className="space-y-3.5">
+          <div>
+            <label className="block text-[12px] font-medium text-[#64748b] mb-1">名称 *</label>
+            <input className="w-full px-2.5 py-[7px] border border-[#e2e8f0] rounded-md text-[13px] outline-none focus:border-[#a7f3d0]" placeholder="例如：我的 API MCP" value={name} onChange={e => setName(e.target.value)} />
+          </div>
+          <div>
+            <label className="block text-[12px] font-medium text-[#64748b] mb-1">描述</label>
+            <input className="w-full px-2.5 py-[7px] border border-[#e2e8f0] rounded-md text-[13px] outline-none focus:border-[#a7f3d0]" placeholder="这个 MCP 的用途" value={desc} onChange={e => setDesc(e.target.value)} />
+          </div>
+          <div>
+            <label className="block text-[12px] font-medium text-[#64748b] mb-1">传输方式</label>
+            <select className="w-full px-2.5 py-[7px] border border-[#e2e8f0] rounded-md text-[13px] outline-none focus:border-[#a7f3d0] bg-white" value={transport} onChange={e => setTransport(e.target.value)}>
+              <option value="stdio">stdio (本地进程)</option>
+              <option value="sse">SSE</option>
+              <option value="streamable-http">Streamable HTTP</option>
+            </select>
+          </div>
+
+          {transport === 'stdio' && (
+            <>
+              <div>
+                <label className="block text-[12px] font-medium text-[#64748b] mb-1">启动命令</label>
+                <input className="w-full px-2.5 py-[7px] border border-[#e2e8f0] rounded-md text-[13px] outline-none focus:border-[#a7f3d0]" placeholder="例如：npx" value={command} onChange={e => setCommand(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-[12px] font-medium text-[#64748b] mb-1">参数（逗号分隔）</label>
+                <input className="w-full px-2.5 py-[7px] border border-[#e2e8f0] rounded-md text-[13px] outline-none focus:border-[#a7f3d0]" placeholder="例如：-y, @company/mcp-server" value={args} onChange={e => setArgs(e.target.value)} />
+              </div>
+            </>
+          )}
+
+          {transport !== 'stdio' && (
+            <div>
+              <label className="block text-[12px] font-medium text-[#64748b] mb-1">URL</label>
+              <input className="w-full px-2.5 py-[7px] border border-[#e2e8f0] rounded-md text-[13px] outline-none focus:border-[#a7f3d0]" placeholder="例如：https://mcp.example.com/mcp" value={url} onChange={e => setUrl(e.target.value)} />
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 mt-5">
+          <button onClick={onClose} className="px-4 py-1.5 rounded-md text-[13px] border border-[#e2e8f0] text-[#64748b] cursor-pointer">取消</button>
+          <button onClick={handleSubmit} disabled={!name.trim() || submitting} className={`px-4 py-1.5 rounded-md text-[13px] font-medium cursor-pointer border ${
+            name.trim() && !submitting
+              ? 'border-[#a7f3d0] text-[#047857] bg-[#f0fdf4] hover:bg-[#a7f3d0]'
+              : 'border-[#e2e8f0] text-[#cbd5e1] bg-[#f8fafc] cursor-not-allowed'
+          }`}>
+            {submitting ? '创建中...' : '创建'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

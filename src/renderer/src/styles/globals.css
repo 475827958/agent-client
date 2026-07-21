@@ -133,3 +133,23 @@ body {
   font-size: 13px;
   font-family: "SF Mono", "Fira Code", monospace;
 }
+.prose-sm table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin: 8px 0;
+}
+.prose-sm thead {
+  border-bottom: 2px solid #d1d5db;
+}
+.prose-sm th {
+  text-align: left;
+  padding: 6px 10px;
+  font-weight: 600;
+  color: #0f172a;
+  background: #f9fafb;
+}
+.prose-sm td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #e5e7eb;
+}

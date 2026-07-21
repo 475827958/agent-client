@@ -1,4 +1,4 @@
-import type { ServerEvent, AppMode, SceneMode } from '../types'
+import type { ServerEvent, AppMode, SceneMode, McpHubServer, McpInstalledServer, CustomMcpServer, CreateCustomMcpRequest } from '../types'
 import { useSettingsStore } from '../stores/settingsStore'
 import { parseNDJSONStream } from './ndjson'
 import { ipcClient } from './ipcClient'
@@ -520,4 +520,95 @@ export async function removeFromQueue(sessionId: string, msgId: string): Promise
   })
 
   if (!response.ok) throw new Error(`Queue remove error: ${response.status}`)
+}
+
+// ===== MCP 管理 API (section 2.9) =====
+
+function getAuthHeaders(): Record<string, string> {
+  const settings = useSettingsStore.getState().settings
+  return {
+    'Content-Type': 'application/json',
+    Authorization: settings.apiKey ? `Bearer ${settings.apiKey}` : ''
+  }
+}
+
+function getMcpUrl(path: string): string {
+  const settings = useSettingsStore.getState().settings
+  const baseUrl = settings.apiBaseUrl || DEFAULT_BASE_URL
+  return `${baseUrl}${path}`
+}
+
+// GET /mcp/hub
+export async function fetchMcpHub(): Promise<{ servers: McpHubServer[] }> {
+  const response = await fetch(getMcpUrl('/mcp/hub'), { headers: getAuthHeaders() })
+  if (!response.ok) throw new Error(`MCP Hub fetch error: ${response.status}`)
+  return response.json()
+}
+
+// GET /mcp/installed
+export async function fetchMcpInstalled(): Promise<{ installed: McpInstalledServer[] }> {
+  const response = await fetch(getMcpUrl('/mcp/installed'), { headers: getAuthHeaders() })
+  if (!response.ok) throw new Error(`MCP Installed fetch error: ${response.status}`)
+  return response.json()
+}
+
+// POST /mcp/install
+export async function installMcpApi(serverId: string): Promise<{ installed: boolean; server_id: string }> {
+  const response = await fetch(getMcpUrl('/mcp/install'), {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ server_id: serverId })
+  })
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Install failed' }))
+    throw new Error(err.detail || `MCP install error: ${response.status}`)
+  }
+  return response.json()
+}
+
+// DELETE /mcp/uninstall/{server_id}
+export async function uninstallMcpApi(serverId: string): Promise<{ uninstalled: boolean; server_id: string }> {
+  const response = await fetch(getMcpUrl(`/mcp/uninstall/${serverId}`), {
+    method: 'DELETE',
+    headers: getAuthHeaders()
+  })
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Uninstall failed' }))
+    throw new Error(err.detail || `MCP uninstall error: ${response.status}`)
+  }
+  return response.json()
+}
+
+// GET /mcp/custom
+export async function fetchMcpCustom(): Promise<{ custom: CustomMcpServer[] }> {
+  const response = await fetch(getMcpUrl('/mcp/custom'), { headers: getAuthHeaders() })
+  if (!response.ok) throw new Error(`MCP Custom fetch error: ${response.status}`)
+  return response.json()
+}
+
+// POST /mcp/custom
+export async function createCustomMcpApi(req: CreateCustomMcpRequest): Promise<CustomMcpServer> {
+  const response = await fetch(getMcpUrl('/mcp/custom'), {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(req)
+  })
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Create custom MCP failed' }))
+    throw new Error(err.detail || `MCP custom create error: ${response.status}`)
+  }
+  return response.json()
+}
+
+// DELETE /mcp/custom/{server_id}
+export async function deleteCustomMcpApi(serverId: string): Promise<{ deleted: boolean; server_id: string }> {
+  const response = await fetch(getMcpUrl(`/mcp/custom/${serverId}`), {
+    method: 'DELETE',
+    headers: getAuthHeaders()
+  })
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Delete custom MCP failed' }))
+    throw new Error(err.detail || `MCP custom delete error: ${response.status}`)
+  }
+  return response.json()
 }

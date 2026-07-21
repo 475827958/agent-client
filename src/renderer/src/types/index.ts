@@ -94,22 +94,66 @@ export interface CustomSkill {
   time: string
 }
 
-export interface McpServer {
-  id: string
-  name: string
-  desc: string
+// ===== MCP (matches section 2.9 API responses) =====
+
+/** Hub 中的 MCP 服务条目 (GET /mcp/hub) */
+export interface McpHubServer {
+  server_id: string
+  server_name: string
+  description: string
   icon: string
   category: string
+  transport: 'stdio' | 'sse' | 'streamable-http'
+  command: string | null
+  args: string[]
+  url: string | null
+  env: Record<string, string>
 }
 
-export interface CustomMcp {
-  id: string
-  name: string
-  desc: string
+/** 已安装的 MCP 服务 (GET /mcp/installed) */
+export interface McpInstalledServer {
+  server_id: string
+  server_name: string
+  description: string
   icon: string
-  source: 'create' | 'upload'
-  fileName?: string
-  time: string
+  category: string
+  transport: string
+  command: string | null
+  args: string[]
+  url: string | null
+  env: Record<string, string>
+}
+
+/** 自定义 MCP 服务 (GET /mcp/custom) */
+export interface CustomMcpServer {
+  server_id: string
+  server_name: string
+  description: string
+  icon: string
+  category: string
+  transport: string
+  command: string | null
+  args: string[]
+  url: string | null
+  env: Record<string, string>
+}
+
+/** 创建自定义 MCP 的请求体 (POST /mcp/custom) */
+export interface CreateCustomMcpRequest {
+  server_name: string
+  description?: string
+  icon?: string
+  category?: string
+  transport?: string
+  command?: string | null
+  args?: string[]
+  url?: string | null
+  env?: Record<string, string>
+}
+
+/** 安装 MCP 请求体 (POST /mcp/install) */
+export interface InstallMcpRequest {
+  server_id: string
 }
 
 export interface MemoryItem {
