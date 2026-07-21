@@ -7245,9 +7245,6 @@ async function* parseNDJSONStream(reader) {
   }
 }
 const DEFAULT_BASE_URL = "/api";
-function isClientTool(toolName) {
-  return CLIENT_TOOLS.some((t2) => t2.name === toolName);
-}
 function resolveWorkspacePath(workspaceRoot, targetPath) {
   const sep = workspaceRoot.includes("\\") ? "\\" : "/";
   const isWin = sep === "\\";
@@ -7440,6 +7437,7 @@ async function createSession(req) {
   const settings = useSettingsStore.getState().settings;
   const baseUrl = settings.apiBaseUrl || DEFAULT_BASE_URL;
   const url = `${baseUrl}/sessions`;
+  console.log("创建会话");
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -7557,7 +7555,7 @@ const planApi = {
   reject: (sessionId) => planAction(sessionId, "reject"),
   answer: (sessionId, answer) => planAction(sessionId, "answer", { answer })
 };
-async function buildAction(sessionId, action) {
+async function buildAction(sessionId, action, toolName) {
   const settings = useSettingsStore.getState().settings;
   const baseUrl = settings.apiBaseUrl || DEFAULT_BASE_URL;
   const url = `${baseUrl}/sessions/${sessionId}/build/${action}`;
@@ -7566,7 +7564,8 @@ async function buildAction(sessionId, action) {
     headers: {
       "Content-Type": "application/json",
       Authorization: settings.apiKey ? `Bearer ${settings.apiKey}` : ""
-    }
+    },
+    body: toolName ? JSON.stringify({ tool_name: toolName }) : void 0
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({ message: "Unknown error" }));
@@ -7574,7 +7573,7 @@ async function buildAction(sessionId, action) {
   }
 }
 const buildApi = {
-  confirm: (sessionId) => buildAction(sessionId, "confirm"),
+  confirm: (sessionId, toolName) => buildAction(sessionId, "confirm", toolName),
   skip: (sessionId) => buildAction(sessionId, "skip"),
   abort: (sessionId) => buildAction(sessionId, "abort")
 };
@@ -7644,7 +7643,6 @@ const useTaskStore = create$1((set, get) => ({
         mode: modeStore.inputMode,
         client_tools: CLIENT_TOOLS
       });
-      console.log("Created session:", data.id);
       set((s) => ({
         tasks: s.tasks.map(
           (t2) => t2.id === id2 ? { ...t2, sessionId: data.id } : t2
@@ -7921,15 +7919,103 @@ function genMsgId() {
 function genPlanEventId() {
   return `pe-${Date.now()}-${planEventIdCounter++}`;
 }
+function rebuildContentFromSegments(m2) {
+  if (!m2.segments || m2.segments.length === 0) return m2.content;
+  return m2.segments.filter((s) => s.type === "text").map((s) => s.content).join("");
+}
+function cleanLastTextSegment(segs, toolName) {
+  for (let i = segs.length - 1; i >= 0; i--) {
+    if (segs[i].type === "text" && segs[i].content) {
+      const text2 = segs[i].content;
+      const cleaned = stripTrailingToolArtifact(text2, toolName);
+      segs[i] = { ...segs[i], content: cleaned };
+      break;
+    }
+  }
+}
+function stripTrailingToolArtifact(text2, toolName) {
+  let result = text2;
+  result = result.replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, "");
+  result = result.replace(/<tool_use>[\s\S]*?<\/tool_use>/gi, "");
+  result = result.replace(/<function_calls>[\s\S]*?<\/function_calls>/gi, "");
+  result = result.replace(/<invoke\b[^>]*>[\s\S]*?<\/invoke>/gi, "");
+  result = result.replace(/\s*<(?:tool_call|tool_use|function_calls|invoke)\b[\s\S]*$/gi, "");
+  {
+    const nameIdx = result.toLowerCase().indexOf(toolName.toLowerCase());
+    if (nameIdx >= 0) {
+      const before = result.slice(0, nameIdx);
+      const boundaryMatch = before.match(/^(.*?)(?:\s*(?:\{|<(?:tool_call|tool_use|function_calls|invoke)\b))[\s\S]*$/i);
+      if (boundaryMatch) {
+        result = boundaryMatch[1].trimEnd();
+      }
+    }
+  }
+  if (result === text2) {
+    let depth = 0;
+    let lastUnclosed = -1;
+    for (let i = result.length - 1; i >= 0; i--) {
+      if (result[i] === "}") depth++;
+      else if (result[i] === "{") {
+        if (depth === 0) {
+          lastUnclosed = i;
+          break;
+        }
+        depth--;
+      }
+    }
+    if (lastUnclosed >= 0) {
+      const tail = result.slice(lastUnclosed);
+      if (/"(?:name|tool_name|tool_call|input|command|arguments)"/.test(tail)) {
+        result = result.slice(0, lastUnclosed).trimEnd();
+      }
+    }
+  }
+  if (result === text2) {
+    const lastClose = result.lastIndexOf("}");
+    if (lastClose >= 0) {
+      let depth = 0, openPos = -1;
+      for (let i = lastClose; i >= 0; i--) {
+        if (result[i] === "}") depth++;
+        else if (result[i] === "{") {
+          depth--;
+          if (depth === 0) {
+            openPos = i;
+            break;
+          }
+        }
+      }
+      if (openPos >= 0) {
+        const block = result.slice(openPos, lastClose + 1);
+        const after = result.slice(lastClose + 1).trim();
+        if (/"(?:name|tool_name|tool_call)"\s*:/.test(block) && (!after || /^(?:json|```|`)?\s*$/.test(after))) {
+          result = result.slice(0, openPos).trimEnd();
+        }
+      }
+    }
+  }
+  result = result.replace(/\s*```(?:json)?\s*\{[\s\S]*?\}\s*```/g, "");
+  result = result.replace(/\n{3,}/g, "\n\n");
+  return result.trim();
+}
 function createEventHandler(taskStore, set, lastSeqRef) {
   return (event) => {
     lastSeqRef.current = event.seq;
     switch (event.type) {
       case "agent.thinking":
-        taskStore.updateLastAssistantMessage((m2) => ({
-          ...m2,
-          thinking: (m2.thinking || "") + event.delta
-        }));
+        taskStore.updateLastAssistantMessage((m2) => {
+          const segs = m2.segments || [];
+          const last = segs[segs.length - 1];
+          if (last?.type === "thinking") {
+            segs[segs.length - 1] = { ...last, content: last.content + event.delta };
+          } else {
+            segs.push({ type: "thinking", content: event.delta });
+          }
+          return {
+            ...m2,
+            thinking: (m2.thinking || "") + event.delta,
+            segments: segs
+          };
+        });
         break;
       case "agent.text":
         taskStore.updateLastAssistantMessage((m2) => {
@@ -7950,9 +8036,14 @@ function createEventHandler(taskStore, set, lastSeqRef) {
         });
         break;
       case "agent.tool_call":
-        taskStore.updateLastAssistantMessage((m2) => ({
-          ...m2,
-          tools: [
+        taskStore.updateLastAssistantMessage((m2) => {
+          const segs = m2.segments || [];
+          cleanLastTextSegment(segs, event.tool_name);
+          m2.content = rebuildContentFromSegments(m2);
+          if (m2.thinking) m2.thinking = stripTrailingToolArtifact(m2.thinking, event.tool_name);
+          m2.segments = segs;
+          m2.segments.push({ type: "tool_call", toolCallId: event.tool_call_id });
+          m2.tools = [
             ...m2.tools || [],
             {
               id: event.tool_call_id,
@@ -7960,8 +8051,9 @@ function createEventHandler(taskStore, set, lastSeqRef) {
               status: "running",
               detail: typeof event.input === "object" ? JSON.stringify(event.input).slice(0, 120) : void 0
             }
-          ]
-        }));
+          ];
+          return { ...m2 };
+        });
         break;
       case "agent.tool_result":
         taskStore.updateLastAssistantMessage((m2) => ({
@@ -7976,28 +8068,19 @@ function createEventHandler(taskStore, set, lastSeqRef) {
         }));
         break;
       case "client.tool_request":
-        taskStore.updateLastAssistantMessage((m2) => ({
-          ...m2,
-          tools: [
-            ...m2.tools || [],
-            {
-              id: event.request_id,
-              name: event.tool_name,
-              status: "pending",
-              detail: typeof event.input === "object" ? JSON.stringify(event.input).slice(0, 120) : void 0
-            }
-          ]
-        }));
-        if (isClientTool(event.tool_name)) {
+        taskStore.updateLastAssistantMessage((m2) => {
+          const segs = m2.segments || [];
+          cleanLastTextSegment(segs, event.tool_name);
+          m2.content = rebuildContentFromSegments(m2);
+          if (m2.thinking) m2.thinking = stripTrailingToolArtifact(m2.thinking, event.tool_name);
+          m2.segments = segs;
+          m2.segments.push({ type: "tool_call", toolCallId: event.request_id });
+          return { ...m2 };
+        });
+        {
           const task = taskStore.getCurrentTask();
           const workspace = useSettingsStore.getState().settings.workspacePath;
           executeClientTool(event.tool_name, event.input, workspace).then((result) => {
-            taskStore.updateLastAssistantMessage((m2) => ({
-              ...m2,
-              tools: m2.tools?.map(
-                (t2) => t2.id === event.request_id ? { ...t2, status: "done", result: result.output || result.error || "Done" } : t2
-              )
-            }));
             if (task?.sessionId) {
               submitToolResult(task.sessionId, event.request_id, result);
             }
@@ -8094,44 +8177,25 @@ function createEventHandler(taskStore, set, lastSeqRef) {
         }));
         break;
       case "build.step_pending":
-        taskStore.updateLastAssistantMessage((m2) => ({
-          ...m2,
-          tools: [
+        taskStore.updateLastAssistantMessage((m2) => {
+          const segs = m2.segments || [];
+          cleanLastTextSegment(segs, event.tool_name);
+          m2.content = rebuildContentFromSegments(m2);
+          if (m2.thinking) m2.thinking = stripTrailingToolArtifact(m2.thinking, event.tool_name);
+          m2.segments = segs;
+          m2.segments.push({ type: "tool_call", toolCallId: event.tool_call_id });
+          m2.tools = [
             ...m2.tools || [],
             {
               id: event.tool_call_id,
               name: event.tool_name,
               status: "pending",
+              command: event.input?.command,
               detail: event.reasoning || JSON.stringify(event.input).slice(0, 120)
             }
-          ]
-        }));
-        if (isClientTool(event.tool_name)) {
-          const task = taskStore.getCurrentTask();
-          taskStore.updateLastAssistantMessage((m2) => ({
-            ...m2,
-            tools: m2.tools?.map(
-              (t2) => t2.id === event.tool_call_id ? { ...t2, status: "running" } : t2
-            )
-          }));
-          if (task?.sessionId) {
-            buildApi.confirm(task.sessionId).catch(
-              (err) => console.error("Build auto-confirm failed:", err)
-            );
-          }
-          const workspace = useSettingsStore.getState().settings.workspacePath;
-          executeClientTool(event.tool_name, event.input, workspace).then((result) => {
-            taskStore.updateLastAssistantMessage((m2) => ({
-              ...m2,
-              tools: m2.tools?.map(
-                (t2) => t2.id === event.tool_call_id ? { ...t2, status: "done", result: result.output || result.error || "Done" } : t2
-              )
-            }));
-            if (task?.sessionId) {
-              submitToolResult(task.sessionId, event.tool_call_id, result);
-            }
-          });
-        }
+          ];
+          return { ...m2 };
+        });
         break;
       case "build.step_confirmed":
         taskStore.updateLastAssistantMessage((m2) => ({
@@ -8175,21 +8239,46 @@ function createEventHandler(taskStore, set, lastSeqRef) {
           set({ isProcessing: false });
         }
         break;
+      case "message.waiting_timeout":
+        break;
+      case "message.queued":
+        break;
+      case "message.start":
+        break;
+      case "queue.updated":
+        break;
+      case "session.timeout":
+        break;
+      case "session.recovered":
+        break;
+      case "system.status":
+        taskStore.updateLastAssistantMessage((m2) => ({
+          ...m2,
+          segments: [
+            ...m2.segments || [],
+            { type: "system_status", message: event.message }
+          ]
+        }));
+        break;
     }
   };
 }
 const useChatStore = create$1((set, get) => ({
   isProcessing: false,
   currentEditingPlanMsgIdx: null,
-  // ===== SEND =====
-  sendMessage: (text2) => {
+  sendMessage: async (text2, files) => {
     if (!text2) return;
     if (get().isProcessing) {
       useQueueStore.getState().addToQueue(text2);
       return;
     }
-    const taskStore = useTaskStore.getState();
-    const task = taskStore.getCurrentTask();
+    let taskStore = useTaskStore.getState();
+    let task = taskStore.getCurrentTask();
+    if (!task) {
+      await taskStore.create();
+      taskStore = useTaskStore.getState();
+      task = taskStore.getCurrentTask();
+    }
     if (!task) return;
     if (!task.sessionId) {
       taskStore.addMessage({
@@ -8234,6 +8323,7 @@ const useChatStore = create$1((set, get) => ({
       sceneMode,
       workspace: settings.workspacePath,
       model: settings.model,
+      files,
       onEvent: handleEvent,
       onError: (err) => {
         taskStore.updateLastAssistantMessage((m2) => ({
@@ -8258,7 +8348,6 @@ const useChatStore = create$1((set, get) => ({
       }
     });
   },
-  // ===== RECONNECT =====
   reconnect: () => {
     const taskStore = useTaskStore.getState();
     const task = taskStore.getCurrentTask();
@@ -8285,19 +8374,32 @@ const useChatStore = create$1((set, get) => ({
       }
     );
   },
-  // ===== BUILD MODE =====
   confirmTool: () => {
     const taskStore = useTaskStore.getState();
     const task = taskStore.getCurrentTask();
     if (!task) return;
-    buildApi.confirm(task.sessionId).catch((err) => {
-      console.error("Build confirm failed:", err);
-    });
+    const msg = task.messages[task.messages.length - 1];
+    const pendingTool = msg?.tools?.find((t2) => t2.status === "pending");
+    if (pendingTool) {
+      taskStore.updateLastAssistantMessage((m2) => ({
+        ...m2,
+        tools: m2.tools?.map(
+          (t2) => t2.id === pendingTool.id ? { ...t2, status: "running" } : t2
+        )
+      }));
+      buildApi.confirm(task.sessionId, pendingTool.name).catch((err) => {
+        console.error("Build confirm failed:", err);
+      });
+    }
   },
   skipTool: () => {
     const taskStore = useTaskStore.getState();
     const task = taskStore.getCurrentTask();
     if (!task) return;
+    taskStore.updateLastAssistantMessage((m2) => ({
+      ...m2,
+      tools: m2.tools?.filter((t2) => t2.status !== "pending")
+    }));
     buildApi.skip(task.sessionId).catch((err) => {
       console.error("Build skip failed:", err);
     });
@@ -8306,11 +8408,14 @@ const useChatStore = create$1((set, get) => ({
     const taskStore = useTaskStore.getState();
     const task = taskStore.getCurrentTask();
     if (!task) return;
+    taskStore.updateLastAssistantMessage((m2) => ({
+      ...m2,
+      tools: m2.tools?.filter((t2) => t2.status !== "pending")
+    }));
     buildApi.abort(task.sessionId).catch((err) => {
       console.error("Build abort failed:", err);
     });
   },
-  // ===== PLAN MODE =====
   selectPlanOption: (_msgIdx, _value) => {
   },
   answerPlanQuestion: (_msgIdx, textAnswer) => {
@@ -8385,7 +8490,6 @@ const useChatStore = create$1((set, get) => ({
       console.error("Plan reject failed:", err);
     });
   },
-  // ===== PLAN EDITOR =====
   openPlanEditor: (msgIdx, _planText) => {
     set({ currentEditingPlanMsgIdx: msgIdx });
   },
@@ -16544,8 +16648,8 @@ function wrap(middleware, callback) {
     done(null, value);
   }
 }
-const minpath = { basename, dirname, extname, join, sep: "/" };
-function basename(path2, extname2) {
+const minpath = { basename: basename$1, dirname, extname, join, sep: "/" };
+function basename$1(path2, extname2) {
   if (extname2 !== void 0 && typeof extname2 !== "string") {
     throw new TypeError('"ext" argument must be a string');
   }
@@ -20998,12 +21102,14 @@ function remarkGfm(options) {
 }
 const CHARS_PER_TICK = 3;
 const TICK_MS = 33;
-function TypewriterText({ text: text2, isStreaming }) {
+function TypewriterText({ text: text2, isStreaming, onDone }) {
   const [revealedLen, setRevealedLen] = reactExports.useState(() => {
     if (!isStreaming) return text2.length;
     return Math.max(0, Math.min(text2.length, 200));
   });
   const timerRef = reactExports.useRef();
+  const doneRef = reactExports.useRef(onDone);
+  doneRef.current = onDone;
   reactExports.useEffect(() => {
     if (!isStreaming) {
       setRevealedLen(text2.length);
@@ -21025,6 +21131,11 @@ function TypewriterText({ text: text2, isStreaming }) {
       setRevealedLen(text2.length);
     }
   }, [isStreaming, text2.length]);
+  reactExports.useEffect(() => {
+    if (revealedLen >= text2.length) {
+      doneRef.current?.();
+    }
+  }, [revealedLen, text2.length]);
   const displayText = text2.slice(0, revealedLen);
   const deferredText = reactExports.useDeferredValue(displayText);
   return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-1 mb-2 prose-sm max-w-none text-[#0f172a]", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Markdown, { remarkPlugins: [remarkGfm], children: deferredText }) });
@@ -21048,58 +21159,19 @@ function MessageItem({ message, msgIndex }) {
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-[#ecfdf5] text-[#064e3b] rounded-[14px_14px_4px_14px] py-3 px-4 text-sm leading-relaxed", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Markdown, { remarkPlugins: [remarkGfm], children: message.content }) })
     ] });
   }
-  const hasThinking = message.thinking || message.tools && message.tools.length > 0;
-  const hasRunning = message.tools?.some((t2) => t2.status === "running");
+  const hasAnySegment = message.segments && message.segments.length > 0;
+  message.tools?.some((t2) => t2.status === "running");
   const hasPending = message.tools?.some((t2) => t2.status === "pending");
-  const toolCount = message.tools?.length || 0;
+  message.tools?.length || 0;
   const isCollapsed = processCollapsed && !hasPending;
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-3 max-w-[740px] animate-[msgIn_0.2s_ease-out]", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[30px] h-[30px] rounded-md bg-[#f0fdf4] text-[#a7f3d0] flex items-center justify-center text-[15px] font-semibold flex-shrink-0", children: "AI" }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-[#e2e8f0] rounded-[14px_14px_14px_4px] py-3 px-4 text-sm leading-relaxed text-[#0f172a] min-w-0 flex-1", children: [
-      hasThinking && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `mt-2.5 border border-[#e2e8f0] rounded-md overflow-hidden ${isCollapsed ? "section-collapsed" : ""}`, children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs(
-          "div",
-          {
-            onClick: () => setProcessCollapsed(!processCollapsed),
-            className: "flex items-center gap-2 px-3 py-2 cursor-pointer text-xs font-medium text-[#64748b] bg-[#f8fafc] select-none hover:bg-[#f1f5f9] transition-colors",
-            children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `inline-block transition-transform text-[10px] text-[#94a3b8] ${isCollapsed ? "-rotate-90" : ""}`, children: "▼" }),
-              "思考与工具调用",
-              toolCount > 0 ? ` (${toolCount})` : "",
-              hasPending && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[#0369a1] text-[11px] ml-1", children: "等待确认..." }),
-              hasRunning && !hasPending && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[#b45309] text-[11px] ml-1", children: "执行中..." })
-            ]
-          }
-        ),
-        !isCollapsed && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-3.5 py-2.5 text-[13px] text-[#94a3b8] italic leading-relaxed bg-white border-t border-[#f1f5f9] max-h-[500px] overflow-y-auto", children: [
-          message.thinking && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mb-2.5 not-italic text-[#64748b]", children: message.thinking }),
-          message.tools?.map((tool, toolIdx) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start gap-2.5 py-2 border-b border-[#f1f5f9] not-italic text-[#0f172a] last:border-b-0", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-4 h-4 flex-shrink-0 mt-0.5 text-[#94a3b8]", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "8", cy: "8", r: "6" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 5v3l2 2" })
-            ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-xs text-[#0f172a]", children: tool.name }),
-              tool.command && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-1 py-1.5 px-2.5 bg-[#1e293b] text-[#a7f3d0] rounded text-[11px] font-mono whitespace-pre-wrap", children: [
-                "$ ",
-                tool.command
-              ] }),
-              tool.detail && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-[#94a3b8] mt-0.5", children: tool.detail }),
-              tool.status === "pending" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-1.5 mt-2 flex-wrap", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => confirmTool(), className: "px-3 py-1 rounded text-[11px] font-medium text-[#047857] border border-[#a7f3d0] bg-[#f0fdf4] hover:bg-[#a7f3d0] transition-colors cursor-pointer", children: "确认" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => skipTool(), className: "px-3 py-1 rounded text-[11px] font-medium text-[#b45309] border border-[#fcd34d] bg-[#fffbeb] hover:bg-[#fde68a] transition-colors cursor-pointer", children: "跳过" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => stopTools(), className: "px-3 py-1 rounded text-[11px] font-medium text-[#b91c1c] border border-[#fecaca] bg-[#fef2f2] hover:bg-[#fecaca] transition-colors cursor-pointer", children: "终止" })
-              ] }),
-              tool.result && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-1 py-1.5 px-2.5 bg-[#f8fafc] rounded text-[11px] font-mono whitespace-pre-wrap max-h-[100px] overflow-y-auto border border-[#f1f5f9]", children: tool.result })
-            ] }),
-            tool.status !== "pending" && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `text-[11px] px-2 py-0.5 rounded-lg font-medium flex-shrink-0 ${tool.status === "running" ? "text-[#b45309] bg-[#fffbeb]" : "text-[#047857] bg-[#ecfdf5]"}`, children: tool.status === "running" ? "执行中..." : "完成" })
-          ] }, tool.id || toolIdx))
-        ] })
-      ] }),
-      message.segments && message.segments.length > 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx(
+      hasAnySegment ? /* @__PURE__ */ jsxRuntimeExports.jsx(
         SegmentsView,
         {
-          segments: message.segments,
+          segments: message.segments || [],
+          tools: message.tools || [],
           msgIndex,
           isStreaming: message.isStreaming ?? false,
           selectedPlanValue,
@@ -21112,15 +21184,21 @@ function MessageItem({ message, msgIndex }) {
           onSelectOption: selectPlanOption,
           onSubmitAnswer: answerPlanQuestion,
           planStatus: message.planStatus,
-          planEditing: message.planEditing
+          planEditing: message.planEditing,
+          processCollapsed: isCollapsed,
+          onToggleCollapse: () => setProcessCollapsed(!processCollapsed),
+          onConfirmTool: confirmTool,
+          onSkipTool: skipTool,
+          onStopTools: stopTools
         }
       ) : message.content && message.isStreaming ? /* @__PURE__ */ jsxRuntimeExports.jsx(TypewriterText, { text: message.content, isStreaming: true }) : message.content ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-1 prose-sm max-w-none text-[#0f172a]", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Markdown, { remarkPlugins: [remarkGfm], children: message.content }) }) : null,
-      message.isStreaming && !message.content && !hasThinking && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block w-2 h-4 bg-[#a7f3d0] animate-pulse" })
+      message.isStreaming && !message.content && !hasAnySegment && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block w-2 h-4 bg-[#a7f3d0] animate-pulse" })
     ] })
   ] });
 }
 function SegmentsView({
   segments,
+  tools,
   msgIndex,
   isStreaming,
   selectedPlanValue,
@@ -21133,145 +21211,263 @@ function SegmentsView({
   onSelectOption,
   onSubmitAnswer,
   planStatus,
-  planEditing
+  planEditing,
+  processCollapsed,
+  onToggleCollapse,
+  onConfirmTool,
+  onSkipTool,
+  onStopTools
 }) {
+  const toolMap = /* @__PURE__ */ new Map();
+  for (const t2 of tools) {
+    toolMap.set(t2.id, t2);
+  }
+  for (let i = 0; i < segments.length; i++) {
+    segments[i].type;
+  }
+  const groups = [];
+  let pendingThinkingTools = [];
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    if (seg.type === "thinking" || seg.type === "tool_call") {
+      pendingThinkingTools.push({ seg, idx: i });
+    } else {
+      if (pendingThinkingTools.length > 0) {
+        groups.push({ kind: "thinking-tools", segs: pendingThinkingTools });
+        pendingThinkingTools = [];
+      }
+      groups.push({ kind: "content", seg, idx: i });
+    }
+  }
+  if (pendingThinkingTools.length > 0) {
+    groups.push({ kind: "thinking-tools", segs: pendingThinkingTools });
+  }
   const lastTextSegIdx = (() => {
     for (let i = segments.length - 1; i >= 0; i--) {
       if (segments[i].type === "text") return i;
     }
     return -1;
   })();
-  return /* @__PURE__ */ jsxRuntimeExports.jsx(jsxRuntimeExports.Fragment, { children: segments.map((seg, i) => {
-    if (seg.type === "text") {
-      const isLastText = i === lastTextSegIdx;
-      if (isLastText && isStreaming) {
-        return /* @__PURE__ */ jsxRuntimeExports.jsx(TypewriterText, { text: seg.content, isStreaming: true }, `txt-${i}`);
+  const [doneTextIndices, setDoneTextIndices] = reactExports.useState(/* @__PURE__ */ new Set());
+  const handleTextDone = reactExports.useCallback((segIdx) => {
+    setDoneTextIndices((prev) => {
+      if (prev.has(segIdx)) return prev;
+      const next = new Set(prev);
+      next.add(segIdx);
+      return next;
+    });
+  }, []);
+  const isTextComplete = (segIdx) => {
+    if (!isStreaming) return true;
+    if (segIdx !== lastTextSegIdx) return true;
+    return doneTextIndices.has(segIdx);
+  };
+  const canShowNonText = (nonTextIdx) => {
+    for (let j = 0; j < nonTextIdx; j++) {
+      if (segments[j].type === "text" && !isTextComplete(j)) {
+        return false;
       }
-      return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-1 mb-2 prose-sm max-w-none text-[#0f172a]", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Markdown, { remarkPlugins: [remarkGfm], children: seg.content }) }, `txt-${i}`);
     }
-    const event = seg;
-    if (event.type === "generated") {
-      return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-0 -mx-1 mb-1 p-4 rounded-[10px] border border-l-[3px] bg-[#f0fdf4] border-[#a7f3d0] border-l-[#10b981]", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] font-semibold text-[#047857] uppercase tracking-wider mb-2", children: "执行计划" }),
-        planStatus === "pending" && !planEditing && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 flex-wrap", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onConfirmPlan(), className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white border border-[#0f172a] hover:bg-[#334155] transition-colors cursor-pointer", children: "确认计划" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onEditPlan(msgIndex), className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-white text-[#64748b] border border-[#e2e8f0] hover:bg-[#f1f5f9] hover:text-[#0f172a] transition-colors cursor-pointer", children: "编辑" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onRejectPlan(), className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-white text-[#b91c1c] border border-[#fecaca] hover:bg-[#fef2f2] transition-colors cursor-pointer", children: "拒绝" })
+    return true;
+  };
+  const renderTool = (toolCallId, key) => {
+    const tool = toolCallId ? toolMap.get(toolCallId) : void 0;
+    if (!tool) return null;
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start gap-2.5 py-2 border-b border-[#f1f5f9] not-italic text-[#0f172a] last:border-b-0", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-4 h-4 flex-shrink-0 mt-0.5 text-[#94a3b8]", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "8", cy: "8", r: "6" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 5v3l2 2" })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-xs text-[#0f172a]", children: tool.name }),
+        tool.command && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-1 py-1.5 px-2.5 bg-[#1e293b] text-[#a7f3d0] rounded text-[11px] font-mono whitespace-pre-wrap", children: [
+          "$ ",
+          tool.command
         ] }),
-        planEditing && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs text-[#0369a1] font-medium flex items-center gap-1.5", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "14", height: "14", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 14h2l8-8-2-2-8 8v2z" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M12 3l2 2" })
+        tool.detail && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-[#94a3b8] mt-0.5", children: tool.detail }),
+        tool.status === "pending" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-1.5 mt-2 flex-wrap", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onConfirmTool(), className: "px-3 py-1 rounded text-[11px] font-medium text-[#047857] border border-[#a7f3d0] bg-[#f0fdf4] hover:bg-[#a7f3d0] transition-colors cursor-pointer", children: "确认" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onSkipTool(), className: "px-3 py-1 rounded text-[11px] font-medium text-[#b45309] border border-[#fcd34d] bg-[#fffbeb] hover:bg-[#fde68a] transition-colors cursor-pointer", children: "跳过" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onStopTools(), className: "px-3 py-1 rounded text-[11px] font-medium text-[#b91c1c] border border-[#fecaca] bg-[#fef2f2] hover:bg-[#fecaca] transition-colors cursor-pointer", children: "终止" })
+        ] }),
+        tool.result && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-1 py-1.5 px-2.5 bg-[#f8fafc] rounded text-[11px] font-mono whitespace-pre-wrap max-h-[100px] overflow-y-auto border border-[#f1f5f9]", children: tool.result })
+      ] }),
+      tool.status !== "pending" && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `text-[11px] px-2 py-0.5 rounded-lg font-medium flex-shrink-0 ${tool.status === "running" ? "text-[#b45309] bg-[#fffbeb]" : "text-[#047857] bg-[#ecfdf5]"}`, children: tool.status === "running" ? "执行中..." : "完成" })
+    ] }, key);
+  };
+  const renderThinkingToolHeader = () => {
+    const hasRunning = tools.some((t2) => t2.status === "running");
+    const hasPending = tools.some((t2) => t2.status === "pending");
+    const toolCount = tools.length;
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "div",
+      {
+        onClick: onToggleCollapse,
+        className: "flex items-center gap-2 px-3 py-2 cursor-pointer text-xs font-medium text-[#64748b] bg-[#f8fafc] select-none hover:bg-[#f1f5f9] transition-colors",
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `inline-block transition-transform text-[10px] text-[#94a3b8] ${processCollapsed ? "-rotate-90" : ""}`, children: "▼" }),
+          "思考与工具调用",
+          toolCount > 0 ? ` (${toolCount})` : "",
+          hasPending && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[#0369a1] text-[11px] ml-1", children: "等待确认..." }),
+          hasRunning && !hasPending && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[#b45309] text-[11px] ml-1", children: "执行中..." })
+        ]
+      }
+    );
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(jsxRuntimeExports.Fragment, { children: groups.map((group, gi2) => {
+    if (group.kind === "content") {
+      const seg = group.seg;
+      const i = group.idx;
+      if (seg.type === "text") {
+        const isLastText = i === lastTextSegIdx;
+        if (isLastText && isStreaming) {
+          return /* @__PURE__ */ jsxRuntimeExports.jsx(TypewriterText, { text: seg.content, isStreaming: true, onDone: () => handleTextDone(i) }, `txt-${i}`);
+        }
+        return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-1 mb-2 prose-sm max-w-none text-[#0f172a]", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Markdown, { remarkPlugins: [remarkGfm], children: seg.content }) }, `txt-${i}`);
+      }
+      if (!canShowNonText(i)) return null;
+      const event = seg;
+      if (event.type === "generated") {
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-0 -mx-1 mb-1 p-4 rounded-[10px] border border-l-[3px] bg-[#f0fdf4] border-[#a7f3d0] border-l-[#10b981]", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] font-semibold text-[#047857] uppercase tracking-wider mb-2", children: "执行计划" }),
+          planStatus === "pending" && !planEditing && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 flex-wrap", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onConfirmPlan(), className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white border border-[#0f172a] hover:bg-[#334155] transition-colors cursor-pointer", children: "确认计划" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onEditPlan(msgIndex), className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-white text-[#64748b] border border-[#e2e8f0] hover:bg-[#f1f5f9] hover:text-[#0f172a] transition-colors cursor-pointer", children: "编辑" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onRejectPlan(), className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-white text-[#b91c1c] border border-[#fecaca] hover:bg-[#fef2f2] transition-colors cursor-pointer", children: "拒绝" })
           ] }),
-          "正在右侧面板编辑计划..."
-        ] })
-      ] }, event.id);
-    }
-    if (event.type === "confirmed") {
-      return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "-mx-1 mb-1 p-3 rounded-[10px] border border-l-[3px] bg-[#ecfdf5] border-[#a7f3d0] border-l-[#10b981]", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs text-[#047857] font-medium bg-[#d1fae5] px-2.5 py-1 rounded-md inline-flex items-center gap-1", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "12", height: "12", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M3 8l4 4 6-8" }) }),
-        "计划已确认，正在自动执行..."
-      ] }) }, event.id);
-    }
-    if (event.type === "rejected") {
-      return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "-mx-1 mb-1 p-3 rounded-[10px] border border-l-[3px] bg-[#fef2f2] border-[#fecaca] border-l-[#ef4444]", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs text-[#b91c1c] font-medium bg-[#fee2e2] px-2.5 py-1 rounded-md inline-flex items-center gap-1", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "12", height: "12", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M4 4l8 8M12 4l-8 8" }) }),
-        "计划已取消"
-      ] }) }, event.id);
-    }
-    if (event.type === "edited") {
-      return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "-mx-1 mb-1 p-3 rounded-[10px] border border-l-[3px] bg-[#f0fdf4] border-[#a7f3d0] border-l-[#10b981]", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs text-[#0369a1] font-medium bg-[#dbeafe] px-2.5 py-1 rounded-md inline-flex items-center gap-1", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "12", height: "12", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 14h2l8-8-2-2-8 8v2z" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M12 3l2 2" })
-        ] }),
-        "计划已编辑"
-      ] }) }, event.id);
-    }
-    if (event.type === "question") {
-      const isConfirm = event.input_type === "confirm";
-      const options = isConfirm ? ["是 / 确定", "否 / 取消"] : event.options || [];
-      if (event.answer) {
-        return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-1.5 p-3 bg-[#f0f9ff] border border-[#bae6fd] rounded-[8px]", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] font-semibold text-[#0369a1] uppercase tracking-wider mb-1", children: "需求澄清" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#0f172a] mb-1.5 leading-relaxed", children: event.question }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-xs text-[#0369a1] font-medium bg-white border border-[#bae6fd] rounded-md px-2.5 py-1.5 inline-block", children: [
-            "回答: ",
-            event.answer
+          planEditing && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs text-[#0369a1] font-medium flex items-center gap-1.5", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "14", height: "14", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 14h2l8-8-2-2-8 8v2z" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M12 3l2 2" })
+            ] }),
+            "正在右侧面板编辑计划..."
           ] })
         ] }, event.id);
       }
-      return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-1.5 p-3 bg-[#f0f9ff] border border-[#bae6fd] rounded-[8px]", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] font-semibold text-[#0369a1] uppercase tracking-wider mb-1", children: "需求澄清" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#0f172a] mb-2.5 leading-relaxed", children: event.question }),
-        event.input_type === "text" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "textarea",
-            {
-              className: "w-full px-3 py-2 border border-[#bae6fd] rounded-md text-[13px] text-[#0f172a] outline-none resize-y mb-2 focus:border-[#0ea5e9] focus:shadow-[0_0_0_3px_rgba(14,165,233,0.15)] transition-colors",
-              placeholder: "输入你的回答...",
-              rows: 2,
-              value: textAnswer,
-              onChange: (e) => onTextAnswer(e.target.value),
-              onKeyDown: (e) => {
-                if (e.key === "Enter" && !e.shiftKey && textAnswer.trim()) {
-                  e.preventDefault();
-                  onSelectValue(textAnswer.trim());
-                  onSubmitAnswer(msgIndex, textAnswer.trim());
-                  onTextAnswer("");
+      if (event.type === "confirmed") {
+        return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "-mx-1 mb-1 p-3 rounded-[10px] border border-l-[3px] bg-[#ecfdf5] border-[#a7f3d0] border-l-[#10b981]", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs text-[#047857] font-medium bg-[#d1fae5] px-2.5 py-1 rounded-md inline-flex items-center gap-1", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "12", height: "12", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M3 8l4 4 6-8" }) }),
+          "计划已确认，正在自动执行..."
+        ] }) }, event.id);
+      }
+      if (event.type === "rejected") {
+        return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "-mx-1 mb-1 p-3 rounded-[10px] border border-l-[3px] bg-[#fef2f2] border-[#fecaca] border-l-[#ef4444]", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs text-[#b91c1c] font-medium bg-[#fee2e2] px-2.5 py-1 rounded-md inline-flex items-center gap-1", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "12", height: "12", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M4 4l8 8M12 4l-8 8" }) }),
+          "计划已取消"
+        ] }) }, event.id);
+      }
+      if (event.type === "edited") {
+        return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "-mx-1 mb-1 p-3 rounded-[10px] border border-l-[3px] bg-[#f0fdf4] border-[#a7f3d0] border-l-[#10b981]", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs text-[#0369a1] font-medium bg-[#dbeafe] px-2.5 py-1 rounded-md inline-flex items-center gap-1", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "12", height: "12", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 14h2l8-8-2-2-8 8v2z" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M12 3l2 2" })
+          ] }),
+          "计划已编辑"
+        ] }) }, event.id);
+      }
+      if (event.type === "question") {
+        const isConfirm = event.input_type === "confirm";
+        const options = isConfirm ? ["是 / 确定", "否 / 取消"] : event.options || [];
+        if (event.answer) {
+          return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-1.5 p-3 bg-[#f0f9ff] border border-[#bae6fd] rounded-[8px]", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] font-semibold text-[#0369a1] uppercase tracking-wider mb-1", children: "需求澄清" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#0f172a] mb-1.5 leading-relaxed", children: event.question }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-xs text-[#0369a1] font-medium bg-white border border-[#bae6fd] rounded-md px-2.5 py-1.5 inline-block", children: [
+              "回答: ",
+              event.answer
+            ] })
+          ] }, event.id);
+        }
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-1.5 p-3 bg-[#f0f9ff] border border-[#bae6fd] rounded-[8px]", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] font-semibold text-[#0369a1] uppercase tracking-wider mb-1", children: "需求澄清" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#0f172a] mb-2.5 leading-relaxed", children: event.question }),
+          event.input_type === "text" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "textarea",
+              {
+                className: "w-full px-3 py-2 border border-[#bae6fd] rounded-md text-[13px] text-[#0f172a] outline-none resize-y mb-2 focus:border-[#0ea5e9] focus:shadow-[0_0_0_3px_rgba(14,165,233,0.15)] transition-colors",
+                placeholder: "输入你的回答...",
+                rows: 2,
+                value: textAnswer,
+                onChange: (e) => onTextAnswer(e.target.value),
+                onKeyDown: (e) => {
+                  if (e.key === "Enter" && !e.shiftKey && textAnswer.trim()) {
+                    e.preventDefault();
+                    onSelectValue(textAnswer.trim());
+                    onSubmitAnswer(msgIndex, textAnswer.trim());
+                    onTextAnswer("");
+                  }
                 }
               }
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "button",
-            {
-              onClick: () => {
-                onSubmitAnswer(msgIndex, textAnswer.trim());
-                onTextAnswer("");
-              },
-              disabled: !textAnswer.trim(),
-              className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white hover:bg-[#334155] transition-colors border-none cursor-pointer disabled:opacity-40",
-              children: "提交"
-            }
-          )
-        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-col gap-1.5 mb-2.5", children: options.map((opt) => {
-            const isSelected = selectedPlanValue === opt;
-            return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                onClick: () => {
+                  onSubmitAnswer(msgIndex, textAnswer.trim());
+                  onTextAnswer("");
+                },
+                disabled: !textAnswer.trim(),
+                className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white hover:bg-[#334155] transition-colors border-none cursor-pointer disabled:opacity-40",
+                children: "提交"
+              }
+            )
+          ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-col gap-1.5 mb-2.5", children: options.map((opt) => {
+              const isSelected = selectedPlanValue === opt;
+              return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                "button",
+                {
+                  type: "button",
+                  onClick: () => {
+                    onSelectValue(opt);
+                    onSelectOption(msgIndex, opt);
+                  },
+                  className: `px-3 py-2 border rounded-md text-[13px] text-left cursor-pointer flex items-center gap-2 ${isSelected ? "border-[#0ea5e9] bg-[#0ea5e9]/10 text-[#0369a1] font-semibold shadow-[0_0_0_1px_#0ea5e9]" : "border-[#bae6fd] bg-white text-[#0f172a] hover:border-[#0ea5e9] hover:bg-[#f0f9ff]"}`,
+                  children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-none ${isSelected ? "border-[#0ea5e9] bg-[#0ea5e9]" : "border-[#94a3b8]"}`, children: isSelected && /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "10", height: "10", viewBox: "0 0 16 16", fill: "none", stroke: "white", strokeWidth: "3", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M3 8l4 4 6-8" }) }) }),
+                    opt
+                  ]
+                },
+                opt
+              );
+            }) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
               "button",
               {
                 type: "button",
                 onClick: () => {
-                  onSelectValue(opt);
-                  onSelectOption(msgIndex, opt);
+                  onSubmitAnswer(msgIndex, selectedPlanValue || void 0);
+                  onSelectValue("");
                 },
-                className: `px-3 py-2 border rounded-md text-[13px] text-left cursor-pointer flex items-center gap-2 ${isSelected ? "border-[#0ea5e9] bg-[#0ea5e9]/10 text-[#0369a1] font-semibold shadow-[0_0_0_1px_#0ea5e9]" : "border-[#bae6fd] bg-white text-[#0f172a] hover:border-[#0ea5e9] hover:bg-[#f0f9ff]"}`,
-                children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-none ${isSelected ? "border-[#0ea5e9] bg-[#0ea5e9]" : "border-[#94a3b8]"}`, children: isSelected && /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "10", height: "10", viewBox: "0 0 16 16", fill: "none", stroke: "white", strokeWidth: "3", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M3 8l4 4 6-8" }) }) }),
-                  opt
-                ]
-              },
-              opt
-            );
-          }) }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "button",
-            {
-              type: "button",
-              onClick: () => {
-                onSubmitAnswer(msgIndex, selectedPlanValue || void 0);
-                onSelectValue("");
-              },
-              disabled: !selectedPlanValue,
-              className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white hover:bg-[#334155] transition-colors border-none cursor-pointer disabled:opacity-40",
-              children: "提交"
-            }
-          )
-        ] })
-      ] }, event.id);
+                disabled: !selectedPlanValue,
+                className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white hover:bg-[#334155] transition-colors border-none cursor-pointer disabled:opacity-40",
+                children: "提交"
+              }
+            )
+          ] })
+        ] }, event.id);
+      }
+      if (seg.type === "system_status") {
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-1.5 p-3 bg-[#fefce8] border border-[#fde68a] rounded-[8px]", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] font-semibold text-[#a16207] uppercase tracking-wider mb-1", children: "系统状态" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#0f172a] leading-relaxed", children: seg.message })
+        ] }, `status-${i}`);
+      }
+      return null;
     }
-    return null;
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `mt-2.5 border border-[#e2e8f0] rounded-md overflow-hidden ${processCollapsed ? "section-collapsed" : ""}`, children: [
+      renderThinkingToolHeader(),
+      !processCollapsed && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-3.5 py-2.5 text-[13px] text-[#94a3b8] italic leading-relaxed bg-white border-t border-[#f1f5f9] max-h-[500px] overflow-y-auto", children: group.segs.map(({ seg, idx }) => {
+        if (seg.type === "thinking") {
+          return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mb-2.5 not-italic text-[#64748b]", children: seg.content }, `think-${idx}`);
+        }
+        if (seg.type === "tool_call") {
+          return renderTool(seg.toolCallId, `tool-${idx}`);
+        }
+        return null;
+      }) })
+    ] }, `thinktools-${gi2}`);
   }) });
 }
 function MessageList({ scrollContainerRef }) {
@@ -21374,6 +21570,134 @@ const SLASH_COMMANDS = [
   { command: "/doc", label: "生成文档", description: "为函数或类生成文档注释" },
   { command: "/optimize", label: "性能优化", description: "分析并优化代码性能瓶颈" }
 ];
+function basename(p2) {
+  return p2.replace(/^.*[/\\]/, "");
+}
+function fileExt(p2) {
+  const dot = p2.lastIndexOf(".");
+  return dot >= 0 ? p2.slice(dot + 1).toLowerCase() : "";
+}
+function fileColor(p2) {
+  const ext = fileExt(p2);
+  const colors = {
+    ts: "#3178c6",
+    tsx: "#3178c6",
+    js: "#f0db4f",
+    jsx: "#61dafb",
+    json: "#f0db4f",
+    css: "#2965f1",
+    scss: "#c6538c",
+    less: "#1d365d",
+    html: "#e44d26",
+    htm: "#e44d26",
+    svg: "#ffb13b",
+    md: "#083fa1",
+    markdown: "#083fa1",
+    py: "#3572A5",
+    rb: "#701516",
+    go: "#00ADD8",
+    rs: "#dea584",
+    java: "#b07219",
+    cpp: "#f34b7d",
+    c: "#555555",
+    h: "#555555",
+    sh: "#89e051",
+    bash: "#89e051",
+    yaml: "#cb171e",
+    yml: "#cb171e",
+    toml: "#9c4221",
+    xml: "#0060ac",
+    sql: "#e38c00",
+    graphql: "#e10098",
+    proto: "#fc4444",
+    vue: "#41b883",
+    svelte: "#ff3e00",
+    prisma: "#2d3748",
+    env: "#f0db4f",
+    gitignore: "#f05133",
+    dockerfile: "#2496ed",
+    lock: "#94a3b8"
+  };
+  return colors[ext] || "#94a3b8";
+}
+function createFileChipDOM(filePath, onRemove) {
+  const color2 = fileColor(filePath);
+  const span = document.createElement("span");
+  span.setAttribute("data-file", filePath);
+  span.setAttribute("contenteditable", "false");
+  span.style.cssText = `display:inline-flex;align-items:center;gap:2px;padding:1px 6px;border-radius:4px;font-size:13px;font-weight:500;border:1px solid ${color2}40;background:${color2}18;color:${color2};cursor:default;vertical-align:middle;margin:0 2px;user-select:none;`;
+  span.innerHTML = `<span style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${basename(filePath)}</span><button style="margin-left:1px;width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;opacity:0.4;background:none;border:none;cursor:pointer;font-size:12px;line-height:1;padding:0;color:inherit;flex-shrink:0" tabindex="-1">&times;</button>`;
+  const btn = span.lastElementChild;
+  btn.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onRemove(span);
+  });
+  return span;
+}
+function readEditor(ed2) {
+  let text2 = "";
+  const files = [];
+  function walk(n2) {
+    if (n2.nodeType === Node.TEXT_NODE) {
+      text2 += n2.textContent || "";
+    } else if (n2.nodeType === Node.ELEMENT_NODE) {
+      const el2 = n2;
+      if (el2.hasAttribute("data-file")) {
+        files.push(el2.getAttribute("data-file") || "");
+      } else if (el2.tagName === "BR") {
+        text2 += "\n";
+      } else {
+        for (const c of Array.from(el2.childNodes)) walk(c);
+      }
+    }
+  }
+  for (const c of Array.from(ed2.childNodes)) {
+    if (c.tagName === "DIV") {
+      if (text2) text2 += "\n";
+      walk(c);
+      text2 += "\n";
+    } else {
+      walk(c);
+    }
+  }
+  return { text: text2, files };
+}
+function getAtTrigger(ed2) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return null;
+  const range = sel.getRangeAt(0);
+  let textBefore = "";
+  let stopped = false;
+  function walk(node2) {
+    if (stopped) return;
+    if (node2 === range.endContainer) {
+      if (node2.nodeType === Node.TEXT_NODE)
+        textBefore += (node2.textContent || "").slice(0, range.endOffset);
+      stopped = true;
+      return;
+    }
+    if (node2.nodeType === Node.TEXT_NODE) {
+      textBefore += node2.textContent || "";
+    } else if (node2.nodeType === Node.ELEMENT_NODE) {
+      const el2 = node2;
+      if (el2.hasAttribute("data-file")) return;
+      if (el2.tagName === "BR") textBefore += "\n";
+      else for (const c of Array.from(node2.childNodes)) walk(c);
+    }
+  }
+  for (const c of Array.from(ed2.childNodes)) {
+    if (stopped) break;
+    walk(c);
+  }
+  const lastAt = textBefore.lastIndexOf("@");
+  if (lastAt < 0) return null;
+  const beforeAt = lastAt > 0 ? textBefore[lastAt - 1] : "\0";
+  if (beforeAt !== " " && beforeAt !== "\n" && beforeAt !== "\0") return null;
+  const afterAt = textBefore.slice(lastAt + 1);
+  if (afterAt.includes(" ") || afterAt.includes("\n")) return null;
+  return { pos: lastAt, filter: afterAt };
+}
 function ChatInput() {
   const sendMessage = useChatStore((s) => s.sendMessage);
   const isProcessing = useChatStore((s) => s.isProcessing);
@@ -21383,60 +21707,258 @@ function ChatInput() {
   const removeFromQueue = useQueueStore((s) => s.removeFromQueue);
   const settings = useSettingsStore((s) => s.settings);
   const saveSettings = useSettingsStore((s) => s.save);
-  const [text2, setText] = reactExports.useState("");
   const [wsDropdown, setWsDropdown] = reactExports.useState(false);
   const [mdDropdown, setMdDropdown] = reactExports.useState(false);
   const [modeDropdown, setModeDropdown] = reactExports.useState(false);
   const [showCommands, setShowCommands] = reactExports.useState(false);
   const [commandFilter, setCommandFilter] = reactExports.useState("");
   const [selectedCmdIdx, setSelectedCmdIdx] = reactExports.useState(0);
-  const textareaRef = reactExports.useRef(null);
+  const editableRef = reactExports.useRef(null);
   const cmdMenuRef = reactExports.useRef(null);
+  const [showFilePicker, setShowFilePicker] = reactExports.useState(false);
+  const [fileFilter, setFileFilter] = reactExports.useState("");
+  const [workspaceFiles, setWorkspaceFiles] = reactExports.useState([]);
+  const [selectedFileIdx, setSelectedFileIdx] = reactExports.useState(0);
+  const [filesLoading, setFilesLoading] = reactExports.useState(false);
+  const fileMenuRef = reactExports.useRef(null);
+  const atPosRef = reactExports.useRef(-1);
+  const insertingRef = reactExports.useRef(false);
+  const isEmptyRef = reactExports.useRef(true);
   reactExports.useEffect(() => {
-    const cursorPos = textareaRef.current?.selectionStart ?? 0;
-    const textBeforeCursor = text2.substring(0, cursorPos);
-    const lastNewline = textBeforeCursor.lastIndexOf("\n");
-    const currentLine = textBeforeCursor.substring(lastNewline + 1);
-    if (currentLine.startsWith("/") && !currentLine.includes(" ")) {
-      setShowCommands(true);
-      setCommandFilter(currentLine);
-      setSelectedCmdIdx(0);
+    const ed2 = editableRef.current;
+    if (!ed2) return;
+    const handleSelectionChange = () => {
+      if (!ed2.matches(":focus-within")) return;
+      if (insertingRef.current) return;
+      const trigger = getAtTrigger(ed2);
+      if (trigger && settings.workspacePath) {
+        setShowFilePicker(true);
+        setFileFilter(trigger.filter);
+        setSelectedFileIdx(0);
+        atPosRef.current = trigger.pos;
+        if (workspaceFiles.length === 0 && !filesLoading) {
+          setFilesLoading(true);
+          ipcClient.file.glob("**/*").then((files) => {
+            setWorkspaceFiles(files.sort());
+            setFilesLoading(false);
+          }).catch(() => setFilesLoading(false));
+        }
+      } else {
+        setShowFilePicker(false);
+        atPosRef.current = -1;
+      }
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount) {
+        const r2 = sel.getRangeAt(0).cloneRange();
+        r2.setStart(ed2, 0);
+        const txt = r2.toString();
+        const lastNl = txt.lastIndexOf("\n");
+        const line = txt.slice(lastNl + 1);
+        if (line.startsWith("/") && !line.includes(" ")) {
+          setShowCommands(true);
+          setCommandFilter(line);
+          setSelectedCmdIdx(0);
+        } else {
+          setShowCommands(false);
+        }
+      }
+    };
+    document.addEventListener("selectionchange", handleSelectionChange);
+    return () => document.removeEventListener("selectionchange", handleSelectionChange);
+  }, [settings.workspacePath, workspaceFiles.length, filesLoading]);
+  reactExports.useEffect(() => {
+    setWorkspaceFiles([]);
+  }, [settings.workspacePath]);
+  const updateEmptyState = reactExports.useCallback(() => {
+    const ed2 = editableRef.current;
+    if (!ed2) return;
+    const { text: text2, files } = readEditor(ed2);
+    isEmptyRef.current = text2.trim() === "" && files.length === 0;
+    if (isEmptyRef.current) {
+      ed2.classList.add("is-empty");
     } else {
-      setShowCommands(false);
+      ed2.classList.remove("is-empty");
     }
-  }, [text2]);
+  }, []);
+  const filteredFiles = workspaceFiles.filter((f2) => {
+    if (!fileFilter) return true;
+    const lower = fileFilter.toLowerCase();
+    return f2.toLowerCase().includes(lower) || basename(f2).toLowerCase().includes(lower);
+  });
   const filteredCommands = SLASH_COMMANDS.filter(
     (c) => c.command.startsWith(commandFilter) || c.label.includes(commandFilter.replace("/", ""))
   );
+  const insertFileRef = reactExports.useCallback((filePath) => {
+    const ed2 = editableRef.current;
+    if (!ed2) return;
+    const atPos = atPosRef.current;
+    const currentFilter = fileFilter;
+    insertingRef.current = true;
+    ed2.focus();
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) {
+      atPosRef.current = -1;
+      setShowFilePicker(false);
+      requestAnimationFrame(() => {
+        insertingRef.current = false;
+      });
+      return;
+    }
+    if (atPos < 0) {
+      const chip = createFileChipDOM(filePath, (el2) => {
+        el2.remove();
+        updateEmptyState();
+      });
+      const range = sel.getRangeAt(0);
+      range.insertNode(chip);
+      const cursorNode = document.createTextNode("​");
+      range.setStartAfter(chip);
+      range.insertNode(cursorNode);
+      range.setStartAfter(cursorNode);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } else {
+      let findPos = function(node2, targetPos) {
+        if (node2.nodeType === Node.TEXT_NODE) {
+          const len = (node2.textContent || "").length;
+          if (charCount + len >= targetPos) {
+            return { node: node2, offset: targetPos - charCount };
+          }
+          charCount += len;
+        } else if (node2.nodeType === Node.ELEMENT_NODE) {
+          const el2 = node2;
+          if (el2.hasAttribute("data-file")) return null;
+          if (el2.tagName === "BR") charCount += 1;
+          else for (const c of Array.from(node2.childNodes)) {
+            const result = findPos(c, targetPos);
+            if (result) return result;
+          }
+        }
+        return null;
+      };
+      let charCount = 0;
+      const found = findPos(ed2, atPos);
+      if (found) {
+        const delLen = currentFilter.length + 1;
+        const range = document.createRange();
+        range.setStart(found.node, found.offset);
+        range.setEnd(found.node, Math.min(found.offset + delLen, (found.node.textContent || "").length));
+        range.deleteContents();
+        const chip = createFileChipDOM(filePath, (el2) => {
+          el2.remove();
+          updateEmptyState();
+        });
+        range.insertNode(chip);
+        const cursorNode = document.createTextNode("​");
+        range.setStartAfter(chip);
+        range.insertNode(cursorNode);
+        range.setStartAfter(cursorNode);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    }
+    atPosRef.current = -1;
+    setShowFilePicker(false);
+    updateEmptyState();
+    setTimeout(() => {
+      ed2.focus();
+      const s = window.getSelection();
+      if (s && ed2.contains(s.anchorNode)) return;
+      const r2 = document.createRange();
+      r2.selectNodeContents(ed2);
+      r2.collapse(false);
+      s?.removeAllRanges();
+      s?.addRange(r2);
+    }, 0);
+    requestAnimationFrame(() => {
+      insertingRef.current = false;
+    });
+  }, [fileFilter, updateEmptyState]);
   const insertCommand = reactExports.useCallback((cmd) => {
-    const cursorPos = textareaRef.current?.selectionStart ?? 0;
-    const textBeforeCursor = text2.substring(0, cursorPos);
-    const textAfterCursor = text2.substring(cursorPos);
-    const lastNewline = textBeforeCursor.lastIndexOf("\n");
-    const lineStart = textBeforeCursor.substring(0, lastNewline + 1);
-    const newText = lineStart + cmd.command + " " + textAfterCursor;
-    setText(newText);
+    const ed2 = editableRef.current;
+    if (!ed2) return;
+    ed2.focus();
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const range = sel.getRangeAt(0).cloneRange();
+    range.setStart(ed2, 0);
+    const textBefore = range.toString();
+    const lastNl = textBefore.lastIndexOf("\n");
+    const currentRange = sel.getRangeAt(0);
+    let charIdx = 0;
+    function findNodeOffset(node2, target) {
+      if (node2.nodeType === Node.TEXT_NODE) {
+        const len = (node2.textContent || "").length;
+        if (charIdx + len >= target) return { node: node2, offset: target - charIdx };
+        charIdx += len;
+      } else if (node2.nodeType === Node.ELEMENT_NODE) {
+        const el2 = node2;
+        if (el2.hasAttribute("data-file")) return null;
+        if (el2.tagName === "BR") charIdx += 1;
+        else for (const c of Array.from(node2.childNodes)) {
+          const r2 = findNodeOffset(c, target);
+          if (r2) return r2;
+        }
+      }
+      return null;
+    }
+    const start = findNodeOffset(ed2, lastNl + 1);
+    if (!start) return;
+    const newRange = document.createRange();
+    newRange.setStart(start.node, start.offset);
+    newRange.setEnd(currentRange.endContainer, currentRange.endOffset);
+    newRange.deleteContents();
+    newRange.insertNode(document.createTextNode(cmd.command + " "));
+    newRange.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
     setShowCommands(false);
-    textareaRef.current?.focus();
-  }, [text2]);
+    updateEmptyState();
+  }, [updateEmptyState]);
   const handleKeyDown = reactExports.useCallback(
     (e) => {
-      if (showCommands) {
+      if (showFilePicker) {
         if (e.key === "ArrowDown") {
           e.preventDefault();
-          setSelectedCmdIdx((prev) => Math.min(prev + 1, filteredCommands.length - 1));
+          setSelectedFileIdx((p2) => Math.min(p2 + 1, filteredFiles.length - 1));
           return;
         }
         if (e.key === "ArrowUp") {
           e.preventDefault();
-          setSelectedCmdIdx((prev) => Math.max(prev - 1, 0));
+          setSelectedFileIdx((p2) => Math.max(p2 - 1, 0));
           return;
         }
         if (e.key === "Enter" || e.key === "Tab") {
           e.preventDefault();
-          if (filteredCommands[selectedCmdIdx]) {
-            insertCommand(filteredCommands[selectedCmdIdx]);
+          if (filteredFiles.length > 0) {
+            const idx = selectedFileIdx < filteredFiles.length ? selectedFileIdx : 0;
+            insertFileRef(filteredFiles[idx]);
           }
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setShowFilePicker(false);
+          atPosRef.current = -1;
+          return;
+        }
+      }
+      if (showCommands) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setSelectedCmdIdx((p2) => Math.min(p2 + 1, filteredCommands.length - 1));
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setSelectedCmdIdx((p2) => Math.max(p2 - 1, 0));
+          return;
+        }
+        if (e.key === "Enter" || e.key === "Tab") {
+          e.preventDefault();
+          if (filteredCommands[selectedCmdIdx]) insertCommand(filteredCommands[selectedCmdIdx]);
           return;
         }
         if (e.key === "Escape") {
@@ -21450,24 +21972,23 @@ function ChatInput() {
         handleSend();
       }
     },
-    [showCommands, filteredCommands, selectedCmdIdx, insertCommand]
+    [showFilePicker, showCommands, filteredFiles, filteredCommands, selectedFileIdx, selectedCmdIdx, insertFileRef, insertCommand]
   );
   const handleSend = reactExports.useCallback(() => {
-    if (!text2.trim() || isProcessing) return;
+    const ed2 = editableRef.current;
+    if (!ed2) return;
+    const { text: text2, files } = readEditor(ed2);
+    const trimmed = text2.trim();
+    if (!trimmed || isProcessing) return;
     if (!settings.workspacePath) {
       alert("请先选择工作空间（workspace）目录");
       return;
     }
-    sendMessage(text2.trim());
-    setText("");
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
-  }, [text2, isProcessing, settings.workspacePath, sendMessage]);
-  const autoResize = (el2) => {
-    el2.style.height = "auto";
-    el2.style.height = Math.min(el2.scrollHeight, 200) + "px";
-  };
+    sendMessage(trimmed, files.length > 0 ? files : void 0);
+    ed2.innerHTML = "";
+    isEmptyRef.current = true;
+    updateEmptyState();
+  }, [isProcessing, settings.workspacePath, sendMessage, updateEmptyState]);
   const closeAllDropdowns = () => {
     setWsDropdown(false);
     setMdDropdown(false);
@@ -21516,7 +22037,10 @@ function ChatInput() {
         children: filteredCommands.map((cmd, idx) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
           "button",
           {
-            onClick: () => insertCommand(cmd),
+            onMouseDown: (e) => {
+              e.preventDefault();
+              insertCommand(cmd);
+            },
             onMouseEnter: () => setSelectedCmdIdx(idx),
             className: `w-full flex items-center gap-3 px-4 py-2.5 text-left border-none bg-transparent cursor-pointer transition-colors ${idx === selectedCmdIdx ? "bg-[#f0fdf4]" : "hover:bg-[#f8fafc]"} ${idx !== 0 ? "border-t border-[#f1f5f9]" : ""}`,
             children: [
@@ -21529,58 +22053,81 @@ function ChatInput() {
         ))
       }
     ),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs(
+    showFilePicker && /* @__PURE__ */ jsxRuntimeExports.jsx(
       "div",
       {
-        className: "max-w-[740px] w-full mx-auto flex items-end gap-2 border rounded-[24px] py-2.5 px-4 transition-colors focus-within:border-[#a7f3d0]",
+        ref: fileMenuRef,
+        className: "max-w-[740px] w-full mx-auto bg-white border border-[#e2e8f0] rounded-[10px] shadow-lg overflow-hidden animate-[msgIn_0.15s_ease-out] max-h-[360px] overflow-y-auto",
+        children: filesLoading ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-4 py-6 text-center text-[13px] text-[#94a3b8]", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-5 h-5 border-2 border-[#a7f3d0] border-t-transparent rounded-full animate-spin mx-auto mb-2" }),
+          "正在加载文件列表..."
+        ] }) : filteredFiles.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-4 py-6 text-center text-[13px] text-[#94a3b8]", children: workspaceFiles.length === 0 ? "工作空间暂无文件" : "无匹配文件" }) : filteredFiles.slice(0, 100).map((filePath, idx) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "button",
+          {
+            onMouseDown: (e) => {
+              e.preventDefault();
+              insertFileRef(filePath);
+            },
+            onMouseEnter: () => setSelectedFileIdx(idx),
+            className: `w-full flex items-center gap-3 px-4 py-2 text-left border-none bg-transparent cursor-pointer transition-colors ${idx === selectedFileIdx ? "bg-[#f0fdf4]" : "hover:bg-[#f8fafc]"} ${idx !== 0 ? "border-t border-[#f1f5f9]" : ""}`,
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[13px] text-[#0f172a] font-medium flex-1 truncate", children: basename(filePath) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[11px] text-[#94a3b8] truncate max-w-[200px] hidden sm:block", children: filePath })
+            ]
+          },
+          filePath
+        ))
+      }
+    ),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(
+      "div",
+      {
+        className: "max-w-[740px] w-full mx-auto border rounded-[24px] py-2.5 px-4 transition-colors focus-within:border-[#a7f3d0]",
         style: { borderColor: "rgba(0,0,0,.1)" },
-        children: [
+        children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-end gap-2", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "textarea",
+            "div",
             {
-              ref: textareaRef,
-              value: text2,
-              onChange: (e) => {
-                setText(e.target.value);
-                autoResize(e.target);
-              },
+              ref: editableRef,
+              contentEditable: !isProcessing,
+              suppressContentEditableWarning: true,
+              onInput: updateEmptyState,
               onKeyDown: handleKeyDown,
-              placeholder: "输入任务，@引用文件， /调用技能与指令",
-              rows: 2,
-              className: "flex-1 border-none bg-transparent resize-none outline-none text-[15px] text-[#0f172a] leading-relaxed min-h-[44px] max-h-[200px] overflow-y-auto placeholder:text-[#94a3b8] py-0"
+              onPaste: (e) => {
+                e.preventDefault();
+                const text2 = e.clipboardData.getData("text/plain");
+                const sel = window.getSelection();
+                if (sel && sel.rangeCount) {
+                  sel.getRangeAt(0).deleteContents();
+                  sel.getRangeAt(0).insertNode(document.createTextNode(text2));
+                  sel.getRangeAt(0).collapse(false);
+                }
+              },
+              className: `flex-1 border-none bg-transparent outline-none text-[15px] text-[#0f172a] leading-relaxed min-h-[44px] max-h-[200px] overflow-y-auto py-1 whitespace-pre-wrap break-words ${isEmptyRef.current ? "is-empty" : ""}`,
+              "data-placeholder": "输入任务，@引用文件， /调用技能与指令",
+              style: { wordBreak: "break-word" },
+              role: "textbox",
+              "aria-multiline": "true"
             }
           ),
           /* @__PURE__ */ jsxRuntimeExports.jsx(
             "button",
             {
               onClick: handleSend,
-              disabled: !text2.trim() || isProcessing,
-              className: "flex-shrink-0 w-[32px] h-[32px] rounded-full flex items-center justify-center border-none cursor-pointer transition-all mb-0.5",
+              disabled: isProcessing,
+              className: "flex-shrink-0 w-[32px] h-[32px] rounded-full flex items-center justify-center border-none cursor-pointer transition-all",
               style: {
-                backgroundColor: text2.trim() ? "#a7f3d0" : "#f1f5f9",
-                color: text2.trim() ? "#047857" : "#94a3b8",
+                backgroundColor: isEmptyRef.current ? "#f1f5f9" : "#a7f3d0",
+                color: isEmptyRef.current ? "#94a3b8" : "#047857",
                 opacity: 1
               },
-              children: isProcessing ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[16px] h-[16px] border-[2px] border-[#047857] border-t-transparent rounded-full animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(
-                "svg",
-                {
-                  width: "16",
-                  height: "16",
-                  viewBox: "0 0 24 24",
-                  fill: "none",
-                  stroke: "currentColor",
-                  strokeWidth: "2.5",
-                  strokeLinecap: "round",
-                  strokeLinejoin: "round",
-                  children: [
-                    /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "12", y1: "19", x2: "12", y2: "5" }),
-                    /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "5 12 12 5 19 12" })
-                  ]
-                }
-              )
+              children: isProcessing ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[16px] h-[16px] border-[2px] border-[#047857] border-t-transparent rounded-full animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "12", y1: "19", x2: "12", y2: "5" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "5 12 12 5 19 12" })
+              ] })
             }
           )
-        ]
+        ] })
       }
     ),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "max-w-[740px] w-full mx-auto flex items-center gap-2", children: [
@@ -21596,55 +22143,16 @@ function ChatInput() {
             },
             className: "flex items-center gap-1 py-[4px] px-2 border border-[#e2e8f0] rounded-md text-xs text-[#64748b] bg-white hover:border-[#cbd5e1] hover:bg-[#f8fafc] transition-colors cursor-pointer",
             children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx(
-                "svg",
-                {
-                  className: "w-3.5 h-3.5",
-                  viewBox: "0 0 16 16",
-                  fill: "none",
-                  stroke: "currentColor",
-                  strokeWidth: "2",
-                  strokeLinecap: "round",
-                  children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 5h3l1.5-2h4L12 5h2a1 1 0 011 1v7a1 1 0 01-1 1H3a1 1 0 01-1-1V6a1 1 0 011-1z" })
-                }
-              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3.5 h-3.5", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 5h3l1.5-2h4L12 5h2a1 1 0 011 1v7a1 1 0 01-1 1H3a1 1 0 01-1-1V6a1 1 0 011-1z" }) }),
               /* @__PURE__ */ jsxRuntimeExports.jsx("span", { title: settings.workspacePath || "", className: "font-medium text-[#64748b] text-[11px]", children: settings.workspacePath || "请选择工作空间..." }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx(
-                "svg",
-                {
-                  className: "w-3.5 h-3.5 text-[#94a3b8]",
-                  viewBox: "0 0 16 16",
-                  fill: "none",
-                  stroke: "currentColor",
-                  strokeWidth: "2.5",
-                  children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M5 7l3 3 3-3" })
-                }
-              )
+              /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3.5 h-3.5 text-[#94a3b8]", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M5 7l3 3 3-3" }) })
             ]
           }
         ),
-        wsDropdown && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute bottom-full left-0 mb-1.5 bg-white border border-[#e2e8f0] rounded-[10px] shadow-lg min-w-[220px] p-1 z-[100]", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
-          "div",
-          {
-            onClick: handleSelectWorkspace,
-            className: "px-3 py-2 rounded-md text-[13px] cursor-pointer flex items-center gap-2 text-[#0f172a] hover:bg-[#f1f5f9] transition-colors",
-            children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx(
-                "svg",
-                {
-                  className: "w-3.5 h-3.5 text-[#94a3b8]",
-                  viewBox: "0 0 16 16",
-                  fill: "none",
-                  stroke: "currentColor",
-                  strokeWidth: "2",
-                  strokeLinecap: "round",
-                  children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 5h3l1.5-2h4L12 5h2a1 1 0 011 1v7a1 1 0 01-1 1H3a1 1 0 01-1-1V6a1 1 0 011-1z" })
-                }
-              ),
-              "浏览选择目录..."
-            ]
-          }
-        ) })
+        wsDropdown && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute bottom-full left-0 mb-1.5 bg-white border border-[#e2e8f0] rounded-[10px] shadow-lg min-w-[220px] p-1 z-[100]", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { onClick: handleSelectWorkspace, className: "px-3 py-2 rounded-md text-[13px] cursor-pointer flex items-center gap-2 text-[#0f172a] hover:bg-[#f1f5f9] transition-colors", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3.5 h-3.5 text-[#94a3b8]", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 5h3l1.5-2h4L12 5h2a1 1 0 011 1v7a1 1 0 01-1 1H3a1 1 0 01-1-1V6a1 1 0 011-1z" }) }),
+          "浏览选择目录..."
+        ] }) })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs(
@@ -21658,34 +22166,12 @@ function ChatInput() {
             },
             className: "flex items-center gap-1 py-[4px] px-2 border border-[#e2e8f0] rounded-md text-xs text-[#64748b] bg-white hover:border-[#cbd5e1] hover:bg-[#f8fafc] transition-colors cursor-pointer",
             children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsxs(
-                "svg",
-                {
-                  className: "w-3.5 h-3.5",
-                  viewBox: "0 0 16 16",
-                  fill: "none",
-                  stroke: "currentColor",
-                  strokeWidth: "2",
-                  strokeLinecap: "round",
-                  strokeLinejoin: "round",
-                  children: [
-                    /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "8", cy: "8", r: "3" }),
-                    /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M13.5 8a5.5 5.5 0 00-11 0" })
-                  ]
-                }
-              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-3.5 h-3.5", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "8", cy: "8", r: "3" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M13.5 8a5.5 5.5 0 00-11 0" })
+              ] }),
               /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-medium text-[#64748b] text-[11px]", children: settings.model }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx(
-                "svg",
-                {
-                  className: "w-3.5 h-3.5 text-[#94a3b8]",
-                  viewBox: "0 0 16 16",
-                  fill: "none",
-                  stroke: "currentColor",
-                  strokeWidth: "2.5",
-                  children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M5 7l3 3 3-3" })
-                }
-              )
+              /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3.5 h-3.5 text-[#94a3b8]", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M5 7l3 3 3-3" }) })
             ]
           }
         ),
@@ -21718,17 +22204,7 @@ function ChatInput() {
             className: "flex items-center gap-1 py-[4px] px-2 border border-[#e2e8f0] rounded-md text-xs text-[#64748b] bg-white hover:border-[#cbd5e1] hover:bg-[#f8fafc] transition-colors cursor-pointer",
             children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-medium text-[11px]", children: inputMode === "build" ? "Build" : inputMode === "plan" ? "Plan" : "Ask" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx(
-                "svg",
-                {
-                  className: "w-3.5 h-3.5 text-[#94a3b8]",
-                  viewBox: "0 0 16 16",
-                  fill: "none",
-                  stroke: "currentColor",
-                  strokeWidth: "2.5",
-                  children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M5 7l3 3 3-3" })
-                }
-              )
+              /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3.5 h-3.5 text-[#94a3b8]", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M5 7l3 3 3-3" }) })
             ]
           }
         ),
@@ -21749,7 +22225,14 @@ function ChatInput() {
         )) })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ml-auto text-[11px] text-[#94a3b8]", children: isProcessing ? "AI 正在处理中..." : "Enter 发送 · Shift+Enter 换行" })
-    ] })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("style", { children: `
+        .is-empty:before {
+          content: attr(data-placeholder);
+          color: #94a3b8;
+          pointer-events: none;
+        }
+      ` })
   ] });
 }
 function ChatPanel() {

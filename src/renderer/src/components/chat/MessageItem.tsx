@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import type { Message, PlanEvent, MessageSegment } from '../../types'
+import type { Message, PlanEvent, MessageSegment, ToolCall } from '../../types'
 import { useChatStore } from '../../stores/chatStore'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -38,10 +38,8 @@ export function MessageItem({ message, msgIndex }: Props) {
   }
 
   // Assistant message
-  const hasThinking = message.thinking || (message.tools && message.tools.length > 0)
-  const hasRunning = message.tools?.some(t => t.status === 'running')
+  const hasAnySegment = (message.segments && message.segments.length > 0)
   const hasPending = message.tools?.some(t => t.status === 'pending')
-  const toolCount = message.tools?.length || 0
   const isCollapsed = processCollapsed && !hasPending
 
   return (
@@ -50,68 +48,11 @@ export function MessageItem({ message, msgIndex }: Props) {
 
       <div className="bg-white border border-[#e2e8f0] rounded-[14px_14px_14px_4px] py-3 px-4 text-sm leading-relaxed text-[#0f172a] min-w-0 flex-1">
 
-        {/* Thinking + Tools section */}
-        {hasThinking && (
-          <div className={`mt-2.5 border border-[#e2e8f0] rounded-md overflow-hidden ${isCollapsed ? 'section-collapsed' : ''}`}>
-            <div
-              onClick={() => setProcessCollapsed(!processCollapsed)}
-              className="flex items-center gap-2 px-3 py-2 cursor-pointer text-xs font-medium text-[#64748b] bg-[#f8fafc] select-none hover:bg-[#f1f5f9] transition-colors"
-            >
-              <span className={`inline-block transition-transform text-[10px] text-[#94a3b8] ${isCollapsed ? '-rotate-90' : ''}`}>▼</span>
-              思考与工具调用{toolCount > 0 ? ` (${toolCount})` : ''}
-              {hasPending && <span className="text-[#0369a1] text-[11px] ml-1">等待确认...</span>}
-              {hasRunning && !hasPending && <span className="text-[#b45309] text-[11px] ml-1">执行中...</span>}
-            </div>
-            {!isCollapsed && (
-              <div className="px-3.5 py-2.5 text-[13px] text-[#94a3b8] italic leading-relaxed bg-white border-t border-[#f1f5f9] max-h-[500px] overflow-y-auto">
-                {/* Thinking text */}
-                {message.thinking && (
-                  <div className="mb-2.5 not-italic text-[#64748b]">{message.thinking}</div>
-                )}
-
-                {/* Tool items */}
-                {message.tools?.map((tool, toolIdx) => (
-                  <div key={tool.id || toolIdx} className="flex items-start gap-2.5 py-2 border-b border-[#f1f5f9] not-italic text-[#0f172a] last:border-b-0">
-                    <svg className="w-4 h-4 flex-shrink-0 mt-0.5 text-[#94a3b8]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-xs text-[#0f172a]">{tool.name}</div>
-                      {tool.command && (
-                        <div className="mt-1 py-1.5 px-2.5 bg-[#1e293b] text-[#a7f3d0] rounded text-[11px] font-mono whitespace-pre-wrap">
-                          $ {tool.command}
-                        </div>
-                      )}
-                      {tool.detail && <div className="text-[11px] text-[#94a3b8] mt-0.5">{tool.detail}</div>}
-                      {tool.status === 'pending' && (
-                        <div className="flex gap-1.5 mt-2 flex-wrap">
-                          <button onClick={() => confirmTool()} className="px-3 py-1 rounded text-[11px] font-medium text-[#047857] border border-[#a7f3d0] bg-[#f0fdf4] hover:bg-[#a7f3d0] transition-colors cursor-pointer">确认</button>
-                          <button onClick={() => skipTool()} className="px-3 py-1 rounded text-[11px] font-medium text-[#b45309] border border-[#fcd34d] bg-[#fffbeb] hover:bg-[#fde68a] transition-colors cursor-pointer">跳过</button>
-                          <button onClick={() => stopTools()} className="px-3 py-1 rounded text-[11px] font-medium text-[#b91c1c] border border-[#fecaca] bg-[#fef2f2] hover:bg-[#fecaca] transition-colors cursor-pointer">终止</button>
-                        </div>
-                      )}
-                      {tool.result && (
-                        <div className="mt-1 py-1.5 px-2.5 bg-[#f8fafc] rounded text-[11px] font-mono whitespace-pre-wrap max-h-[100px] overflow-y-auto border border-[#f1f5f9]">
-                          {tool.result}
-                        </div>
-                      )}
-                    </div>
-                    {tool.status !== 'pending' && (
-                      <span className={`text-[11px] px-2 py-0.5 rounded-lg font-medium flex-shrink-0 ${
-                        tool.status === 'running' ? 'text-[#b45309] bg-[#fffbeb]' : 'text-[#047857] bg-[#ecfdf5]'
-                      }`}>
-                        {tool.status === 'running' ? '执行中...' : '完成'}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Segments: text chunks and plan events interleaved in arrival order */}
-        {message.segments && message.segments.length > 0 ? (
+        {/* Segments: text, thinking, tool_calls, plan events — all interleaved in arrival order */}
+        {hasAnySegment ? (
           <SegmentsView
-            segments={message.segments}
+            segments={message.segments || []}
+            tools={message.tools || []}
             msgIndex={msgIndex}
             isStreaming={message.isStreaming ?? false}
             selectedPlanValue={selectedPlanValue}
@@ -125,6 +66,11 @@ export function MessageItem({ message, msgIndex }: Props) {
             onSubmitAnswer={answerPlanQuestion}
             planStatus={message.planStatus}
             planEditing={message.planEditing}
+            processCollapsed={isCollapsed}
+            onToggleCollapse={() => setProcessCollapsed(!processCollapsed)}
+            onConfirmTool={confirmTool}
+            onSkipTool={skipTool}
+            onStopTools={stopTools}
           />
         ) : (
           message.content && message.isStreaming ? (
@@ -137,7 +83,7 @@ export function MessageItem({ message, msgIndex }: Props) {
         )}
 
         {/* Streaming indicator */}
-        {message.isStreaming && !message.content && !hasThinking && (
+        {message.isStreaming && !message.content && !hasAnySegment && (
           <span className="inline-block w-2 h-4 bg-[#a7f3d0] animate-pulse" />
         )}
       </div>
@@ -145,9 +91,10 @@ export function MessageItem({ message, msgIndex }: Props) {
   )
 }
 
-// Renders text chunks and plan events interleaved in arrival order
+// Renders all segments interleaved in arrival order
 function SegmentsView({
   segments,
+  tools,
   msgIndex,
   isStreaming,
   selectedPlanValue,
@@ -160,9 +107,15 @@ function SegmentsView({
   onSelectOption,
   onSubmitAnswer,
   planStatus,
-  planEditing
+  planEditing,
+  processCollapsed,
+  onToggleCollapse,
+  onConfirmTool,
+  onSkipTool,
+  onStopTools
 }: {
   segments: MessageSegment[]
+  tools: ToolCall[]
   msgIndex: number
   isStreaming: boolean
   selectedPlanValue: string | null
@@ -176,7 +129,18 @@ function SegmentsView({
   onSubmitAnswer: (msgIdx: number, textAnswer?: string) => void
   planStatus?: string
   planEditing?: boolean
+  processCollapsed: boolean
+  onToggleCollapse: () => void
+  onConfirmTool: () => void
+  onSkipTool: () => void
+  onStopTools: () => void
 }) {
+  // Build a map for quick tool lookup by id
+  const toolMap = new Map<string, ToolCall>()
+  for (const t of tools) {
+    toolMap.set(t.id, t)
+  }
+
   // Find the index of the last text segment (for typewriter animation)
   const lastTextSegIdx = (() => {
     for (let i = segments.length - 1; i >= 0; i--) {
@@ -197,8 +161,6 @@ function SegmentsView({
     })
   }, [])
 
-  // A text segment is visually complete if it's not the last streaming text
-  // (renders as static markdown), or if its typewriter animation has finished.
   const isTextComplete = (segIdx: number) => {
     if (!isStreaming) return true
     if (segIdx !== lastTextSegIdx) return true
@@ -215,17 +177,105 @@ function SegmentsView({
     return true
   }
 
+  // Render a single tool by looking up its live state from the tools map
+  const renderTool = (toolCallId: string | undefined, key: string | number) => {
+    const tool = toolCallId ? toolMap.get(toolCallId) : undefined
+    if (!tool) return null
+
+    return (
+      <div key={key} className="flex items-start gap-2.5 py-2 border-b border-[#f1f5f9] not-italic text-[#0f172a] last:border-b-0">
+        <svg className="w-4 h-4 flex-shrink-0 mt-0.5 text-[#94a3b8]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="8" cy="8" r="6" /><path d="M8 5v3l2 2" /></svg>
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-xs text-[#0f172a]">{tool.name}</div>
+          {tool.command && (
+            <div className="mt-1 py-1.5 px-2.5 bg-[#1e293b] text-[#a7f3d0] rounded text-[11px] font-mono whitespace-pre-wrap">
+              $ {tool.command}
+            </div>
+          )}
+          {tool.detail && <div className="text-[11px] text-[#94a3b8] mt-0.5">{tool.detail}</div>}
+          {tool.status === 'pending' && (
+            <div className="flex gap-1.5 mt-2 flex-wrap">
+              <button onClick={() => onConfirmTool()} className="px-3 py-1 rounded text-[11px] font-medium text-[#047857] border border-[#a7f3d0] bg-[#f0fdf4] hover:bg-[#a7f3d0] transition-colors cursor-pointer">确认</button>
+              <button onClick={() => onSkipTool()} className="px-3 py-1 rounded text-[11px] font-medium text-[#b45309] border border-[#fcd34d] bg-[#fffbeb] hover:bg-[#fde68a] transition-colors cursor-pointer">跳过</button>
+              <button onClick={() => onStopTools()} className="px-3 py-1 rounded text-[11px] font-medium text-[#b91c1c] border border-[#fecaca] bg-[#fef2f2] hover:bg-[#fecaca] transition-colors cursor-pointer">终止</button>
+            </div>
+          )}
+          {tool.result && (
+            <div className="mt-1 py-1.5 px-2.5 bg-[#f8fafc] rounded text-[11px] font-mono whitespace-pre-wrap max-h-[100px] overflow-y-auto border border-[#f1f5f9]">
+              {tool.result}
+            </div>
+          )}
+        </div>
+        {tool.status !== 'pending' && (
+          <span className={`text-[11px] px-2 py-0.5 rounded-lg font-medium flex-shrink-0 ${tool.status === 'running' ? 'text-[#b45309] bg-[#fffbeb]' : 'text-[#047857] bg-[#ecfdf5]'
+            }`}>
+            {tool.status === 'running' ? '执行中...' : '完成'}
+          </span>
+        )}
+      </div>
+    )
+  }
+
+  // Build a flat render list: contiguous thinking segments are grouped into one box;
+  // tool calls and other segments render inline in arrival order.
+  type RenderItem =
+    | { kind: 'thinking'; segs: { seg: typeof segments[0]; idx: number }[] }
+    | { kind: 'other'; seg: typeof segments[0]; idx: number }
+
+  const renderItems: RenderItem[] = []
+  let pending: { seg: typeof segments[0]; idx: number }[] = []
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i]
+    if (seg.type === 'thinking') {
+      pending.push({ seg, idx: i })
+    } else {
+      if (pending.length > 0) {
+        renderItems.push({ kind: 'thinking', segs: pending })
+        pending = []
+      }
+      renderItems.push({ kind: 'other', seg, idx: i })
+    }
+  }
+  if (pending.length > 0) {
+    renderItems.push({ kind: 'thinking', segs: pending })
+  }
+
   return (
     <>
-      {segments.map((seg, i) => {
-        // Text segment — use typewriter for the last one during streaming
+      {renderItems.map((item, ri) => {
+        if (item.kind === 'thinking') {
+          const firstIdx = item.segs[0].idx
+          if (!canShowNonText(firstIdx)) return null
+          return (
+            <div key={`thinking-${ri}`} className={`mt-2.5 border border-[#e2e8f0] rounded-md overflow-hidden ${processCollapsed ? 'section-collapsed' : ''}`}>
+              <div
+                onClick={onToggleCollapse}
+                className="flex items-center gap-2 px-3 py-2 cursor-pointer text-xs font-medium text-[#64748b] bg-[#f8fafc] select-none hover:bg-[#f1f5f9] transition-colors"
+              >
+                <span className={`inline-block transition-transform text-[10px] text-[#94a3b8] ${processCollapsed ? '-rotate-90' : ''}`}>▼</span>
+                思考过程
+              </div>
+              {!processCollapsed && (
+                <div className="px-3.5 py-2.5 text-[13px] text-[#64748b] leading-relaxed bg-white border-t border-[#f1f5f9] max-h-[300px] overflow-y-auto">
+                  {item.segs.map(({ seg, idx }) => (
+                    <div key={`think-${idx}`} className="mb-2.5 last:mb-0">{seg.type === 'thinking' ? seg.content : null}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        }
+
+        // Other segments: text, tool_call, plan, system_status — all inline
+        const seg = item.seg
+        const i = item.idx
+
+        // Text segment
         if (seg.type === 'text') {
           const isLastText = i === lastTextSegIdx
-
           if (isLastText && isStreaming) {
             return <TypewriterText key={`txt-${i}`} text={seg.content} isStreaming={true} onDone={() => handleTextDone(i)} />
           }
-
           return (
             <div key={`txt-${i}`} className="mt-1 mb-2 prose-sm max-w-none text-[#0f172a]">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{seg.content}</ReactMarkdown>
@@ -233,13 +283,13 @@ function SegmentsView({
           )
         }
 
-        // Tool call segment — used only as an ordering marker between text segments.
-        // The actual tool UI is rendered in the "思考与工具调用" collapsed section above.
+        // Tool call — render inline without wrapper
         if (seg.type === 'tool_call') {
-          return null
+          if (!canShowNonText(i)) return null
+          return renderTool(seg.toolCallId, `tool-${i}`)
         }
 
-        // Plan event segments
+        // Plan events — only show when preceding text is complete
         if (!canShowNonText(i)) return null
 
         const event = seg as PlanEvent
@@ -257,51 +307,46 @@ function SegmentsView({
               )}
               {planEditing && (
                 <span className="text-xs text-[#0369a1] font-medium flex items-center gap-1.5">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 14h2l8-8-2-2-8 8v2z"/><path d="M12 3l2 2"/></svg>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 14h2l8-8-2-2-8 8v2z" /><path d="M12 3l2 2" /></svg>
                   正在右侧面板编辑计划...
                 </span>
               )}
             </div>
           )
         }
-
         if (event.type === 'confirmed') {
           return (
             <div key={event.id} className="-mx-1 mb-1 p-3 rounded-[10px] border border-l-[3px] bg-[#ecfdf5] border-[#a7f3d0] border-l-[#10b981]">
               <span className="text-xs text-[#047857] font-medium bg-[#d1fae5] px-2.5 py-1 rounded-md inline-flex items-center gap-1">
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 8l4 4 6-8"/></svg>
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 8l4 4 6-8" /></svg>
                 计划已确认，正在自动执行...
               </span>
             </div>
           )
         }
-
         if (event.type === 'rejected') {
           return (
             <div key={event.id} className="-mx-1 mb-1 p-3 rounded-[10px] border border-l-[3px] bg-[#fef2f2] border-[#fecaca] border-l-[#ef4444]">
               <span className="text-xs text-[#b91c1c] font-medium bg-[#fee2e2] px-2.5 py-1 rounded-md inline-flex items-center gap-1">
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 4l8 8M12 4l-8 8" /></svg>
                 计划已取消
               </span>
             </div>
           )
         }
-
         if (event.type === 'edited') {
           return (
             <div key={event.id} className="-mx-1 mb-1 p-3 rounded-[10px] border border-l-[3px] bg-[#f0fdf4] border-[#a7f3d0] border-l-[#10b981]">
               <span className="text-xs text-[#0369a1] font-medium bg-[#dbeafe] px-2.5 py-1 rounded-md inline-flex items-center gap-1">
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 14h2l8-8-2-2-8 8v2z"/><path d="M12 3l2 2"/></svg>
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 14h2l8-8-2-2-8 8v2z" /><path d="M12 3l2 2" /></svg>
                 计划已编辑
               </span>
             </div>
           )
         }
-
         if (event.type === 'question') {
           const isConfirm = event.input_type === 'confirm'
           const options = isConfirm ? ['是 / 确定', '否 / 取消'] : (event.options || [])
-
           if (event.answer) {
             return (
               <div key={event.id} className="mb-1.5 p-3 bg-[#f0f9ff] border border-[#bae6fd] rounded-[8px]">
@@ -313,12 +358,10 @@ function SegmentsView({
               </div>
             )
           }
-
           return (
             <div key={event.id} className="mb-1.5 p-3 bg-[#f0f9ff] border border-[#bae6fd] rounded-[8px]">
               <div className="text-[10px] font-semibold text-[#0369a1] uppercase tracking-wider mb-1">需求澄清</div>
               <div className="text-xs text-[#0f172a] mb-2.5 leading-relaxed">{event.question}</div>
-
               {event.input_type === 'text' ? (
                 <>
                   <textarea
@@ -360,17 +403,15 @@ function SegmentsView({
                             onSelectValue(opt)
                             onSelectOption(msgIndex, opt)
                           }}
-                          className={`px-3 py-2 border rounded-md text-[13px] text-left cursor-pointer flex items-center gap-2 ${
-                            isSelected
+                          className={`px-3 py-2 border rounded-md text-[13px] text-left cursor-pointer flex items-center gap-2 ${isSelected
                               ? 'border-[#0ea5e9] bg-[#0ea5e9]/10 text-[#0369a1] font-semibold shadow-[0_0_0_1px_#0ea5e9]'
                               : 'border-[#bae6fd] bg-white text-[#0f172a] hover:border-[#0ea5e9] hover:bg-[#f0f9ff]'
-                          }`}
+                            }`}
                         >
-                          <span className={`flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-none ${
-                            isSelected ? 'border-[#0ea5e9] bg-[#0ea5e9]' : 'border-[#94a3b8]'
-                          }`}>
+                          <span className={`flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-none ${isSelected ? 'border-[#0ea5e9] bg-[#0ea5e9]' : 'border-[#94a3b8]'
+                            }`}>
                             {isSelected && (
-                              <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="3"><path d="M3 8l4 4 6-8"/></svg>
+                              <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="3"><path d="M3 8l4 4 6-8" /></svg>
                             )}
                           </span>
                           {opt}

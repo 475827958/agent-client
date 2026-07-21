@@ -140,10 +140,20 @@ function createEventHandler(
     switch (event.type) {
       // ---- Thinking & Text ----
       case 'agent.thinking':
-        taskStore.updateLastAssistantMessage((m) => ({
-          ...m,
-          thinking: (m.thinking || '') + event.delta
-        }))
+        taskStore.updateLastAssistantMessage((m) => {
+          const segs = m.segments || []
+          const last = segs[segs.length - 1]
+          if (last?.type === 'thinking') {
+            segs[segs.length - 1] = { ...last, content: last.content + event.delta }
+          } else {
+            segs.push({ type: 'thinking' as const, content: event.delta })
+          }
+          return {
+            ...m,
+            thinking: (m.thinking || '') + event.delta,
+            segments: segs
+          }
+        })
         break
 
       case 'agent.text':
@@ -177,7 +187,7 @@ function createEventHandler(
           if (m.thinking) m.thinking = stripTrailingToolArtifact(m.thinking, event.tool_name)
           m.segments = segs
           // Insert tool_call marker for text ordering
-          m.segments.push({ type: 'tool_call' as const, toolCall: null as any })
+          m.segments.push({ type: 'tool_call' as const, toolCallId: event.tool_call_id })
           m.tools = [
             ...(m.tools || []),
             {
@@ -216,7 +226,7 @@ function createEventHandler(
           m.content = rebuildContentFromSegments(m)
           if (m.thinking) m.thinking = stripTrailingToolArtifact(m.thinking, event.tool_name)
           m.segments = segs
-          m.segments.push({ type: 'tool_call' as const, toolCall: null as any })
+          m.segments.push({ type: 'tool_call' as const, toolCallId: event.request_id })
           return { ...m }
         })
 
@@ -337,7 +347,7 @@ function createEventHandler(
           m.content = rebuildContentFromSegments(m)
           if (m.thinking) m.thinking = stripTrailingToolArtifact(m.thinking, event.tool_name)
           m.segments = segs
-          m.segments.push({ type: 'tool_call' as const, toolCall: null as any })
+          m.segments.push({ type: 'tool_call' as const, toolCallId: event.tool_call_id })
           m.tools = [
             ...(m.tools || []),
             {
@@ -446,7 +456,7 @@ interface ChatState {
   isProcessing: boolean
   currentEditingPlanMsgIdx: number | null
 
-  sendMessage: (text: string) => void
+  sendMessage: (text: string, files?: string[]) => Promise<void>
   reconnect: () => void
   confirmTool: () => void
   skipTool: () => void
@@ -466,7 +476,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isProcessing: false,
   currentEditingPlanMsgIdx: null,
 
-  sendMessage: (text: string) => {
+  sendMessage: async (text: string, files?: string[]) => {
     if (!text) return
 
     if (get().isProcessing) {
@@ -474,8 +484,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return
     }
 
-    const taskStore = useTaskStore.getState()
-    const task = taskStore.getCurrentTask()
+    let taskStore = useTaskStore.getState()
+    let task = taskStore.getCurrentTask()
+    // Auto-create task + session if none exists
+    if (!task) {
+      await taskStore.create()
+      taskStore = useTaskStore.getState()
+      task = taskStore.getCurrentTask()
+    }
+
     if (!task) return
 
     if (!task.sessionId) {
@@ -528,6 +545,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       sceneMode: sceneMode,
       workspace: settings.workspacePath,
       model: settings.model,
+      files: files,
       onEvent: handleEvent,
       onError: (err) => {
         taskStore.updateLastAssistantMessage((m) => ({
