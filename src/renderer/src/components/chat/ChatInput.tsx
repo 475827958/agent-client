@@ -4,7 +4,8 @@ import { useModeStore } from '../../stores/modeStore'
 import { useQueueStore } from '../../stores/queueStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { ipcClient } from '../../services/ipcClient'
-import type { AppMode } from '../../types'
+import { fetchInstalledSkills } from '../../services/api'
+import type { AppMode, InstalledSkill } from '../../types'
 
 const MODELS = ['deepseek-v4-pro']
 
@@ -15,16 +16,7 @@ interface SlashCommand {
 }
 
 const SLASH_COMMANDS: SlashCommand[] = [
-  { command: '/help', label: '帮助', description: '获取使用帮助与指令列表' },
   { command: '/clear', label: '清空对话', description: '清空当前会话的所有消息' },
-  { command: '/file', label: '引用文件', description: '选择并引用项目中的文件内容' },
-  { command: '/search', label: '搜索代码库', description: '在代码库中搜索关键词或符号' },
-  { command: '/explain', label: '解释代码', description: '解释选中代码段的逻辑与用途' },
-  { command: '/fix', label: '修复问题', description: '查找并修复代码中的错误' },
-  { command: '/refactor', label: '重构代码', description: '优化代码结构与可读性' },
-  { command: '/test', label: '生成测试', description: '为选中代码生成单元测试' },
-  { command: '/doc', label: '生成文档', description: '为函数或类生成文档注释' },
-  { command: '/optimize', label: '性能优化', description: '分析并优化代码性能瓶颈' },
 ]
 
 // ===== File helpers =====
@@ -53,6 +45,55 @@ function fileColor(p: string): string {
   return colors[ext] || '#94a3b8'
 }
 
+// Find a DOM node+offset matching a plain-text character index (skipping chips, counting
+// newlines for DIV/BR the same way getEditorPlainText does).
+function findPlainTextOffset(ed: HTMLElement, target: number): { node: Node; offset: number } | null {
+  let charIdx = 0
+  function walk(node: Node): { node: Node; offset: number } | null {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const len = (node.textContent || '').length
+      if (charIdx + len >= target) return { node, offset: target - charIdx }
+      charIdx += len
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const el = node as HTMLElement
+      if (el.hasAttribute('data-file') || el.hasAttribute('data-skill-id')) return null
+      if (el.tagName === 'BR') { charIdx += 1 }
+      else if (el.tagName === 'DIV') {
+        if (charIdx > 0) charIdx += 1
+        for (const c of Array.from(node.childNodes)) {
+          const r = walk(c)
+          if (r) return r
+        }
+        if (charIdx <= target) charIdx += 1
+      } else {
+        for (const c of Array.from(node.childNodes)) {
+          const r = walk(c)
+          if (r) return r
+        }
+      }
+    }
+    return null
+  }
+  for (const c of Array.from(ed.childNodes)) {
+    const r = walk(c)
+    if (r) return r
+  }
+  return null
+}
+
+// Compute the plain-text position of the last word-boundary '/' before cursor.
+function findSlashPosInEditor(ed: HTMLElement, endContainer: Node, endOffset: number): number {
+  const plainBefore = getEditorPlainText(ed, endContainer, endOffset)
+  const lastNl = plainBefore.lastIndexOf('\n')
+  const line = plainBefore.slice(lastNl + 1)
+  for (let i = line.length - 1; i >= 0; i--) {
+    if (line[i] === '/' && (i === 0 || line[i - 1] === ' ')) {
+      return lastNl + 1 + i
+    }
+  }
+  return -1
+}
+
 function createFileChipDOM(filePath: string, onRemove: (el: HTMLElement) => void): HTMLElement {
   const color = fileColor(filePath)
   const span = document.createElement('span')
@@ -70,10 +111,60 @@ function createFileChipDOM(filePath: string, onRemove: (el: HTMLElement) => void
   return span
 }
 
-// Collect text and file paths from contenteditable DOM
-function readEditor(ed: HTMLElement): { text: string; files: string[] } {
+function createSkillChipDOM(skillId: string, skillName: string, icon: string, onRemove: (el: HTMLElement) => void): HTMLElement {
+  const span = document.createElement('span')
+  span.setAttribute('data-skill-id', skillId)
+  span.setAttribute('data-skill-name', skillName)
+  span.setAttribute('contenteditable', 'false')
+  span.style.cssText = `display:inline-flex;align-items:center;gap:2px;padding:1px 6px;border-radius:4px;font-size:13px;font-weight:500;border:1px solid #a7f3d0;background:#f0fdf4;color:#047857;cursor:default;vertical-align:middle;margin:0 2px;user-select:none;`
+  span.innerHTML = `<span>${'⚡'}</span> <span style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${skillName}</span>`
+    + `<button style="margin-left:1px;width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;opacity:0.4;background:none;border:none;cursor:pointer;font-size:12px;line-height:1;padding:0;color:inherit;flex-shrink:0" tabindex="-1">&times;</button>`
+  const btn = span.lastElementChild as HTMLElement
+  btn.addEventListener('mousedown', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onRemove(span)
+  })
+  return span
+}
+
+// Walk DOM, collecting text from text nodes only, skipping data-file/data-skill-id chips.
+// Returns plain text up to the given cursor position (or full text if endContainer omitted).
+function getEditorPlainText(ed: HTMLElement, endContainer?: Node, endOffset?: number): string {
+  let text = ''
+  let stopped = false
+  function walk(n: Node) {
+    if (stopped) return
+    if (endContainer && n === endContainer) {
+      if (n.nodeType === Node.TEXT_NODE)
+        text += (n.textContent || '').slice(0, endOffset)
+      stopped = true
+      return
+    }
+    if (n.nodeType === Node.TEXT_NODE) {
+      text += n.textContent || ''
+    } else if (n.nodeType === Node.ELEMENT_NODE) {
+      const el = n as HTMLElement
+      if (el.hasAttribute('data-file') || el.hasAttribute('data-skill-id')) return
+      if (el.tagName === 'BR') text += '\n'
+      else if (el.tagName === 'DIV') {
+        if (text && !text.endsWith('\n')) text += '\n'
+        for (const c of Array.from(n.childNodes)) walk(c)
+        if (!text.endsWith('\n')) text += '\n'
+      } else {
+        for (const c of Array.from(n.childNodes)) walk(c)
+      }
+    }
+  }
+  for (const c of Array.from(ed.childNodes)) walk(c)
+  return text
+}
+
+// Collect text, file paths, and skills from contenteditable DOM
+function readEditor(ed: HTMLElement): { text: string; files: string[]; skills: { skill_id: string; skill_name: string }[] } {
   let text = ''
   const files: string[] = []
+  const skills: { skill_id: string; skill_name: string }[] = []
   function walk(n: Node) {
     if (n.nodeType === Node.TEXT_NODE) {
       text += n.textContent || ''
@@ -81,6 +172,11 @@ function readEditor(ed: HTMLElement): { text: string; files: string[] } {
       const el = n as HTMLElement
       if (el.hasAttribute('data-file')) {
         files.push(el.getAttribute('data-file') || '')
+      } else if (el.hasAttribute('data-skill-id')) {
+        skills.push({
+          skill_id: el.getAttribute('data-skill-id') || '',
+          skill_name: el.getAttribute('data-skill-name') || ''
+        })
       } else if (el.tagName === 'BR') {
         text += '\n'
       } else {
@@ -97,7 +193,7 @@ function readEditor(ed: HTMLElement): { text: string; files: string[] } {
       walk(c)
     }
   }
-  return { text, files }
+  return { text, files, skills }
 }
 
 // Find @ trigger position in plain text before cursor, skipping file chips (same as findPos)
@@ -119,7 +215,7 @@ function getAtTrigger(ed: HTMLElement): { pos: number; filter: string } | null {
       textBefore += node.textContent || ''
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       const el = node as HTMLElement
-      if (el.hasAttribute('data-file')) return
+      if (el.hasAttribute('data-file') || el.hasAttribute('data-skill-id')) return
       if (el.tagName === 'BR') textBefore += '\n'
       else for (const c of Array.from(node.childNodes)) walk(c)
     }
@@ -153,6 +249,7 @@ export function ChatInput() {
   const [showCommands, setShowCommands] = useState(false)
   const [commandFilter, setCommandFilter] = useState('')
   const [selectedCmdIdx, setSelectedCmdIdx] = useState(0)
+  const [installedSkills, setInstalledSkills] = useState<InstalledSkill[]>([])
   const editableRef = useRef<HTMLDivElement>(null)
   const cmdMenuRef = useRef<HTMLDivElement>(null)
 
@@ -167,7 +264,7 @@ export function ChatInput() {
   const insertingRef = useRef(false) // guard against selectionchange firing during insertFileRef
 
   // Is the editor empty (no text and no chips)?
-  const isEmptyRef = useRef(true)
+  const [isEmpty, setIsEmpty] = useState(true)
 
   // Detect @ mention in contenteditable
   useEffect(() => {
@@ -198,15 +295,28 @@ export function ChatInput() {
       // Also check for slash commands
       const sel = window.getSelection()
       if (sel && sel.rangeCount) {
-        const r = sel.getRangeAt(0).cloneRange()
-        r.setStart(ed, 0)
-        const txt = r.toString()
-        const lastNl = txt.lastIndexOf('\n')
-        const line = txt.slice(lastNl + 1)
-        if (line.startsWith('/') && !line.includes(' ')) {
+        const toCursor = getEditorPlainText(ed, sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset)
+        const lastNl = toCursor.lastIndexOf('\n')
+        const line = toCursor.slice(lastNl + 1)
+        // Find the last '/' in the current line that's at a word boundary (start of line, or after a space)
+        let slashPos = -1
+        for (let i = line.length - 1; i >= 0; i--) {
+          if (line[i] === '/' && (i === 0 || line[i - 1] === ' ')) {
+            slashPos = i
+            break
+          }
+        }
+        const filter = slashPos >= 0 ? line.slice(slashPos + 1) : ''
+        if (slashPos >= 0 && !filter.includes(' ')) {
           setShowCommands(true)
-          setCommandFilter(line)
+          setCommandFilter('/' + filter)
           setSelectedCmdIdx(0)
+          // Fetch skills on first open
+          if (installedSkills.length === 0) {
+            fetchInstalledSkills().then(data => {
+              setInstalledSkills(data.installed || [])
+            }).catch(() => { })
+          }
         } else {
           setShowCommands(false)
         }
@@ -226,14 +336,9 @@ export function ChatInput() {
   const updateEmptyState = useCallback(() => {
     const ed = editableRef.current
     if (!ed) return
-    const { text, files } = readEditor(ed)
-    isEmptyRef.current = text.trim() === '' && files.length === 0
-    // Toggle placeholder class
-    if (isEmptyRef.current) {
-      ed.classList.add('is-empty')
-    } else {
-      ed.classList.remove('is-empty')
-    }
+    const { text, files, skills } = readEditor(ed)
+    const empty = text.trim() === '' && files.length === 0 && skills.length === 0
+    setIsEmpty(empty)
   }, [])
 
   const filteredFiles = workspaceFiles.filter((f) => {
@@ -245,6 +350,22 @@ export function ChatInput() {
   const filteredCommands = SLASH_COMMANDS.filter(
     (c) => c.command.startsWith(commandFilter) || c.label.includes(commandFilter.replace('/', ''))
   )
+
+  const filteredSkills = installedSkills.filter(
+    (s) => {
+      const kw = commandFilter.replace('/', '').toLowerCase()
+      return !kw || s.skill_name.toLowerCase().includes(kw) || s.description.toLowerCase().includes(kw)
+    }
+  )
+
+  type SlashItem =
+    | { kind: 'command'; cmd: SlashCommand }
+    | { kind: 'skill'; skill: InstalledSkill }
+
+  const slashItems: SlashItem[] = [
+    ...filteredSkills.map(s => ({ kind: 'skill' as const, skill: s })),
+    ...filteredCommands.map(c => ({ kind: 'command' as const, cmd: c })),
+  ]
 
   // Insert file chip at @ position
   const insertFileRef = useCallback((filePath: string) => {
@@ -295,7 +416,7 @@ export function ChatInput() {
           charCount += len
         } else if (node.nodeType === Node.ELEMENT_NODE) {
           const el = node as HTMLElement
-          if (el.hasAttribute('data-file')) return null
+          if (el.hasAttribute('data-file') || el.hasAttribute('data-skill-id')) return null
           if (el.tagName === 'BR') charCount += 1
           else for (const c of Array.from(node.childNodes)) {
             const result = findPos(c, targetPos)
@@ -360,31 +481,12 @@ export function ChatInput() {
 
     const sel = window.getSelection()
     if (!sel || !sel.rangeCount) return
-    const range = sel.getRangeAt(0).cloneRange()
-    range.setStart(ed, 0)
-    const textBefore = range.toString()
-    const lastNl = textBefore.lastIndexOf('\n')
 
-    // Delete from @searchterm through cursor, insert command text
     const currentRange = sel.getRangeAt(0)
-    let charIdx = 0
-    function findNodeOffset(node: Node, target: number): { node: Node; offset: number } | null {
-      if (node.nodeType === Node.TEXT_NODE) {
-        const len = (node.textContent || '').length
-        if (charIdx + len >= target) return { node, offset: target - charIdx }
-        charIdx += len
-      } else if (node.nodeType === Node.ELEMENT_NODE) {
-        const el = node as HTMLElement
-        if (el.hasAttribute('data-file')) return null
-        if (el.tagName === 'BR') charIdx += 1
-        else for (const c of Array.from(node.childNodes)) {
-          const r = findNodeOffset(c, target)
-          if (r) return r
-        }
-      }
-      return null
-    }
-    const start = findNodeOffset(ed, lastNl + 1)
+    const slashPlainPos = findSlashPosInEditor(ed, currentRange.endContainer, currentRange.endOffset)
+    if (slashPlainPos < 0) return
+
+    const start = findPlainTextOffset(ed, slashPlainPos)
     if (!start) return
 
     const newRange = document.createRange()
@@ -393,6 +495,45 @@ export function ChatInput() {
     newRange.deleteContents()
     newRange.insertNode(document.createTextNode(cmd.command + ' '))
     newRange.collapse(false)
+    sel.removeAllRanges()
+    sel.addRange(newRange)
+
+    setShowCommands(false)
+    updateEmptyState()
+  }, [updateEmptyState])
+
+  const insertSkill = useCallback((skill: InstalledSkill) => {
+    const ed = editableRef.current
+    if (!ed) return
+    ed.focus()
+
+    const sel = window.getSelection()
+    if (!sel || !sel.rangeCount) return
+
+    const currentRange = sel.getRangeAt(0)
+    const slashPlainPos = findSlashPosInEditor(ed, currentRange.endContainer, currentRange.endOffset)
+    if (slashPlainPos < 0) return
+
+    const start = findPlainTextOffset(ed, slashPlainPos)
+    if (!start) return
+
+    const newRange = document.createRange()
+    newRange.setStart(start.node, start.offset)
+    newRange.setEnd(currentRange.endContainer, currentRange.endOffset)
+    newRange.deleteContents()
+
+    // Insert skill chip
+    const chip = createSkillChipDOM(skill.skill_id, skill.skill_name, skill.icon, (el) => {
+      el.remove()
+      updateEmptyState()
+    })
+    newRange.insertNode(chip)
+    // Insert a space text node after chip
+    const spaceNode = document.createTextNode(' ')
+    newRange.setStartAfter(chip)
+    newRange.insertNode(spaceNode)
+    newRange.setStartAfter(spaceNode)
+    newRange.collapse(true)
     sel.removeAllRanges()
     sel.addRange(newRange)
 
@@ -418,11 +559,15 @@ export function ChatInput() {
       }
 
       if (showCommands) {
-        if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedCmdIdx(p => Math.min(p + 1, filteredCommands.length - 1)); return }
+        if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedCmdIdx(p => Math.min(p + 1, slashItems.length - 1)); return }
         if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedCmdIdx(p => Math.max(p - 1, 0)); return }
         if (e.key === 'Enter' || e.key === 'Tab') {
           e.preventDefault()
-          if (filteredCommands[selectedCmdIdx]) insertCommand(filteredCommands[selectedCmdIdx])
+          const item = slashItems[selectedCmdIdx]
+          if (item) {
+            if (item.kind === 'command') insertCommand(item.cmd)
+            else insertSkill(item.skill)
+          }
           return
         }
         if (e.key === 'Escape') { e.preventDefault(); setShowCommands(false); return }
@@ -433,22 +578,26 @@ export function ChatInput() {
         handleSend()
       }
     },
-    [showFilePicker, showCommands, filteredFiles, filteredCommands, selectedFileIdx, selectedCmdIdx, insertFileRef, insertCommand]
+    [showFilePicker, showCommands, filteredFiles, slashItems, selectedFileIdx, selectedCmdIdx, insertFileRef, insertCommand, insertSkill]
   )
 
   const handleSend = useCallback(() => {
     const ed = editableRef.current
     if (!ed) return
-    const { text, files } = readEditor(ed)
+    const { text, files, skills } = readEditor(ed)
     const trimmed = text.trim()
-    if (!trimmed) return
+    if (!trimmed && files.length === 0 && skills.length === 0) return
     if (!settings.workspacePath) {
       alert('请先选择工作空间（workspace）目录')
       return
     }
-    sendMessage(trimmed, files.length > 0 ? files : undefined)
+    sendMessage(
+      trimmed || ' ',
+      files.length > 0 ? files : undefined,
+      skills.length > 0 ? skills : undefined
+    )
     ed.innerHTML = ''
-    isEmptyRef.current = true
+    setIsEmpty(true)
     updateEmptyState()
   }, [isProcessing, settings.workspacePath, sendMessage, updateEmptyState])
 
@@ -499,28 +648,60 @@ export function ChatInput() {
       )}
 
       {/* Slash command popup */}
-      {showCommands && filteredCommands.length > 0 && (
+      {showCommands && slashItems.length > 0 && (
         <div
           ref={cmdMenuRef}
-          className="max-w-[740px] w-full mx-auto bg-white border border-[#e2e8f0] rounded-[10px] shadow-lg overflow-hidden animate-[msgIn_0.15s_ease-out]"
+          className="max-w-[740px] w-full mx-auto bg-white border border-[#e2e8f0] rounded-[10px] shadow-lg overflow-hidden animate-[msgIn_0.15s_ease-out] max-h-[400px] overflow-y-auto"
         >
-          {filteredCommands.map((cmd, idx) => (
-            <button
-              key={cmd.command}
-              onMouseDown={(e) => { e.preventDefault(); insertCommand(cmd) }}
-              onMouseEnter={() => setSelectedCmdIdx(idx)}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left border-none bg-transparent cursor-pointer transition-colors ${idx === selectedCmdIdx ? 'bg-[#f0fdf4]' : 'hover:bg-[#f8fafc]'
-                } ${idx !== 0 ? 'border-t border-[#f1f5f9]' : ''}`}
-            >
-              <span className="text-[13px] font-semibold text-[#047857] w-[70px] flex-shrink-0">
-                {cmd.command}
-              </span>
-              <span className="text-[13px] text-[#0f172a] font-medium">{cmd.label}</span>
-              <span className="text-[12px] text-[#94a3b8] ml-auto hidden sm:block">
-                {cmd.description}
-              </span>
-            </button>
-          ))}
+          {(() => {
+            let lastKind: string | null = null
+            return slashItems.map((item, idx) => {
+              const sectionLabel = item.kind === 'skill' ? 'Skills' : 'Commands'
+              const showLabel = item.kind !== lastKind
+              lastKind = item.kind
+              return (
+                <div key={item.kind === 'command' ? 'cmd-' + item.cmd.command : 'skill-' + item.skill.skill_id}>
+                  {showLabel && (
+                    <div className="text-[10px] font-semibold text-[#94a3b8] uppercase tracking-wider px-4 pt-2.5 pb-1">
+                      {sectionLabel}
+                    </div>
+                  )}
+                  <button
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      if (item.kind === 'command') insertCommand(item.cmd)
+                      else insertSkill(item.skill)
+                    }}
+                    onMouseEnter={() => setSelectedCmdIdx(idx)}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left border-none bg-transparent cursor-pointer transition-colors ${idx === selectedCmdIdx ? 'bg-[#f0fdf4]' : 'hover:bg-[#f8fafc]'
+                      }`}
+                  >
+                    {item.kind === 'command' ? (
+                      <>
+                        <span className="text-[13px] font-semibold text-[#047857] w-[70px] flex-shrink-0">
+                          {item.cmd.command}
+                        </span>
+                        <span className="text-[13px] text-[#0f172a] font-medium">{item.cmd.label}</span>
+                        <span className="text-[12px] text-[#94a3b8] ml-auto hidden sm:block">
+                          {item.cmd.description}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="w-[16px] h-[16px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-[12px]">
+                          {'⚡'}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[13px] text-[#0f172a] font-medium">{item.skill.skill_name}</span>
+                          <span className="text-[12px] text-[#94a3b8] ml-2 hidden sm:inline">{item.skill.description}</span>
+                        </div>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )
+            })
+          })()}
         </div>
       )}
 
@@ -564,34 +745,43 @@ export function ChatInput() {
         style={{ borderColor: 'rgba(0,0,0,.1)' }}
       >
         <div className="flex items-end gap-2">
-          <div
-            ref={editableRef}
-            contentEditable={true}
-            suppressContentEditableWarning
-            onInput={updateEmptyState}
-            onKeyDown={handleKeyDown}
-            onPaste={(e) => {
-              e.preventDefault()
-              const text = e.clipboardData.getData('text/plain')
-              const sel = window.getSelection()
-              if (sel && sel.rangeCount) {
-                sel.getRangeAt(0).deleteContents()
-                sel.getRangeAt(0).insertNode(document.createTextNode(text))
-                sel.getRangeAt(0).collapse(false)
-              }
-            }}
-            className={`flex-1 border-none bg-transparent outline-none text-[15px] text-[#0f172a] leading-relaxed min-h-[44px] max-h-[200px] overflow-y-auto py-1 whitespace-pre-wrap break-words ${isEmptyRef.current ? 'is-empty' : ''}`}
-            data-placeholder="输入任务，@引用文件， /调用技能与指令"
-            style={{ wordBreak: 'break-word' }}
-            role="textbox"
-            aria-multiline="true"
-          />
+          <div className="relative flex-1">
+            <div
+              ref={editableRef}
+              contentEditable={true}
+              suppressContentEditableWarning
+              onInput={updateEmptyState}
+              onKeyDown={handleKeyDown}
+              onPaste={(e) => {
+                e.preventDefault()
+                const text = e.clipboardData.getData('text/plain')
+                const sel = window.getSelection()
+                if (sel && sel.rangeCount) {
+                  sel.getRangeAt(0).deleteContents()
+                  sel.getRangeAt(0).insertNode(document.createTextNode(text))
+                  sel.getRangeAt(0).collapse(false)
+                }
+              }}
+              className="border-none bg-transparent outline-none text-[15px] text-[#0f172a] leading-relaxed min-h-[44px] max-h-[200px] overflow-y-auto py-1 whitespace-pre-wrap break-words"
+              style={{ wordBreak: 'break-word' }}
+              role="textbox"
+              aria-multiline="true"
+            />
+            {isEmpty && (
+              <div
+                className="absolute top-0 left-0 text-[15px] text-[#94a3b8] leading-relaxed py-1 pointer-events-none select-none whitespace-nowrap"
+                aria-hidden="true"
+              >
+                输入任务，@引用文件， /调用技能与指令
+              </div>
+            )}
+          </div>
           <button
             onClick={handleSend}
             className="flex-shrink-0 w-[32px] h-[32px] rounded-full flex items-center justify-center border-none cursor-pointer transition-all"
             style={{
-              backgroundColor: isEmptyRef.current ? '#f1f5f9' : '#a7f3d0',
-              color: isEmptyRef.current ? '#94a3b8' : '#047857',
+              backgroundColor: isEmpty ? '#f1f5f9' : '#a7f3d0',
+              color: isEmpty ? '#94a3b8' : '#047857',
               opacity: 1,
             }}
           >
@@ -700,13 +890,6 @@ export function ChatInput() {
         </span>
       </div>
 
-      <style>{`
-        .is-empty:before {
-          content: attr(data-placeholder);
-          color: #94a3b8;
-          pointer-events: none;
-        }
-      `}</style>
     </div>
   )
 }

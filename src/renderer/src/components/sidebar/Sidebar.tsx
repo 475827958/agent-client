@@ -5,10 +5,11 @@ type ConfigPage = 'skills' | 'mcp' | 'memory'
 
 interface Props {
   onOpenConfig: (page: ConfigPage) => void
+  onCloseConfig: () => void
   activeConfig: ConfigPage | null
 }
 
-export function Sidebar({ onOpenConfig, activeConfig }: Props) {
+export function Sidebar({ onOpenConfig, onCloseConfig, activeConfig }: Props) {
   const tasks = useTaskStore((s) => s.tasks)
   const currentId = useTaskStore((s) => s.currentTaskId)
   const create = useTaskStore((s) => s.create)
@@ -30,7 +31,7 @@ export function Sidebar({ onOpenConfig, activeConfig }: Props) {
 
       {/* New Task */}
       <button
-        onClick={() => create()}
+        onClick={() => { onCloseConfig(); create() }}
         className="flex items-center justify-center gap-2.5 py-2.5 mb-1 rounded-md bg-[#0f172a] text-white text-[13px] font-medium hover:bg-[#334155] transition-colors w-full"
       >
         <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

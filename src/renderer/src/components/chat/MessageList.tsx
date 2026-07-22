@@ -10,6 +10,7 @@ interface Props {
 export function MessageList({ scrollContainerRef }: Props) {
   const task = useTaskStore((s) => s.getCurrentTask())
   const bottomRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
   const isAtBottomRef = useRef(true)
   const prevMsgCountRef = useRef(task?.messages.length ?? 0)
   const prevSegCountRef = useRef(0)
@@ -32,10 +33,11 @@ export function MessageList({ scrollContainerRef }: Props) {
     return () => el.removeEventListener('scroll', handleScroll)
   }, [scrollContainerRef, handleScroll])
 
-  // Auto-scroll to bottom on every content change while user is at the bottom
-  // Uses ResizeObserver for efficient detection of content growth
+  // Auto-scroll when content grows (text, thinking, segments, tools — any height change)
+  // Observes the content wrapper (whose height grows with content), NOT the scroll
+  // container (which has a fixed height set by flex-1, so ResizeObserver won't fire).
   useEffect(() => {
-    const el = scrollContainerRef.current
+    const el = contentRef.current
     if (!el) return
 
     const ro = new ResizeObserver(() => {
@@ -45,7 +47,7 @@ export function MessageList({ scrollContainerRef }: Props) {
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [scrollContainerRef])
+  }, [])
 
   // When a new message is added, force-scroll to bottom regardless of position
   useEffect(() => {
@@ -116,7 +118,7 @@ export function MessageList({ scrollContainerRef }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div ref={contentRef} className="flex flex-col gap-5">
       {task.messages.map((msg, idx) => (
         <MessageItem key={msg.id} message={msg} msgIndex={idx} />
       ))}

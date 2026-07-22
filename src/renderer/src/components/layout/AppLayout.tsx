@@ -37,6 +37,7 @@ export function AppLayout() {
     <div className="flex h-screen w-screen overflow-hidden bg-[#e2e8f0]">
       <Sidebar
         onOpenConfig={(page) => setConfigPage(configPage === page ? null : page)}
+        onCloseConfig={() => setConfigPage(null)}
         activeConfig={configPage}
       />
 

@@ -79,6 +79,8 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
 
   // Skills actions
   loadSkillHub: async () => {
+    const s = get()
+    if (s.hubSkillsLoading) return
     set({ hubSkillsLoading: true, hubSkillsError: null })
     try {
       const data = await fetchSkillHub()
@@ -89,6 +91,8 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   },
 
   loadInstalledSkills: async () => {
+    const s = get()
+    if (s.installedSkillsLoading) return
     set({ installedSkillsLoading: true, installedSkillsError: null })
     try {
       const data = await fetchInstalledSkills()
@@ -99,6 +103,8 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   },
 
   loadCustomSkills: async () => {
+    const s = get()
+    if (s.customSkillsLoading) return
     set({ customSkillsLoading: true, customSkillsError: null })
     try {
       const data = await fetchCustomSkillsApi()
@@ -152,6 +158,8 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
 
   // MCP actions
   loadMcpHub: async () => {
+    const s = get()
+    if (s.mcpHubLoading) return
     set({ mcpHubLoading: true, mcpHubError: null })
     try {
       const data = await fetchMcpHub()
@@ -162,6 +170,8 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   },
 
   loadInstalledMcps: async () => {
+    const s = get()
+    if (s.installedLoading) return
     set({ installedLoading: true, installedError: null })
     try {
       const data = await fetchMcpInstalled()
@@ -172,6 +182,8 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   },
 
   loadCustomMcps: async () => {
+    const s = get()
+    if (s.customLoading) return
     set({ customLoading: true, customError: null })
     try {
       const data = await fetchMcpCustom()

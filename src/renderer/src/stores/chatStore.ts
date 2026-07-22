@@ -456,7 +456,7 @@ interface ChatState {
   isProcessing: boolean
   currentEditingPlanMsgIdx: number | null
 
-  sendMessage: (text: string, files?: string[]) => Promise<void>
+  sendMessage: (text: string, files?: string[], skillInvocations?: { skill_id: string; skill_name: string }[]) => Promise<void>
   reconnect: () => void
   confirmTool: () => void
   skipTool: () => void
@@ -476,7 +476,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isProcessing: false,
   currentEditingPlanMsgIdx: null,
 
-  sendMessage: async (text: string, files?: string[]) => {
+  sendMessage: async (text: string, files?: string[], skillInvocations?: { skill_id: string; skill_name: string }[]) => {
     if (!text) return
 
     if (get().isProcessing) {
@@ -514,6 +514,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       id: genMsgId(),
       role: 'user',
       content: text,
+      files,
+      skillInvocations: skillInvocations && skillInvocations.length > 0 ? skillInvocations : undefined,
       timestamp: Date.now()
     }
     taskStore.addMessage(userMsg)
@@ -546,6 +548,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       workspace: settings.workspacePath,
       model: settings.model,
       files: files,
+      skillInvocations: skillInvocations && skillInvocations.length > 0 ? skillInvocations : undefined,
       onEvent: handleEvent,
       onError: (err) => {
         taskStore.updateLastAssistantMessage((m) => ({

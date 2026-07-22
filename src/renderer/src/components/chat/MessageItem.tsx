@@ -32,6 +32,31 @@ export function MessageItem({ message, msgIndex }: Props) {
         <div className="w-[30px] h-[30px] rounded-md bg-[#f0fdf4] text-[#047857] flex items-center justify-center text-[13px] font-semibold flex-shrink-0">Z</div>
         <div className="bg-[#ecfdf5] text-[#064e3b] rounded-[14px_14px_4px_14px] py-3 px-4 text-sm leading-relaxed">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+          {message.files && message.files.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-[#d1fae5]">
+              {message.files.map((f, i) => (
+                <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/60 text-[11px] text-[#047857] font-medium">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 2h6l4 4v8a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" />
+                    <path d="M9 2v4h4" />
+                  </svg>
+                  {f.split(/[/\\]/).pop()}
+                </span>
+              ))}
+            </div>
+          )}
+          {message.skillInvocations && message.skillInvocations.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-[#d1fae5]">
+              {message.skillInvocations.map((s, i) => (
+                <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/60 text-[11px] text-[#047857] font-medium">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M13 2l-8 8-3-3" />
+                  </svg>
+                  {s.skill_name}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     )

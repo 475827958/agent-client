@@ -38,6 +38,8 @@ export interface Message {
   role: 'user' | 'assistant'
   content: string
   thinking?: string
+  files?: string[]
+  skillInvocations?: { skill_id: string; skill_name: string }[]
   tools?: ToolCall[]
   processCollapsed?: boolean
   segments?: MessageSegment[]
