@@ -23,8 +23,8 @@ export function Sidebar({ onOpenConfig, onCloseConfig, activeConfig }: Props) {
       {/* Brand */}
       <div className="flex items-center gap-2.5 px-2.5 pb-6 text-lg font-bold text-[#0f172a] tracking-[-0.4px]">
         <svg width="30" height="30" viewBox="0 0 30 30" fill="none" className="flex-shrink-0">
-          <rect width="30" height="30" rx="8" fill="#a7f3d0"/>
-          <path d="M7 15L13 21L23 9" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          <rect width="30" height="30" rx="8" fill="#a7f3d0" />
+          <path d="M7 15L13 21L23 9" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         iWork
       </div>
@@ -35,7 +35,7 @@ export function Sidebar({ onOpenConfig, onCloseConfig, activeConfig }: Props) {
         className="flex items-center justify-center gap-2.5 py-2.5 mb-1 rounded-md bg-[#0f172a] text-white text-[13px] font-medium hover:bg-[#334155] transition-colors w-full"
       >
         <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <path d="M8 3v10M3 8h10"/>
+          <path d="M8 3v10M3 8h10" />
         </svg>
         新建任务
       </button>
@@ -45,19 +45,19 @@ export function Sidebar({ onOpenConfig, onCloseConfig, activeConfig }: Props) {
         配置
       </div>
       <SidebarBtn
-        icon={<svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1.5" y="1.5" width="5" height="5" rx="1"/><rect x="9.5" y="1.5" width="5" height="5" rx="1"/><rect x="1.5" y="9.5" width="5" height="5" rx="1"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/></svg>}
+        icon={<svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1.5" y="1.5" width="5" height="5" rx="1" /><rect x="9.5" y="1.5" width="5" height="5" rx="1" /><rect x="1.5" y="9.5" width="5" height="5" rx="1" /><rect x="9.5" y="9.5" width="5" height="5" rx="1" /></svg>}
         label="Skills 配置"
         active={activeConfig === 'skills'}
         onClick={() => onOpenConfig('skills')}
       />
       <SidebarBtn
-        icon={<svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="5" r="2"/><circle cx="11" cy="11" r="2"/><line x1="6.3" y1="6.3" x2="9.7" y2="9.7"/><line x1="5" y1="13" x2="5" y2="7"/><line x1="11" y1="9" x2="11" y2="3"/></svg>}
+        icon={<svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="5" r="2" /><circle cx="11" cy="11" r="2" /><line x1="6.3" y1="6.3" x2="9.7" y2="9.7" /><line x1="5" y1="13" x2="5" y2="7" /><line x1="11" y1="9" x2="11" y2="3" /></svg>}
         label="MCP 配置"
         active={activeConfig === 'mcp'}
         onClick={() => onOpenConfig('mcp')}
       />
       <SidebarBtn
-        icon={<svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 6v3M8 11v.01"/></svg>}
+        icon={<svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8" r="6" /><path d="M8 6v3M8 11v.01" /></svg>}
         label="记忆配置"
         active={activeConfig === 'memory'}
         onClick={() => onOpenConfig('memory')}
@@ -65,14 +65,14 @@ export function Sidebar({ onOpenConfig, onCloseConfig, activeConfig }: Props) {
 
       {/* Placeholder buttons */}
       <SidebarBtn
-        icon={<svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="5" r="2"/><circle cx="11" cy="6" r="2"/><circle cx="4" cy="11" r="2"/><circle cx="10" cy="11" r="2"/></svg>}
+        icon={<svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="5" r="2" /><circle cx="11" cy="6" r="2" /><circle cx="4" cy="11" r="2" /><circle cx="10" cy="11" r="2" /></svg>}
         label="专家和专家团"
-        onClick={() => {}}
+        onClick={() => { }}
       />
       <SidebarBtn
-        icon={<svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8" r="2"/><path d="M2 8a6 6 0 0112 0"/><path d="M5 3a6 6 0 015 10"/></svg>}
+        icon={<svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8" r="2" /><path d="M2 8a6 6 0 0112 0" /><path d="M5 3a6 6 0 015 10" /></svg>}
         label="自动化"
-        onClick={() => {}}
+        onClick={() => { }}
       />
 
       {/* Task List */}
@@ -83,7 +83,7 @@ export function Sidebar({ onOpenConfig, onCloseConfig, activeConfig }: Props) {
         {tasks.map((t) => (
           <div
             key={t.id}
-            onClick={() => select(t.id)}
+            onClick={() => { onCloseConfig(); select(t.id) }}
             onContextMenu={(e) => {
               e.preventDefault()
               const menu = document.getElementById('ctxMenu')
@@ -101,11 +101,11 @@ export function Sidebar({ onOpenConfig, onCloseConfig, activeConfig }: Props) {
               menu.querySelectorAll('.ctx-menu-item').forEach((el, i) => {
                 el.addEventListener('click', () => {
                   menu.classList.remove('show')
-                  ;[
-                    () => rename(t.id, prompt('重命名任务:', t.title) || t.title),
-                    () => duplicate(t.id),
-                    () => del(t.id)
-                  ][i]()
+                    ;[
+                      () => rename(t.id, prompt('重命名任务:', t.title) || t.title),
+                      () => duplicate(t.id),
+                      () => del(t.id)
+                    ][i]()
                 })
               })
               const closeCtx = (ev: MouseEvent) => {
@@ -116,11 +116,10 @@ export function Sidebar({ onOpenConfig, onCloseConfig, activeConfig }: Props) {
               }
               setTimeout(() => document.addEventListener('click', closeCtx), 10)
             }}
-            className={`task-item py-2 px-2.5 rounded-md text-[13px] cursor-pointer flex items-center gap-2 transition-colors ${
-              t.id === currentId
-                ? 'bg-[rgba(167,243,208,0.4)] text-[#047857] font-medium'
-                : 'text-sidebar-text hover:bg-sidebar-hover'
-            }`}
+            className={`task-item py-2 px-2.5 rounded-md text-[13px] cursor-pointer flex items-center gap-2 transition-colors ${t.id === currentId
+              ? 'bg-[rgba(167,243,208,0.4)] text-[#047857] font-medium'
+              : 'text-sidebar-text hover:bg-sidebar-hover'
+              }`}
           >
             <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{t.title}</span>
             <span className="text-[11px] text-sidebar-text-dim flex-shrink-0">{t.time}</span>
@@ -131,7 +130,7 @@ export function Sidebar({ onOpenConfig, onCloseConfig, activeConfig }: Props) {
       {/* User Footer */}
       <div className="border-t border-sidebar-divider pt-3 mt-1 flex items-center gap-2.5 text-xs text-sidebar-text-dim">
         <div className="w-[26px] h-[26px] rounded-full bg-[#a7f3d0] flex items-center justify-center flex-shrink-0 text-[#047857] text-xs font-semibold">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="5" r="3" /><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6" /></svg>
         </div>
         <span>ZLL</span>
       </div>
@@ -143,11 +142,10 @@ function SidebarBtn({ icon, label, active, onClick }: { icon: React.ReactNode; l
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2.5 py-[9px] px-2.5 rounded-md cursor-pointer text-[13px] transition-colors w-full text-left border-none bg-none font-sans tracking-[-0.1px] ${
-        active
-          ? 'bg-[rgba(167,243,208,0.4)] text-[#047857] font-medium'
-          : 'text-sidebar-text hover:bg-sidebar-hover hover:text-[#0f172a]'
-      }`}
+      className={`flex items-center gap-2.5 py-[9px] px-2.5 rounded-md cursor-pointer text-[13px] transition-colors w-full text-left border-none bg-none font-sans tracking-[-0.1px] ${active
+        ? 'bg-[rgba(167,243,208,0.4)] text-[#047857] font-medium'
+        : 'text-sidebar-text hover:bg-sidebar-hover hover:text-[#0f172a]'
+        }`}
     >
       {icon}
       {label}
