@@ -1,26 +1,24 @@
 import { create } from 'zustand'
-import type { HubSkill, CustomSkill, McpHubServer, McpInstalledServer, CustomMcpServer, CreateCustomMcpRequest } from '../types'
+import type { HubSkill, InstalledSkill, CustomSkillDef, CreateCustomSkillRequest, McpHubServer, McpInstalledServer, CustomMcpServer, CreateCustomMcpRequest } from '../types'
 import {
   fetchMcpHub, fetchMcpInstalled, fetchMcpCustom,
-  installMcpApi, uninstallMcpApi, createCustomMcpApi, deleteCustomMcpApi
+  installMcpApi, uninstallMcpApi, createCustomMcpApi, deleteCustomMcpApi,
+  fetchSkillHub, fetchInstalledSkills, fetchCustomSkillsApi,
+  installSkillApi, uninstallSkillApi, enableSkillApi, disableSkillApi,
+  createCustomSkillApi, deleteCustomSkillApi
 } from '../services/api'
 
-const HUB_SKILLS: HubSkill[] = [
-  { id: 'h1', name: 'GitHub 集成', desc: '管理 Issues、PR、仓库操作', icon: '🐙', category: '开发' },
-  { id: 'h2', name: 'Slack 通知', desc: '发送消息、管理频道通知', icon: '💬', category: '协作' },
-  { id: 'h3', name: 'PDF 解析器', desc: '解析和提取 PDF 内容', icon: '📕', category: '文档' },
-  { id: 'h4', name: '图片生成', desc: '通过 AI 生成和编辑图片', icon: '🎨', category: '创作' },
-  { id: 'h5', name: '邮件助手', desc: '自动读取、分类和回复邮件', icon: '📧', category: '办公' },
-  { id: 'h6', name: '数据可视化', desc: '生成图表和数据分析报告', icon: '📊', category: '数据' },
-  { id: 'h7', name: 'API 测试', desc: 'REST API 自动化测试工具', icon: '🧪', category: '开发' },
-  { id: 'h8', name: '翻译助手', desc: '多语言实时翻译', icon: '🌍', category: '办公' }
-]
-
 interface ConfigState {
-  // Skills (hardcoded for now)
+  // Skills — API-backed
   hubSkills: HubSkill[]
-  installedSkillIds: string[]
-  customSkills: CustomSkill[]
+  hubSkillsLoading: boolean
+  hubSkillsError: string | null
+  installedSkills: InstalledSkill[]
+  installedSkillsLoading: boolean
+  installedSkillsError: string | null
+  customSkills: CustomSkillDef[]
+  customSkillsLoading: boolean
+  customSkillsError: string | null
 
   // MCP — API-backed
   mcpHub: McpHubServer[]
@@ -34,10 +32,16 @@ interface ConfigState {
   customError: string | null
 
   // Skills actions
-  installSkill: (id: string) => void
-  uninstallSkill: (id: string) => void
-  addCustomSkill: (skill: CustomSkill) => void
-  deleteCustomSkill: (id: string) => void
+  loadSkillHub: () => Promise<void>
+  loadInstalledSkills: () => Promise<void>
+  loadCustomSkills: () => Promise<void>
+  loadAllSkills: () => Promise<void>
+  installSkill: (skillId: string) => Promise<void>
+  uninstallSkill: (skillId: string) => Promise<void>
+  enableSkill: (skillId: string) => Promise<void>
+  disableSkill: (skillId: string) => Promise<void>
+  createCustomSkill: (req: CreateCustomSkillRequest) => Promise<void>
+  deleteCustomSkill: (skillId: string) => Promise<void>
 
   // MCP actions
   loadMcpHub: () => Promise<void>
@@ -51,12 +55,16 @@ interface ConfigState {
 }
 
 export const useConfigStore = create<ConfigState>((set, get) => ({
-  hubSkills: HUB_SKILLS,
-  installedSkillIds: ['h1', 'h3', 'h8'],
-  customSkills: [
-    { id: 'c1', name: '自定义日志分析', desc: '解析应用日志并生成报告', icon: '📋', source: 'create', time: '1周前' },
-    { id: 'c2', name: '数据库备份脚本', desc: '定时备份 PostgreSQL 数据库', icon: '💾', source: 'upload', fileName: 'db-backup.skill', time: '2周前' }
-  ],
+  // Skills — API-backed
+  hubSkills: [],
+  hubSkillsLoading: false,
+  hubSkillsError: null,
+  installedSkills: [],
+  installedSkillsLoading: false,
+  installedSkillsError: null,
+  customSkills: [],
+  customSkillsLoading: false,
+  customSkillsError: null,
 
   // MCP — API-backed
   mcpHub: [],
@@ -70,21 +78,77 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   customError: null,
 
   // Skills actions
-  installSkill: (id) =>
-    set((s) => ({
-      installedSkillIds: s.installedSkillIds.includes(id) ? s.installedSkillIds : [...s.installedSkillIds, id]
-    })),
+  loadSkillHub: async () => {
+    set({ hubSkillsLoading: true, hubSkillsError: null })
+    try {
+      const data = await fetchSkillHub()
+      set({ hubSkills: data.skills, hubSkillsLoading: false })
+    } catch (err: any) {
+      set({ hubSkillsError: err.message || '加载 Skill Hub 失败', hubSkillsLoading: false })
+    }
+  },
 
-  uninstallSkill: (id) =>
-    set((s) => ({
-      installedSkillIds: s.installedSkillIds.filter((x) => x !== id)
-    })),
+  loadInstalledSkills: async () => {
+    set({ installedSkillsLoading: true, installedSkillsError: null })
+    try {
+      const data = await fetchInstalledSkills()
+      set({ installedSkills: data.installed, installedSkillsLoading: false })
+    } catch (err: any) {
+      set({ installedSkillsError: err.message || '加载已安装 Skill 失败', installedSkillsLoading: false })
+    }
+  },
 
-  addCustomSkill: (skill) =>
-    set((s) => ({ customSkills: [skill, ...s.customSkills] })),
+  loadCustomSkills: async () => {
+    set({ customSkillsLoading: true, customSkillsError: null })
+    try {
+      const data = await fetchCustomSkillsApi()
+      set({ customSkills: data.custom, customSkillsLoading: false })
+    } catch (err: any) {
+      set({ customSkillsError: err.message || '加载自定义 Skill 失败', customSkillsLoading: false })
+    }
+  },
 
-  deleteCustomSkill: (id) =>
-    set((s) => ({ customSkills: s.customSkills.filter((x) => x.id !== id) })),
+  loadAllSkills: async () => {
+    await Promise.all([get().loadSkillHub(), get().loadInstalledSkills(), get().loadCustomSkills()])
+  },
+
+  installSkill: async (skillId) => {
+    try {
+      await installSkillApi(skillId)
+      await get().loadInstalledSkills()
+    } catch (err: any) {
+      throw err
+    }
+  },
+
+  uninstallSkill: async (skillId) => {
+    try {
+      await uninstallSkillApi(skillId)
+      await get().loadInstalledSkills()
+    } catch (err: any) {
+      throw err
+    }
+  },
+
+  enableSkill: async (skillId) => {
+    await enableSkillApi(skillId)
+    await get().loadInstalledSkills()
+  },
+
+  disableSkill: async (skillId) => {
+    await disableSkillApi(skillId)
+    await get().loadInstalledSkills()
+  },
+
+  createCustomSkill: async (req) => {
+    await createCustomSkillApi(req)
+    await Promise.all([get().loadCustomSkills(), get().loadInstalledSkills()])
+  },
+
+  deleteCustomSkill: async (skillId) => {
+    await deleteCustomSkillApi(skillId)
+    await Promise.all([get().loadCustomSkills(), get().loadInstalledSkills()])
+  },
 
   // MCP actions
   loadMcpHub: async () => {

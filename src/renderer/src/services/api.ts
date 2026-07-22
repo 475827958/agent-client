@@ -1,4 +1,4 @@
-import type { ServerEvent, AppMode, SceneMode, McpHubServer, McpInstalledServer, CustomMcpServer, CreateCustomMcpRequest } from '../types'
+import type { ServerEvent, AppMode, SceneMode, McpHubServer, McpInstalledServer, CustomMcpServer, CreateCustomMcpRequest, HubSkill, InstalledSkill, CustomSkillDef, CreateCustomSkillRequest } from '../types'
 import { useSettingsStore } from '../stores/settingsStore'
 import { parseNDJSONStream } from './ndjson'
 import { ipcClient } from './ipcClient'
@@ -323,6 +323,7 @@ export async function sendChatMessage(opts: ChatStreamOptions): Promise<void> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        "Accept": "application/json, text/event-stream",
         Authorization: settings.apiKey ? `Bearer ${settings.apiKey}` : ''
       },
       body: JSON.stringify({
@@ -609,6 +610,131 @@ export async function deleteCustomMcpApi(serverId: string): Promise<{ deleted: b
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: 'Delete custom MCP failed' }))
     throw new Error(err.detail || `MCP custom delete error: ${response.status}`)
+  }
+  return response.json()
+}
+
+// ===== Skill 管理 API (section 3.9) =====
+
+function getSkillUrl(path: string): string {
+  const settings = useSettingsStore.getState().settings
+  const baseUrl = settings.apiBaseUrl || DEFAULT_BASE_URL
+  return `${baseUrl}${path}`
+}
+
+// GET /skills/hub
+export async function fetchSkillHub(): Promise<{ skills: HubSkill[] }> {
+  const response = await fetch(getSkillUrl('/skills/hub'), { headers: getAuthHeaders() })
+  if (!response.ok) throw new Error(`Skill Hub fetch error: ${response.status}`)
+  return response.json()
+}
+
+// GET /skills/installed
+export async function fetchInstalledSkills(): Promise<{ installed: InstalledSkill[] }> {
+  const response = await fetch(getSkillUrl('/skills/installed'), { headers: getAuthHeaders() })
+  if (!response.ok) throw new Error(`Skill Installed fetch error: ${response.status}`)
+  return response.json()
+}
+
+// POST /skills/install
+export async function installSkillApi(skillId: string): Promise<{ installed: boolean; skill_id: string }> {
+  const response = await fetch(getSkillUrl('/skills/install'), {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ skill_id: skillId })
+  })
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Install failed' }))
+    throw new Error(err.detail || `Skill install error: ${response.status}`)
+  }
+  return response.json()
+}
+
+// DELETE /skills/uninstall/{skill_id}
+export async function uninstallSkillApi(skillId: string): Promise<{ uninstalled: boolean; skill_id: string }> {
+  const response = await fetch(getSkillUrl(`/skills/uninstall/${skillId}`), {
+    method: 'DELETE',
+    headers: getAuthHeaders()
+  })
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Uninstall failed' }))
+    throw new Error(err.detail || `Skill uninstall error: ${response.status}`)
+  }
+  return response.json()
+}
+
+// POST /skills/enable
+export async function enableSkillApi(skillId: string): Promise<{ enabled: boolean; skill_id: string }> {
+  const response = await fetch(getSkillUrl('/skills/enable'), {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ skill_id: skillId })
+  })
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Enable failed' }))
+    throw new Error(err.detail || `Skill enable error: ${response.status}`)
+  }
+  return response.json()
+}
+
+// POST /skills/disable
+export async function disableSkillApi(skillId: string): Promise<{ disabled: boolean; skill_id: string }> {
+  const response = await fetch(getSkillUrl('/skills/disable'), {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ skill_id: skillId })
+  })
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Disable failed' }))
+    throw new Error(err.detail || `Skill disable error: ${response.status}`)
+  }
+  return response.json()
+}
+
+// GET /skills/custom
+export async function fetchCustomSkillsApi(): Promise<{ custom: CustomSkillDef[] }> {
+  const response = await fetch(getSkillUrl('/skills/custom'), { headers: getAuthHeaders() })
+  if (!response.ok) throw new Error(`Custom Skills fetch error: ${response.status}`)
+  return response.json()
+}
+
+// POST /skills/custom
+export async function createCustomSkillApi(req: CreateCustomSkillRequest): Promise<CustomSkillDef> {
+  const response = await fetch(getSkillUrl('/skills/custom'), {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(req)
+  })
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Create custom skill failed' }))
+    throw new Error(err.detail || `Custom skill create error: ${response.status}`)
+  }
+  return response.json()
+}
+
+// PUT /skills/custom/{skill_id}
+export async function updateCustomSkillApi(skillId: string, req: Partial<CreateCustomSkillRequest>): Promise<{ updated: boolean; skill_id: string }> {
+  const response = await fetch(getSkillUrl(`/skills/custom/${skillId}`), {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(req)
+  })
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Update custom skill failed' }))
+    throw new Error(err.detail || `Custom skill update error: ${response.status}`)
+  }
+  return response.json()
+}
+
+// DELETE /skills/custom/{skill_id}
+export async function deleteCustomSkillApi(skillId: string): Promise<{ deleted: boolean; skill_id: string }> {
+  const response = await fetch(getSkillUrl(`/skills/custom/${skillId}`), {
+    method: 'DELETE',
+    headers: getAuthHeaders()
+  })
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Delete custom skill failed' }))
+    throw new Error(err.detail || `Custom skill delete error: ${response.status}`)
   }
   return response.json()
 }

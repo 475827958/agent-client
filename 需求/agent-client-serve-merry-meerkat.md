@@ -56,6 +56,27 @@
     - [2.8.4 与主对话流程的联通](#284-与主对话流程的联通)
   - [2.9 MCP 查询接口定义](#29-mcp-查询接口定义)
   - [2.10 与 Query Loop 引擎的集成点总结](#210-与-query-loop-引擎的集成点总结)
+- [3. Skill 集成](#3-skill-集成)
+  - [3.1 架构概览](#31-架构概览)
+  - [3.2 Skill 格式与结构](#32-skill-格式与结构)
+  - [3.3 Skill 生命周期](#33-skill-生命周期)
+  - [3.4 Skill 配置](#34-skill-配置)
+    - [3.4.1 配置文件格式](#341-配置文件格式)
+    - [3.4.2 配置层级：会话级 vs 消息级](#342-配置层级会话级-vs-消息级)
+  - [3.5 Skill 发现与注册](#35-skill-发现与注册)
+    - [3.5.1 启动加载流程](#351-启动加载流程)
+    - [3.5.2 Skill ID 命名规则](#352-skill-id-命名规则)
+    - [3.5.3 合并到 LLM 上下文](#353-合并到-llm-上下文)
+  - [3.6 Skill Prompt 注入](#36-skill-prompt-注入)
+  - [3.7 错误处理](#37-错误处理)
+  - [3.8 Skill 管理（Hub）](#38-skill-管理hub)
+    - [3.8.1 Hub 数据来源](#381-hub-数据来源)
+    - [3.8.2 安装 / 卸载流程](#382-安装--卸载流程)
+    - [3.8.3 启用 / 禁用](#383-启用--禁用)
+    - [3.8.4 自定义 Skill](#384-自定义-skill)
+    - [3.8.5 与主对话流程的联通](#385-与主对话流程的联通)
+  - [3.9 Skill 查询接口定义](#39-skill-查询接口定义)
+  - [3.10 与 Query Loop 引擎的集成点总结](#310-与-query-loop-引擎的集成点总结)
 
 ---
 
@@ -1747,7 +1768,11 @@ type StreamChunk =
           | "llm_format_error" | "llm_rate_limited"
           | "token_compressing" | "db_retrying"
           | "client_disconnected" | "stream_buffer_replaying"
-          | "session_recovering";
+          | "session_recovering"
+          | "mcp_reconnecting" | "mcp_reconnected" | "mcp_permanently_down"
+          | "mcp_server_not_installed" | "mcp_server_not_ready"
+          | "mcp_tool_not_found" | "mcp_tool_timeout" | "mcp_tool_error"
+          | "mcp_connection_lost";
       message: string;                     // 给人看的中文描述，如 "AI 服务连接超时，正在重试（第 2/3 次，4 秒后）..."
       turn?: number;                       // 关联的 turn（可选）
       detail?: string;                     // 补充信息（可选），如异常原文截取
@@ -2176,6 +2201,96 @@ mcp_servers.yaml 中的 transport 决定连接方式：
     → 适用: 远程 MCP 服务（公司内部 API MCP）
     → 配置: url, headers
 ```
+
+**三种传输的 connect / request / disconnect 操作对比：**
+
+```
+┌─ StdioTransport ─────────────────────────────────────────────────────┐
+│                                                                      │
+│  connect()                                                           │
+│    asyncio.create_subprocess_exec(cmd, args, stdin=PIPE, stdout=PIPE)│
+│    → fork 子进程，拿到 stdin StreamWriter + stdout StreamReader       │
+│                                                                      │
+│  request(id=N)                                                       │
+│    self._request_id += 1                                             │
+│    stdin.write('{"jsonrpc":"2.0","id":N,"method":"...","params":{}}  │
+│               '\n')                                                  │
+│    await stdin.drain()                                               │
+│    line = await stdout.readline()     ← 阻塞等待一行 JSON             │
+│    return json.loads(line)["result"]                                  │
+│                                                                      │
+│  disconnect()                                                        │
+│    transport.request("shutdown", {})  ← 优雅关闭                      │
+│    stdin.close()                                                     │
+│    await process.wait(timeout=5)      ← 超时则 kill()                │
+│                                                                      │
+│  特点: 一问一答，锁保护，进程崩溃直接体现为 ConnectionError             │
+└──────────────────────────────────────────────────────────────────────┘
+
+┌─ HttpTransport (streamable-http) ────────────────────────────────────┐
+│                                                                      │
+│  connect()                                                           │
+│    self._client = httpx.AsyncClient(timeout=30, verify=...)          │
+│    设置 Accept: application/json, text/event-stream                  │
+│    → 无实际网络请求，仅创建 HTTP 客户端                                │
+│                                                                      │
+│  request(id=N)                                                       │
+│    self._request_id += 1                                             │
+│    resp = await client.post(url, json={"jsonrpc":"2.0","id":N,...},  │
+│                              headers=...)                            │
+│    resp.raise_for_status()                                           │
+│    data = resp.json()                 ← 直接解析 JSON body            │
+│    if "error" in data: raise MCPError                                │
+│    return data["result"]                                              │
+│                                                                      │
+│  disconnect()                                                        │
+│    await self._client.aclose()        ← 关闭 HTTP 连接池              │
+│                                                                      │
+│  特点: 每次 request 是一次完整 HTTP POST，无长连接状态，响应路径唯一    │
+└──────────────────────────────────────────────────────────────────────┘
+
+┌─ SseTransport (sse) ─────────────────────────────────────────────────┐
+│                                                                      │
+│  connect()                                                           │
+│    ① GET /mcp (Accept: text/event-stream, stream=True)               │
+│    ② 启动后台 asyncio.Task: _read_sse() 持续消费 SSE 流              │
+│    ③ await _endpoint_ready.wait()   ← 等待 endpoint 事件到达         │
+│       SSE 流中解析:                                                   │
+│         event: endpoint                                              │
+│         data: /mcp/session/abc123                                    │
+│       → self._endpoint_url = urljoin(base, "/mcp/session/abc123")    │
+│    ④ 超时或流错误 → disconnect → raise ConnectionError               │
+│                                                                      │
+│  request(id=N)                                                       │
+│    ① POST endpoint_url {"jsonrpc":"2.0","id":N,...}                  │
+│    ② 检查 Content-Type:                                              │
+│       ├─ application/json → resp.json() 直接返回                      │
+│       ├─ text/event-stream → 从 POST body 提取 SSE data              │
+│       └─ 202 Accepted / 空 body → 创建 Future 放入 _pending[id]      │
+│           等待后台 _read_sse() 从 GET SSE 流中匹配 id 后 resolve      │
+│           超时 → raise ConnectionError                                │
+│                                                                      │
+│  disconnect()                                                        │
+│    ① 取消所有 _pending Futures（set_exception）                       │
+│    ② _read_task.cancel()              ← 取消后台 SSE 读取任务         │
+│    ③ await _sse_response.aclose()     ← 关闭 GET SSE 响应流          │
+│    ④ await _client.aclose()           ← 关闭 httpx 客户端             │
+│                                                                      │
+│  特点: 双路异步响应，                                          │
+│        _read_sse() 是唯一 aiter_lines() 消费者（避免重复消费）        │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**三者核心差异：**
+
+| 维度 | Stdio | streamable-http | SSE |
+|------|-------|-----------------|-----|
+| **连接建立** | fork 子进程（~2-5s） | 创建 HTTP client（瞬态） | GET SSE + 解析 endpoint |
+| **request 响应路径** | 1 条：stdout 逐行读 | 1 条：POST body JSON | 2 条：POST body **或** GET SSE 流 |
+| **并发模型** | 锁 + 一问一答 | 锁 + HTTP 同步 | 锁 + Future + 后台 Task |
+| **断开方式** | `shutdown` → `stdin.close()` → `kill()` | `client.aclose()` | cancel Task → close SSE → close client |
+| **断线感知** | 进程退出 (`returncode`) | HTTP 异常 | SSE 流关闭 / Task 异常 |
+| **额外复杂度** | — | — | Event(端点同步) + Future(跨路径匹配) + 单 reader 约束 |
 
 ### 2.3 MCP 服务生命周期
 
@@ -2747,26 +2862,13 @@ for srv_def in mcp_config.servers:
 | 17g | **连接意外断开**（进程崩溃） | READY → DISCONNECTED | 下次调用时发现服务不可用才报错 | 后台自动重连 |
 | 17h | **JSON-RPC 协议错误** | 依赖错误类型 | `"MCP 服务 '{name}' 返回协议错误 (code={code}): {msg}"` | 不重试 |
 
-#### 2.7.2 与现有四级处理策略的映射
+#### 2.7.2 MCP 三级异常处理策略
 
-```
-第 1 级（重试）：Server 启动失败、初始化超时、连接超时
-  → 指数退避重连，成功自动恢复
-  → 推送 system.status(code="mcp_reconnecting")
-     message: "MCP 服务 'GitHub MCP' 连接断开，正在重连（第 2/3 次，8 秒后）..."
-
-第 2 级（降级）：tools/call 失败、工具不存在
-  → 错误注入 LLM 上下文，AI 自行调整策略
-  → 与权限拒绝、客户端工具失败的降级策略一致
-
-第 3 级（暂停）：不适用
-  MCP 工具执行在服务端完成，不涉及用户交互。
-  超时直接报错给 LLM，不暂停引擎等待。
-
-第 4 级（终止）：不适用
-  单个 MCP 服务故障不影响整个引擎，仅当前 turn 受影响。
-  LLM 收到错误后可在下一个 turn 尝试替代方案。
-```
+| 级别 | MCP 场景 | 处理方式 |
+|------|---------|---------|
+| **1. 重试** | Server 启动失败、initialize 超时、运行中断连 | 指数退避重连（2^n s，最多 3 次），推送 `mcp_reconnecting` / `mcp_reconnected`；3 次耗尽 → `mcp_permanently_down` |
+| **2. 放入上下文，LLM 决定** | tools/call 失败、工具不存在、tools/call 超时、JSON-RPC 协议错误 | 错误文本注入 LLM 上下文，LLM 自行决定重试、换方案、或告知用户 |
+| **3. 终止任务** | 重连耗尽（`mcp_permanently_down`） | 该 MCP 服务标记 DISCONNECTED，推送 `system.status` 通知用户检查配置；不影响引擎和其他 MCP 服务 |
 
 #### 2.7.3 MCP 相关的 system.status 通知
 
@@ -2797,6 +2899,58 @@ for srv_def in mcp_config.servers:
   message: string;          // "MCP 服务 'GitHub MCP' 多次重连失败，已停止尝试"
   server_id: string;
 }
+
+// MCP 工具调用错误（从 call_tool() 推送）
+{
+  type: "system.status";
+  code: "mcp_server_not_installed" | "mcp_server_not_ready"
+      | "mcp_tool_not_found" | "mcp_tool_timeout"
+      | "mcp_tool_error" | "mcp_connection_lost";
+  message: string;          // 错误详情，与 agent.tool_result.error 一致
+  server_id: string;
+}
+```
+
+#### 2.7.4 实现审查：已覆盖 vs 待修复
+
+对照 2.7.1 的 17a~17h 场景，逐一审查 `server/tools/mcp_runtime.py` 中的实际处理情况。
+
+**已正确覆盖：**
+
+| 场景 | 代码位置 | 实际行为 |
+|------|---------|---------|
+| **17d** 工具不存在 | `call_tool()` L563-569 | 对比 `state.tools`，返回错误 dict（含可用工具列表），LLM 自适应 |
+| **17e** tools/call 执行异常 | `call_tool()` L618 | `except Exception` 兜底捕获，返回 `{success: false, error: str(e)}` |
+| **17f** tools/call 超时 120s | `call_tool()` L594 | `except asyncio.TimeoutError`，返回超时错误 |
+| **17g** 连接意外断开 | `call_tool()` L600 | `except (ConnectionError, OSError)` → 清空 tools → `transport.disconnect()` → `_schedule_reconnect()` → 推送 `mcp_reconnecting` |
+| **17h** JSON-RPC 协议错误 | 各 transport `request()` | 响应含 `"error"` 字段时抛出 `MCPError`（code + message），`call_tool()` L618 捕获后返回给 LLM |
+
+**待修复的缺口：**
+
+| # | 问题 | 严重程度 | 根因 | 修复方向 |
+|---|------|---------|------|---------|
+| **G1** | **初始连接失败不触发自动重连**（17a/17b/17c 的"重试策略"列实际未执行） | **高** | `_do_connect()` L676 `except → raise`，`connect_server()` 不捕获，异常最终被 `_auto_connect_installed_mcps()`（`main.py:99`）和 `install_mcp()`（`mcp_routes.py:131`）的 `logger.warning` 吞掉。`_schedule_reconnect()` 仅在两处被调用：`_reconnect_loop()` 重连链、`call_tool()` L612（运行时断连），缺少"初始连接失败 → 调度重连"路径 | `_do_connect()` 的 `except` 块中，在 `raise` 前调用 `self._schedule_reconnect(sid)` |
+| **G2** | **`notify("notifications/initialized")` 失败会中断整个连接** | **中** | `_do_connect()` L667 的 `notify` 在 try 块内，如果进程/连接恰好在此时断开，抛出的异常会使 initialize 已经成功的连接被标记为 ERROR | 将该行移出 try 块，或用 `try/except` 包裹（initialized 通知按 MCP 规范是 best-effort） |
+| **G3** | **SSE 流中断后等待中的 `request()` 不清醒** | **中** | `SseTransport._read_sse()` L367-373：endpoint 已就绪后若 SSE 流断开，`_pending` 中的 Futures 无人处理，硬等 120s 超时 | `_read_sse()` 异常退出时遍历 `self._pending` 全部 `set_exception(ConnectionError("SSE 流已断开"))` |`` |
+| **G4** | **StdioTransport `_request()` 未包装 JSON 解析异常** | **低** | L181 `json.loads(response_line)` — 若子进程输出非 JSON 内容，`json.JSONDecodeError` 直接上抛，最终作为 raw traceback 注入 LLM 上下文 | 包装为 `MCPError`，让 LLM 看到的是有意义的错误文本 |
+| **G5** | **StdioTransport `notify()` 无 null check** | **低** | L159 `self.process.stdin.write(...)` — 如果在 `connect()` 失败后调用 `notify()`，`self.process` 为 None 导致 `AttributeError`。`HttpTransport` 和 `SseTransport` 的 `notify()` 均有 null check | 加 `if self.process is None: return` 守卫 |
+
+**重连触发路径梳理（现状 vs 设计）：**
+
+```
+设计文档约定的触发点:                    实际代码的触发点:
+                                          
+connect 失败 → _schedule_reconnect()    ✗ 未实现（G1）
+  17a 启动失败                            异常被外层吞掉，server 卡在 ERROR
+  17b 握手超时                            同上
+  17c tools/list 失败                      同上
+                                          
+call_tool 中途断连 → _schedule_reconnect()  ✓ 已实现（L600-612）
+  17g 进程崩溃 / HTTP 不可达               ConnectionError/OSError 捕获 → 重连
+  
+重连链 → _schedule_reconnect()             ✓ 已实现（L688-715）
+  第 N 次重试失败 → 第 N+1 次               指数退避 2^n 秒，最多 3 次
+  3 次耗尽 → mcp_permanently_down          推送 system.status + 停重连
 ```
 
 ### 2.8 MCP 服务管理（Hub）
@@ -3056,6 +3210,800 @@ QueryLoopEngine
 ```
 
 **服务启动时机：** MCP 服务在 `EngineManager.get_or_create()` 创建新引擎时预连接——所有 `enabled=true` 的服务在后台启动（不阻塞引擎主循环）。选择预连接而非懒加载的原因是：工具列表必须在第一条消息的 `context.build()` 时就绪，懒加载会导致第一条消息的首个 turn 缺失 MCP 工具。
+
+---
+
+## 3. Skill 集成
+
+### 3.1 架构概览
+
+Skill 是 iWork 改变 AI 行为模式的核心机制。与 MCP 工具（为 LLM 增加外部工具调用能力）不同，Skill 通过**向 system prompt 注入预定义的提示词片段**来引导 LLM 的行为。Skill 不启动子进程、不建立网络连接、不产生任何运行时状态——它纯粹是一段文本，在每次 LLM 调用前注入到上下文中。
+
+```
+┌── Electron Client ──┐     ┌── FastAPI Server ───────────────────────────────┐
+│                      │     │                                                  │
+│  Skill Hub UI        │     │  ┌── SkillRegistry (内存级) ─────────────────┐  │
+│  (配置面板，           │     │  │                                           │  │
+│   浏览/安装/启停)      │     │  │  skill-hub.json ──→ {skill_id: SkillDef}   │  │
+│                      │◄───►│  │  skill_state_{user}.json → install/disabled │  │
+│  用户消息 →           │ API │  │                                           │  │
+│  POST /messages      │─────►│  └──────────────┬────────────────────────────┘  │
+│  body.skill_invocations      │                │                                │
+│                      │      │                ▼                                │
+│                      │      │  ┌── ContextManager.build() ─────────────────┐  │
+│                      │      │  │  system_prompt += skill_registry           │  │
+│                      │      │  │      .get_active_prompts(skill_ids)        │  │
+│                      │      │  │  → llm.stream(system=augmented_prompt)     │  │
+│                      │      │  └───────────────────────────────────────────┘  │
+└──────────────────────┘     └──────────────────────────────────────────────────┘
+```
+
+**两层架构：**
+
+| 层 | 组件 | 职责 |
+|---|---|---|
+| **配置层** | `skill-hub.json` + `skill_state_{user_id}.json` | 存储 Skill 定义（Hub 目录）和用户级安装状态。Hub 由管理员维护，state 按用户隔离 |
+| **注入层** | `ContextManager.build()` + `SkillRegistry` | 解析消息/会话中引用的 `skill_ids`，加载对应定义，将其 `prompt` 片段注入 system prompt |
+
+**Skill vs MCP 核心差异：**
+
+| 维度 | MCP | Skill |
+|------|-----|-------|
+| 本质 | 外部进程运行时 | 提示词片段注入 |
+| 通信方式 | JSON-RPC 2.0 over stdio/HTTP | 无（启动时读取文件） |
+| 生命周期 | CONNECTING → INITIALIZED → READY → ERROR | 安装 ↔ 卸载，启用 ↔ 禁用 |
+| 运行时状态 | 进程句柄、传输连接 | 内存中的 SkillDefinition 列表 |
+| 执行方式 | `tools/call` → 子进程 → 结果 | 无执行——LLM 调用前注入 system prompt |
+| 故障模式 | 进程崩溃、超时、协议错误 | JSON 格式错误、定义缺失 |
+| 流数据块 | `system.status`（mcp_reconnecting 等） | 无（注入是同步的，发生在 LLM 调用之前） |
+| 安装行为 | 写入 state + 启动子进程连接 | 纯 JSON 状态写入 |
+
+### 3.2 Skill 格式与结构
+
+#### 3.2.1 字段定义
+
+每个 Skill 是一个 JSON 对象，定义如下：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `skill_id` | string | 是 | 唯一标识。Hub: `sk` + 序号，Custom: `cs` + 序号，Builtin: `bi` + 序号 |
+| `skill_name` | string | 是 | 显示名称，用于 `/` 选择器和标签展示 |
+| `description` | string | 是 | 功能简述，用于 Hub 卡片和 `/` 选择器 tooltip |
+| `version` | string | 否 | 语义化版本号（Hub 发布用） |
+| `category` | string | 否 | 分类标签，如"开发""文档""效率" |
+| `icon` | string | 否 | Emoji 图标，用于 UI 展示 |
+| `author` | string | 否 | 作者名（Hub 发布用） |
+| `tags` | string[] | 否 | 搜索/发现标签 |
+| **`prompt`** | **string** | **是** | **Skill 的核心——注入 system prompt 的文本片段** |
+| `source` | enum | 否 | `hub` / `custom` / `builtin` |
+
+#### 3.2.2 完整示例
+
+```json
+{
+  "skill_id": "sk1",
+  "skill_name": "代码审查",
+  "description": "让 AI 以资深代码审查员的视角分析代码，关注安全性、性能和可维护性",
+  "version": "1.2.0",
+  "category": "开发",
+  "icon": "🔍",
+  "author": "iWork Team",
+  "tags": ["code", "review", "security"],
+  "source": "hub",
+  "prompt": "\n## Skill: 代码审查\n你正在扮演一位资深代码审查员。在分析代码时，请遵循以下原则：\n1. **安全性优先**：首先检查 OWASP Top 10 漏洞（SQL注入、XSS、CSRF 等）\n2. **性能分析**：识别 N+1 查询、不必要的内存分配、阻塞操作\n3. **可维护性**：检查命名规范、函数复杂度（超过 15 行建议拆分）、重复代码\n4. **输出格式**：使用表格总结发现的问题，按严重程度排序（🔴 严重 / 🟡 中等 / 🟢 建议）\n"
+}
+```
+
+> **核心理解：** `prompt` 字段就是 Skill 的全部。`description`、`icon` 等字段只是 UI 元数据，供 Hub 浏览和选择器展示。真正改变 LLM 行为的是注入到 system prompt 中的 `prompt` 文本。
+
+#### 3.2.3 内置 Skill
+
+系统预装、不可卸载的内置 Skill（对应 `source: "builtin"`）：
+
+| skill_id | 名称 | 用途 | 来源 |
+|----------|------|------|------|
+| `bi1` | 日常办公 | 默认 `office` 模式的 system prompt 片段 | `context.py` 中的 `SYSTEM_PROMPTS["office"]` |
+| `bi2` | 代码开发 | 默认 `code` 模式的 system prompt 片段 | `context.py` 中的 `SYSTEM_PROMPTS["code"]` |
+
+内置 Skill 硬编码在服务端，不参与安装/卸载流程。现有的 `SYSTEM_PROMPTS` 和 `MODE_PROMPTS` 本质上已经是内置 Skill 的形式。
+
+#### 3.2.4 ID 前缀规则
+
+| 前缀 | 来源 | 示例 | 安装态 | 卸载 |
+|------|------|------|--------|------|
+| `sk` | Hub Skill | `sk1`, `sk42` | 可安装 | 可卸载 |
+| `cs` | Custom Skill（用户自建） | `cs1`, `cs2` | 创建即安装 | 删除即卸载 |
+| `bi` | Builtin Skill（系统内置） | `bi1`, `bi2` | 始终安装 | 不可卸载 |
+
+### 3.3 Skill 生命周期
+
+Skill 没有进程、没有连接、没有运行时状态。它的生命周期就是一个安装/卸载/启用的标记流转：
+
+```
+                    ┌──────────────────────────────────────┐
+                    │          SKILL LIFECYCLE              │
+                    │                                       │
+    ┌──────────┐    │                                       │
+    │UNINSTALL │    │                                       │
+    │    ED    │───►│  INSTALLED  ──→  ENABLED              │
+    │          │    │  (在 state    (在 / 选择器              │
+    └────┬─────┘    │   的         中可见，                   │
+         │          │   installed_  prompt 会               │
+         │ 卸载     │   ids 中)     被注入)                  │
+         │          │                                       │
+         └──────────┼───────────────────────────────────────┘
+```
+
+| 状态 | 说明 | 用户可见行为 |
+|------|------|-------------|
+| **UNINSTALLED** | Skill 不在用户的 `skill_state.json` 中 | 不出现在 `/` 选择器和"已安装"标签页 |
+| **INSTALLED** | `skill_id` 已写入 `installed_ids` | 出现在"已安装"标签页；如果不在 `disabled_ids` 中则 `/` 选择器可见 |
+| **ENABLED** | INSTALLED 的子集，且不在 `disabled_ids` 中 | `/` 选择器中可见、可选中；消息发送时 prompt 会被注入 |
+
+> **与 MCP 的关键区别：** MCP 有 `CONNECTING → INITIALIZED → READY → ERROR` 多种运行时状态，有指数退避重连逻辑。Skill 安装 = 纯 JSON 写入，无需 `connect_server()`、无心跳、无重连。
+
+### 3.4 Skill 配置
+
+#### 3.4.1 配置文件格式
+
+**`skill-hub.json`**（服务端 Hub 目录，类似 `server/mcp-hub.json`）：
+
+由管理员维护，用户只读。存储所有可安装的社区/团队 Skill 的完整定义：
+
+```json
+{
+  "skills": [
+    {
+      "skill_id": "sk1",
+      "skill_name": "代码审查",
+      "description": "以资深代码审查员视角分析代码，关注安全性、性能和可维护性",
+      "version": "1.2.0",
+      "category": "开发",
+      "icon": "🔍",
+      "author": "iWork Team",
+      "tags": ["code", "review", "security"],
+      "prompt": "\n## Skill: 代码审查\n你正在扮演一位资深代码审查员..."
+    },
+    {
+      "skill_id": "sk2",
+      "skill_name": "文档生成器",
+      "description": "自动生成 README、API 文档和代码注释",
+      "version": "1.0.0",
+      "category": "文档",
+      "icon": "📝",
+      "author": "iWork Team",
+      "tags": ["docs", "readme", "api"],
+      "prompt": "\n## Skill: 文档生成器\n你是技术文档专家。生成文档时请遵循以下规范..."
+    }
+  ]
+}
+```
+
+**`skill_state_{user_id}.json`**（用户级安装状态，类似 `server/storage/mcp_state.json`）：
+
+每用户独立存储，记录该用户安装了哪些 Skill、禁用了哪些、以及自定义 Skill 的完整定义：
+
+```json
+{
+  "installed_ids": ["sk1", "sk3", "cs1", "bi1", "bi2"],
+  "disabled_ids": ["sk3"],
+  "custom_skills": [
+    {
+      "skill_id": "cs1",
+      "skill_name": "我的代码风格",
+      "description": "遵循团队 ESLint 配置的代码风格",
+      "category": "自定义",
+      "icon": "✨",
+      "source": "custom",
+      "prompt": "\n## Skill: 我的代码风格\n请严格遵循以下规则:\n- 使用 2 空格缩进\n- 单引号优先\n- 行尾不加分号\n- 每行不超过 100 字符\n"
+    }
+  ]
+}
+```
+
+**字段说明：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `installed_ids` | string[] | 用户已安装的所有 Skill ID（含 Hub、Custom、Builtin） |
+| `disabled_ids` | string[] | 已安装但临时禁用的 Skill ID 子集 |
+| `custom_skills` | object[] | 用户自建/上传的 Skill 完整定义 |
+
+> **设计要点：** `disabled_ids` 是 Skill 特有的概念——MCP 中没有，因为 MCP 的启用/禁用在每个 server 的 `enabled` 字段控制。Skill 更简单：安装后默认启用，用户可选择禁用而不卸载。
+
+#### 3.4.2 配置层级：会话级 vs 消息级
+
+```
+配置层级（越下层优先级越高）：
+
+┌── skill_state_{user_id}.json（用户级默认安装/启用状态）      ← 最底层
+│   定义了用户安装了哪些 Skill、哪些被禁用
+│
+├── Session.default_skill_ids（会话级默认）                   ← 中间层
+│   POST /sessions 或 PATCH /sessions/{id} 可指定
+│   决定该会话默认激活哪些 Skill（新增字段）
+│
+├── Message.skill_invocations（消息级覆盖）                    ← 最顶层
+│   POST /messages 时传入（已在 MessageCreate 模型中定义）
+│   不为空时，仅使用列表中指定的 Skill
+│
+└── SkillRegistry.get_active_prompts() 解析逻辑：
+    msg.skill_invocations 非空 → 仅使用消息级列表
+    否则 session.default_skill_ids 非空 → 使用会话级列表
+    否则 → 使用所有已安装且未禁用的 Skill
+```
+
+> **设计原理：** 与 MCP 配置层级完全一致。会话级默认保证同一任务的历史消息有稳定的 Skill 集；消息级覆盖允许单次请求临时调整（如"这次不要用代码审查模式"）。Skill 在消息入队时锁定配置，后续变更不影响历史消息。
+
+#### 3.4.3 凭据管理
+
+Skill 不需要凭据管理。Skill 只包含纯文本 prompt，不涉及 API key、token、密码等敏感信息。这是 Skill 比 MCP 简单的又一个根本原因。
+
+### 3.5 Skill 发现与注册
+
+#### 3.5.1 启动加载流程
+
+与 MCP 需要 `tools/list` 网络调用不同，Skill 的"发现"就是启动时读文件：
+
+```
+  ┌─ SkillRegistry.__init__() ──────────────────────────────────┐
+  │                                                               │
+  │  1. 加载 skill-hub.json → hub_skills: dict[id, SkillDef]      │
+  │  2. 加载 skill_state_{user_id}.json → 用户安装/禁用状态       │
+  │  3. 合并 custom_skills 到 lookup                              │
+  │  4. 添加 builtin skills (硬编码) → 注入 lookup                 │
+  │                                                               │
+  │  结果: registry._skills = {                                   │
+  │    "sk1": SkillDefinition(...),  # 来自 Hub                   │
+  │    "sk2": SkillDefinition(...),  # 来自 Hub                   │
+  │    "cs1": SkillDefinition(...),  # 来自 Custom                │
+  │    "bi1": SkillDefinition(...),  # 内置 (office)              │
+  │    "bi2": SkillDefinition(...),  # 内置 (code)                │
+  │  }                                                            │
+  │                                                               │
+  │  registry._installed = {"sk1", "cs1", "bi1", "bi2"}          │
+  │  registry._disabled = {"sk2"}                                 │
+  │                                                               │
+  └───────────────────────────────────────────────────────────────┘
+```
+
+**SkillRegistry 核心实现：**
+
+```python
+class SkillDefinition(BaseModel):
+    """Skill 的完整定义。核心是 prompt 字段。"""
+    skill_id: str
+    skill_name: str
+    description: str
+    prompt: str                          # 注入 system prompt 的文本
+    version: str = "1.0.0"
+    category: str = ""
+    icon: str = ""
+    author: str = ""
+    tags: list[str] = Field(default_factory=list)
+    source: Literal["hub", "custom", "builtin"] = "hub"
+
+
+class SkillRegistry:
+    """管理所有已知 Skill（Hub + Custom + Builtin）的内存注册表。"""
+
+    def __init__(self, hub_path: Path, state_path: Path, user_id: str):
+        self._skills: dict[str, SkillDefinition] = {}
+        self._installed: set[str] = set()
+        self._disabled: set[str] = set()
+        self.user_id = user_id
+        self._load(hub_path, state_path)
+
+    def _load(self, hub_path: Path, state_path: Path):
+        hub = _load_json(hub_path) if hub_path.exists() else {"skills": []}
+        state = _load_json(state_path) if state_path.exists() else {}
+
+        # Hub skills
+        for s in hub.get("skills", []):
+            self._skills[s["skill_id"]] = SkillDefinition(**s, source="hub")
+
+        # Custom skills from user state
+        for s in state.get("custom_skills", []):
+            self._skills[s["skill_id"]] = SkillDefinition(**s, source="custom")
+
+        # Builtin skills (hardcoded)
+        for s in BUILTIN_SKILLS:
+            self._skills[s.skill_id] = s
+
+        # User state
+        self._installed = set(state.get("installed_ids", []))
+        self._disabled = set(state.get("disabled_ids", []))
+        # Builtins are always installed
+        self._installed.update(s.skill_id for s in BUILTIN_SKILLS)
+
+    def get_active_prompts(self, skill_ids: list[str] | None) -> str:
+        """将 skill_id 列表解析为拼接后的 prompt 文本。"""
+        if skill_ids is not None:
+            ids = [sid for sid in skill_ids
+                   if sid in self._skills and sid not in self._disabled]
+        else:
+            ids = [sid for sid in self._installed
+                   if sid not in self._disabled]
+
+        parts = []
+        for sid in ids:
+            skill = self._skills.get(sid)
+            if skill:
+                parts.append(f"\n## Skill: {skill.skill_name}\n{skill.prompt}")
+        return "\n".join(parts)
+
+    def get_available_for_picker(self) -> list[SkillDefinition]:
+        """返回 / 选择器所需的 Skill 列表（已安装 + 未禁用）。"""
+        return [self._skills[sid] for sid in self._installed
+                if sid not in self._disabled and sid in self._skills]
+
+    def install(self, skill_id: str):
+        """安装 Skill（纯状态更新）。"""
+        if skill_id not in self._skills or self._skills[skill_id].source == "builtin":
+            raise ValueError(f"无法安装 Skill: {skill_id}")
+        self._installed.add(skill_id)
+
+    def uninstall(self, skill_id: str):
+        """卸载 Skill（纯状态更新）。"""
+        if self._skills[skill_id].source == "builtin":
+            raise ValueError(f"内置 Skill 不可卸载: {skill_id}")
+        self._installed.discard(skill_id)
+        self._disabled.discard(skill_id)
+```
+
+#### 3.5.2 Skill ID 命名规则
+
+```
+skill-hub.json 条目      →  skill_id: "sk1", "sk2", "sk3", ...
+custom_skills 条目       →  skill_id: "cs1", "cs2", "cs3", ... (自动分配)
+内置 Skill               →  skill_id: "bi1", "bi2", ...
+```
+
+Hub 和 Custom 的 ID 空间独立自增，互不冲突。
+
+#### 3.5.3 合并到 LLM 上下文
+
+对应 `server/engine/context.py` ——构建 LLM 上下文时，在 system prompt 末尾追加激活的 Skill prompt 片段：
+
+```python
+# context.py - ContextManager.build() 增强
+
+async def build(
+    self, session_id, turn, mode, scene_mode,
+    client_tools=None,
+    mcp_tools=None,
+    skill_ids=None,              # 新增
+    skill_registry=None,         # 新增
+):
+    history = self._contexts.get(session_id, [])
+    system = SYSTEM_PROMPTS.get(scene_mode, SYSTEM_PROMPTS["office"])
+    system += MODE_PROMPTS.get(mode, "")
+
+    # ── Skill prompt 注入 ── 新增
+    if skill_registry:
+        skill_prompts = skill_registry.get_active_prompts(skill_ids)
+        if skill_prompts:
+            system += "\n\n## 激活的技能\n" + skill_prompts
+
+    # ... rest unchanged ...
+```
+
+**冲突处理：** Skill prompt 追加在 scene/system prompt 之后、用户消息之前。同一 Skill 被会话级和消息级同时指定时，消息级优先。Skill 之间不存在命名冲突——不同 Skill 的 prompt 是独立的文本块，按 `## Skill: {name}` 分隔。
+
+### 3.6 Skill Prompt 注入
+
+#### 3.6.1 注入时机与流程
+
+Skill 的"执行"本质是在 `ContextManager.build()` 中同步完成的一次字符串拼接：
+
+```
+QueryLoopEngine._run_message_loop()
+        │
+        ├── 1. 解析 skill_ids:
+        │      if msg.skill_invocations:
+        │          skill_ids = [s.skill_id for s in msg.skill_invocations]
+        │      elif session.default_skill_ids:
+        │          skill_ids = session.default_skill_ids
+        │      else:
+        │          skill_ids = None   # → 使用所有已启用
+        │
+        ├── 2. context_mgr.build(skill_ids=..., skill_registry=...)
+        │      └── system += skill_registry.get_active_prompts(skill_ids)
+        │
+        ├── 3. llm.stream(system=augmented_prompt, tools=...)
+        │      └── LLM 看到的是已包含 Skill 行为引导的完整 system prompt
+        │
+        └── 4. 后续流程无任何变化：
+               tool_use → _execute_tool_chunk → dispatch
+               text → _push_chunk("agent.text")
+```
+
+#### 3.6.2 system prompt 组装顺序
+
+```
+完整的 system prompt 组装顺序:
+  1. SYSTEM_PROMPTS[scene_mode]     ← "你是 iWork，一个 AI 编程助手..."
+  2. MODE_PROMPTS[mode]             ← "模式：build。当前处于构建模式..."
+  3. Skill prompts（逐个拼接）       ← "\n## Skill: 代码审查\n你正在扮演一位资深..."
+                                    ← "\n## Skill: 文档生成器\n你是技术文档专家..."
+```
+
+每个 Skill 的 prompt 前加 `## Skill: {skill_name}` 作为标题，使 LLM 能识别不同的行为指导来源。
+
+#### 3.6.3 无流数据块
+
+Skill 注入不产生任何 `StreamChunk`。它不涉及工具调用，不等待客户端回传，不影响流中断恢复逻辑。对客户端而言，Skill 的使用完全透明——前端只需在消息发送时携带 `skill_invocations`，其余行为全部体现在 LLM 的回复内容中。
+
+#### 3.6.4 与 MCP 工具执行的对比
+
+```
+MCP 工具执行链路:
+  LLM → tool_use("github.search_issues")
+      → ToolDispatcher.classify() → SERVER
+      → dispatch() → transport.request("tools/call")
+      → [子进程执行...]
+      → agent.tool_result → 注入上下文
+  前端必须渲染 tool_call → tool_result 状态变化
+
+Skill Prompt 注入链路:
+  context.build() → skill_registry.get_active_prompts()
+      → 字符串拼接 → llm.stream(system=augmented_prompt)
+  前端完全透明，无任何流数据块
+```
+
+### 3.7 错误处理
+
+Skill 无运行时连接，所有错误都发生在**启动加载**或**install/uninstall 请求**期间。不存在重试、不存在超时、不存在重连。
+
+#### 3.7.1 错误分类
+
+| # | 场景 | 触发条件 | 处理方式 | LLM 影响 |
+|---|------|---------|---------|---------|
+| S1 | **Skill 定义 JSON 格式错误** | `skill-hub.json` 或 `custom_skills` 条目非法 | 记录错误日志，跳过该条目，继续加载其余 Skill | 该 Skill 不可用 |
+| S2 | **skill_id 未找到** | `skill_invocations` 引用了不存在的 ID | 记录警告日志，跳过未知 ID，注入其余 Skill | 缺失的 Skill 静默忽略 |
+| S3 | **prompt 为空或过短**（< 10 字符） | Skill 定义不完整 | 加载时记录警告，标记为不可用 | 该 Skill 不可用 |
+| S4 | **skill_state.json 损坏** | 文件被外部破坏 | 记录错误，回退到空状态（所有 Hub/Custom Skill 视为未安装） | 仅内置 Skill 有效 |
+| S5 | **重复 skill_id**（Hub 和 Custom 重复） | 同名 ID 冲突 | Custom 覆盖 Hub（记录的优先级规则） | Custom 版本生效 |
+| S6 | **skill-hub.json 文件缺失** | 服务端未配置 Hub | Hub 目录为空，仅 Custom + Builtin 可用 | Hub 标签页为空 |
+
+#### 3.7.2 全量 Level 2（降级）处理
+
+Skill 的所有错误都是 Level 2（对应第 1 章 1.8.2 的四级处理策略）。Skill 永远不会导致任务终止——它只是辅助性的行为引导。如果某个 Skill 加载失败或定义缺失，引擎静默跳过，不会推送 `message.error` 或 `system.status`。
+
+**Skill 不需要以下 MCP 级别的处理：**
+- 重试（没有连接可重试）
+- `system.status` 通知（没有运行时状态变化）
+- 终止（Skill 缺失不是致命错误）
+- 权限检查（Skill 不访问文件系统或网络）
+
+#### 3.7.3 安装态错误
+
+| 场景 | HTTP 状态码 | 说明 |
+|------|-----------|------|
+| 安装不存在的 Hub Skill | 404 | Hub 中无此 skill_id |
+| 重复安装 | 409 | 已安装 |
+| 卸载内置 Skill | 403 | 内置 Skill 不可卸载 |
+| 卸载/禁用未安装的 Skill | 404 | 未安装 |
+| Custom Skill validation 失败 | 422 | prompt 过短、name 为空等 |
+
+### 3.8 Skill 管理（Hub）
+
+#### 3.8.1 Hub 数据来源
+
+Hub 数据以 JSON 配置文件形式存储于服务端 `server/skill-hub.json`，管理员可直接编辑此文件增删条目。客户端通过 API 获取可安装的 Skill 列表。
+
+每条 Hub 条目包含完整的 Skill 定义，客户端用于展示和安装：
+
+```json
+{
+  "skill_id": "sk1",
+  "skill_name": "代码审查",
+  "description": "以资深代码审查员视角分析代码，关注安全性、性能和可维护性",
+  "icon": "🔍",
+  "category": "开发",
+  "version": "1.2.0",
+  "author": "iWork Team",
+  "tags": ["code", "review", "security"]
+}
+```
+
+> 注意：Hub 列表 API 响应中**不包含 `prompt` 字段**，仅安装后才可获取完整定义。
+
+#### 3.8.2 安装 / 卸载流程
+
+安装/卸载状态持久化在 `server/storage/skill_state_{user_id}.json`：
+
+```
+安装:
+  用户点击 [安装]
+  → POST /skills/install  Body: {skill_id: "sk1"}
+  → 校验 skill_id 在 Hub 中存在
+  → 写入 skill_state_{user_id}.json 的 installed_ids
+  → SkillRegistry.install(skill_id)  更新内存注册表
+  → 返回 200: {installed: true, skill_id: "sk1"}
+  → 重复安装返回 409
+
+卸载:
+  用户点击 [已安装]
+  → DELETE /skills/uninstall/{skill_id}
+  → 从 skill_state_{user_id}.json 的 installed_ids 和 disabled_ids 中移除
+  → SkillRegistry.uninstall(skill_id)  更新内存注册表
+  → 返回 200: {uninstalled: true, skill_id: "sk1"}
+  → 未安装返回 404，内置返回 403
+```
+
+> **与 MCP 的核心区别：** MCP 安装时触发 `connect_server()` 启动子进程，卸载时触发 `disconnect_server()` 关闭子进程。Skill 的安装/卸载是纯 JSON 文件写入，无任何运行时操作。
+
+#### 3.8.3 启用 / 禁用
+
+Skill 可以在不卸载的情况下临时禁用：
+
+```
+禁用:
+  → POST /skills/disable  Body: {skill_id: "sk3"}
+  → 写入 disabled_ids
+  → Skill 保留在 installed_ids 中，但 / 选择器中移除、prompt 不再注入
+
+启用:
+  → POST /skills/enable  Body: {skill_id: "sk3"}
+  → 从 disabled_ids 中移除
+  → Skill 重新出现在 / 选择器中
+```
+
+MCP 使用每个 server 配置中的 `enabled: true/false` 字段来控制启停，而 Skill 使用独立的 `disabled_ids` 列表。这是两种等价的实现方式，选择独立列表是为了让 `installed_ids` 保持为纯粹的"已安装"语义。
+
+#### 3.8.4 自定义 Skill
+
+用户可通过三种方式创建自定义 Skill：
+
+1. **上传 `.skill.json` 文件**：服务端验证 Schema，自动分配 `skill_id = cs{N+1}`，写入 `custom_skills` 并自动安装
+2. **从 UI 表单创建**：弹窗填写 name、description、prompt，提交后验证并持久化
+3. **从 Hub 克隆**：安装 Hub Skill 后"另存为自定义"，复制其 prompt 并允许修改
+
+删除自定义 Skill 时同时从 `custom_skills`、`installed_ids` 和 `disabled_ids` 中移除。
+
+#### 3.8.5 与主对话流程的联通
+
+Skill 通过以下字段与主对话流程打通，**无需新增消息级 API**（`skill_invocations` 已存在）：
+
+```
+POST /sessions         body.default_skill_ids    → 会话级默认 Skill（新增字段）
+PATCH /sessions/{id}   body.default_skill_ids    → 更新会话默认（新增字段）
+POST /messages         body.skill_invocations    → 消息级 Skill（已在 MessageCreate.skill_invocations 定义）
+```
+
+`Session` 模型需新增可选字段 `default_skill_ids: list[str] | None`。
+
+### 3.9 Skill 查询接口定义
+
+所有 Skill 管理接口挂载在 `/skills` 前缀下，由 `server/api/skill_routes.py` 实现。
+
+| 方法 + 路径 | 说明 | 持久化 |
+|------------|------|--------|
+| `GET /skills/hub` | 浏览 Hub 中所有可安装的 Skill | 读取 `skill-hub.json` |
+| `GET /skills/installed` | 查看已安装的 Skill（含启用/禁用状态） | 读取 `skill_state_{user_id}.json` + Hub |
+| `POST /skills/install` | 安装 Hub 中的 Skill | 写入 installed_ids |
+| `DELETE /skills/uninstall/{skill_id}` | 卸载已安装的 Skill | 移除 installed_ids + disabled_ids |
+| `POST /skills/enable` | 启用已安装的 Skill | 从 disabled_ids 移除 |
+| `POST /skills/disable` | 禁用已安装的 Skill | 写入 disabled_ids |
+| `GET /skills/custom` | 查看自定义 Skill 列表 | 读取 custom_skills |
+| `POST /skills/custom` | 创建自定义 Skill（自动分配 ID + 自动安装） | 追加 custom_skills + installed_ids |
+| `PUT /skills/custom/{skill_id}` | 更新自定义 Skill（部分字段） | 修改 custom_skills 条目 |
+| `DELETE /skills/custom/{skill_id}` | 删除自定义 Skill（同步卸载） | 移除 custom_skills + installed_ids + disabled_ids |
+
+```typescript
+// ═══════════════════════════════════════════
+// GET /skills/hub — 浏览 Hub 所有可安装的 Skill
+// ═══════════════════════════════════════════
+
+Response 200:
+{
+  skills: {
+    skill_id: string;         // "sk1"
+    skill_name: string;       // "代码审查"
+    description: string;      // "以资深代码审查员视角分析代码..."
+    version: string;          // "1.2.0"
+    category: string;         // "开发"
+    icon: string;             // "🔍"
+    author: string;           // "iWork Team"
+    tags: string[];           // ["code", "review", "security"]
+    // prompt 字段不返回——Hub 列表不暴露完整提示词
+  }[];
+}
+
+
+// ═══════════════════════════════════════════
+// GET /skills/installed — 查看已安装的 Skill
+// ═══════════════════════════════════════════
+
+Response 200:
+{
+  installed: {
+    skill_id: string;
+    skill_name: string;
+    description: string;
+    icon: string;
+    category: string;
+    source: "hub" | "custom" | "builtin";
+    enabled: boolean;         // true 除非在 disabled_ids 中
+    prompt: string;           // 已安装的 Skill 返回完整 prompt
+  }[];
+}
+
+
+// ═══════════════════════════════════════════
+// POST /skills/install — 安装 Hub 中的 Skill
+// ═══════════════════════════════════════════
+
+Request Body:
+{ skill_id: string; }         // 必须存在于 Hub 中
+
+Response 200:
+{ installed: true; skill_id: string; }
+
+// 409 — 已安装
+{ detail: "技能已安装: sk1"; }
+
+// 404 — Hub 中不存在
+{ detail: "Hub 中不存在技能: xxx"; }
+
+
+// ═══════════════════════════════════════════
+// DELETE /skills/uninstall/{skill_id} — 卸载 Skill
+// ═══════════════════════════════════════════
+
+Response 200:
+{ uninstalled: true; skill_id: string; }
+
+// 403 — 内置 Skill 不可卸载
+{ detail: "内置技能不可卸载: bi1"; }
+
+// 404 — 未安装
+{ detail: "未安装该技能: xxx"; }
+
+
+// ═══════════════════════════════════════════
+// POST /skills/enable & POST /skills/disable
+// ═══════════════════════════════════════════
+
+Request Body:
+{ skill_id: string; }
+
+Response 200:
+{ enabled: true; skill_id: string; }
+// 或
+{ disabled: true; skill_id: string; }
+
+// 404 — 未安装
+{ detail: "未安装该技能: xxx"; }
+
+
+// ═══════════════════════════════════════════
+// GET /skills/custom — 查看自定义 Skill 列表
+// ═══════════════════════════════════════════
+
+Response 200:
+{
+  custom: {
+    skill_id: string;          // 自动生成 "cs1", "cs2", ...
+    skill_name: string;
+    description: string;
+    icon: string;              // 默认 "✨"
+    category: string;          // 默认 "自定义"
+    prompt: string;
+    created_at: string;
+    updated_at: string;
+  }[];
+}
+
+
+// ═══════════════════════════════════════════
+// POST /skills/custom — 创建自定义 Skill
+// ═══════════════════════════════════════════
+
+Request Body:
+{
+  skill_name: string;          // 必填，最大 100 字符
+  description?: string;        // 默认 ""
+  icon?: string;               // 默认 "✨"
+  prompt: string;              // 必填，最小 10 字符
+  category?: string;           // 默认 "自定义"
+}
+// skill_id 由服务端自动生成（cs + 自增序号），创建后自动安装
+
+Response 201:
+{
+  skill_id: "cs2";
+  skill_name: string;
+  description: string;
+  icon: string;
+  category: string;
+  prompt: string;
+  created_at: string;
+}
+
+// 422 — 验证失败
+{ detail: "prompt 不能少于 10 个字符"; }
+
+
+// ═══════════════════════════════════════════
+// PUT /skills/custom/{skill_id} — 更新自定义 Skill
+// ═══════════════════════════════════════════
+
+Request Body:
+{
+  skill_name?: string;
+  description?: string;
+  icon?: string;
+  prompt?: string;
+  category?: string;
+}
+// 部分更新：仅传入的字段生效
+
+Response 200:
+{ updated: true; skill_id: string; }
+
+// 404 — 自定义 Skill 不存在
+{ detail: "自定义技能不存在: xxx"; }
+
+
+// ═══════════════════════════════════════════
+// DELETE /skills/custom/{skill_id} — 删除自定义 Skill
+// ═══════════════════════════════════════════
+
+Response 200:
+{ deleted: true; skill_id: string; }
+
+// 404 — 不存在
+{ detail: "自定义技能不存在: xxx"; }
+```
+
+### 3.10 与 Query Loop 引擎的集成点总结
+
+Skill 在第 1 章 Query Loop 引擎架构中的注入位置：
+
+```
+QueryLoopEngine
+│
+├── EngineManager.get_or_create(session_id, user_id)
+│   └── skill_registry = SkillRegistry(hub_path, state_path, user_id)   ← 新增
+│       (纯内存加载，同步完成，无异步，无进程管理)
+│
+├── _run_message_loop()
+│   │
+│   ├── skill_ids 解析:
+│   │     msg.skill_invocations → session.default_skill_ids → None    ← 新增
+│   │
+│   ├── context_mgr.build()
+│   │   └── system += skill_registry.get_active_prompts(skill_ids)    ← 新增
+│   │   └── tools = [client_tools] + [mcp_tools]                      ← 现有逻辑不变
+│   │
+│   ├── llm.stream(system=augmented_prompt, tools=...)                 ← 现有逻辑不变
+│   │
+│   └── _execute_tool_chunk() → 无任何变化                              ← 现有逻辑不变
+│
+├── _push_chunk() → agent.text / agent.tool_result / ...               ← 现有逻辑不变
+│   (Skill 注入不产生任何新的流数据块)
+│
+└── context_mgr.append_tool_result()                                   ← 现有逻辑不变
+```
+
+**需要变更的组件：**
+
+| 组件 | 变更内容 | 复杂度 |
+|------|---------|--------|
+| `EngineManager.__init__()` | 接受 `skill_registry: SkillRegistry` 参数 | 低 |
+| `QueryLoopEngine.__init__()` | 存储 `self._skill_registry` | 低 |
+| `QueryLoopEngine._run_message_loop()` | 在 `context.build()` 前添加 `skill_ids` 解析 | 中 |
+| `ContextManager.build()` | 接受 `skill_ids` + `skill_registry` 参数，追加 Skill prompt | 中 |
+| `QueryLoopEngine.enqueue()` | 已透传 `skill_invocations`（`query_loop.py` L270），无需变更 | 无 |
+| `main.py` lifespan | 初始化 `SkillRegistry`，传入 `EngineManager` | 低 |
+| `server/models/session.py` | `Session` 模型新增可选字段 `default_skill_ids` | 低 |
+| `server/models/message.py` | 已有 `SkillInvocation`，新增 `SkillDefinition` 等 API 模型 | 中 |
+
+**服务启动时机：** Skill 的注册表初始化在 `main.py` lifespan 中同步执行（读两个 JSON 文件），无需预连接、无需异步等待。与 MCP 需要 `_auto_connect_installed_mcps()` 启动所有子进程截然不同。
+
+**流数据块：** Skill 注入不产生任何新的 `StreamChunk` 类型。客户端无需做任何特殊处理——Skill 的行为效果完全体现在 LLM 生成的文本和工具调用中。
 
 ---
 

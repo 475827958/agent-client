@@ -75,15 +75,55 @@ export const DEFAULT_SETTINGS: Settings = {
   fullAccess: false
 }
 
-// ===== Skills / MCP / Config =====
+// ===== Skills (matches section 3.9 API responses) =====
+
+/** Hub 中的 Skill 条目 (GET /skills/hub) */
 export interface HubSkill {
-  id: string
-  name: string
-  desc: string
-  icon: string
+  skill_id: string
+  skill_name: string
+  description: string
+  version: string
   category: string
+  icon: string
+  author: string
+  tags: string[]
 }
 
+/** 已安装的 Skill (GET /skills/installed) */
+export interface InstalledSkill {
+  skill_id: string
+  skill_name: string
+  description: string
+  icon: string
+  category: string
+  source: 'hub' | 'custom' | 'builtin'
+  enabled: boolean
+  prompt: string
+}
+
+/** 自定义 Skill (GET /skills/custom) */
+export interface CustomSkillDef {
+  skill_id: string
+  skill_name: string
+  description: string
+  icon: string
+  category: string
+  prompt: string
+  created_at: string
+  updated_at: string
+}
+
+/** 创建自定义 Skill 的请求体 (POST /skills/custom) */
+export interface CreateCustomSkillRequest {
+  skill_name: string
+  description?: string
+  icon?: string
+  prompt: string
+  category?: string
+}
+
+// Keep legacy CustomSkill for now if needed, but mark as deprecated
+/** @deprecated Use CustomSkillDef instead */
 export interface CustomSkill {
   id: string
   name: string
