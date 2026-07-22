@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useChatStore } from '../../stores/chatStore'
+import { useTaskStore } from '../../stores/taskStore'
 
 export function PlanEditorPanel() {
   const currentEditingPlanMsgIdx = useChatStore((s) => s.currentEditingPlanMsgIdx)
@@ -9,6 +10,27 @@ export function PlanEditorPanel() {
   const [text, setText] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const isOpen = currentEditingPlanMsgIdx != null
+
+  // Populate editor text from the message being edited
+  useEffect(() => {
+    if (currentEditingPlanMsgIdx != null) {
+      const task = useTaskStore.getState().getCurrentTask()
+      const msg = task?.messages[currentEditingPlanMsgIdx]
+      if (msg) {
+        // Collect text from segments before the first 'generated' plan event
+        const segs = msg.segments || []
+        const generatedIdx = segs.findIndex(s => s.type === 'generated')
+        const textSegs = segs.slice(0, generatedIdx >= 0 ? generatedIdx : undefined)
+        const planText = textSegs
+          .filter((s): s is { type: 'text'; content: string } => s.type === 'text')
+          .map(s => s.content)
+          .join('')
+        setText(planText || msg.content || '')
+      }
+    } else {
+      setText('')
+    }
+  }, [currentEditingPlanMsgIdx])
 
   // Focus textarea after open animation
   useEffect(() => {

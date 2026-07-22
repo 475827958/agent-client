@@ -376,7 +376,9 @@ function createEventHandler(
       case 'build.step_skipped':
         taskStore.updateLastAssistantMessage((m) => ({
           ...m,
-          tools: m.tools?.filter((t) => t.id !== event.tool_call_id)
+          tools: m.tools?.map((t) =>
+            t.id === event.tool_call_id ? { ...t, status: 'skipped' as const } : t
+          )
         }))
         break
 
@@ -632,7 +634,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     taskStore.updateLastAssistantMessage((m) => ({
       ...m,
-      tools: m.tools?.filter(t => t.status !== 'pending')
+      tools: m.tools?.map((t) => t.status === 'pending' ? { ...t, status: 'skipped' as const } : t)
     }))
 
     buildApi.skip(task.sessionId).catch((err) => {
@@ -647,7 +649,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     taskStore.updateLastAssistantMessage((m) => ({
       ...m,
-      tools: m.tools?.filter(t => t.status !== 'pending')
+      tools: m.tools?.map((t) => t.status === 'pending' ? { ...t, status: 'skipped' as const } : t)
     }))
 
     buildApi.abort(task.sessionId).catch((err) => {

@@ -11,7 +11,7 @@ export interface ToolCall {
   result?: string
   _result?: string
   input?: Record<string, unknown>
-  status: 'pending' | 'running' | 'done'
+  status: 'pending' | 'running' | 'done' | 'skipped'
 }
 
 // ===== Plan =====

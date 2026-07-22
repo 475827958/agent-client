@@ -207,35 +207,82 @@ function SegmentsView({
     const tool = toolCallId ? toolMap.get(toolCallId) : undefined
     if (!tool) return null
 
+    // Build mode tools have reasoning (the question from AI)
+    const hasReasoning = tool.detail && !tool.detail.startsWith('{')
+
     return (
-      <div key={key} className="flex items-start gap-2.5 py-2 border-b border-[#f1f5f9] not-italic text-[#0f172a] last:border-b-0">
-        <svg className="w-4 h-4 flex-shrink-0 mt-0.5 text-[#94a3b8]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="8" cy="8" r="6" /><path d="M8 5v3l2 2" /></svg>
-        <div className="flex-1 min-w-0">
-          <div className="font-semibold text-xs text-[#0f172a]">{tool.name}</div>
-          {tool.command && (
-            <div className="mt-1 py-1.5 px-2.5 bg-[#1e293b] text-[#a7f3d0] rounded text-[11px] font-mono whitespace-pre-wrap">
-              $ {tool.command}
+      <div key={key} className="mb-1.5 not-italic text-[#0f172a]">
+        {/* Tool reasoning as a question card */}
+        {hasReasoning && (
+          <div className="p-3 bg-[#f0f9ff] border border-[#bae6fd] rounded-[8px]">
+            <div className="text-[10px] font-semibold text-[#0369a1] uppercase tracking-wider mb-1">执行步骤: {tool.name}</div>
+            <div className="text-xs text-[#0f172a] mb-1.5 leading-relaxed">{tool.detail}</div>
+            {tool.command && (
+              <div className="mt-1 py-1.5 px-2.5 bg-[#1e293b] text-[#a7f3d0] rounded text-[11px] font-mono whitespace-pre-wrap">
+                $ {tool.command}
+              </div>
+            )}
+            {/* User answer */}
+            {tool.status !== 'pending' && (
+              <div className="mt-2 pt-2 border-t border-[#bae6fd]">
+                <span className={`text-[11px] font-medium px-2.5 py-0.5 rounded-md inline-flex items-center gap-1 ${
+                  tool.status === 'skipped'
+                    ? 'text-[#b45309] bg-[#fffbeb] border border-[#fcd34d]'
+                    : 'text-[#047857] bg-[#d1fae5] border border-[#a7f3d0]'
+                }`}>
+                  {tool.status === 'skipped' ? (
+                    <>
+                      <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+                      已跳过
+                    </>
+                  ) : (
+                    <>
+                      <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 8l4 4 6-8" /></svg>
+                      已确认，正在执行...
+                    </>
+                  )}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* No reasoning — simple tool card (agent.tool_call, etc.) */}
+        {!hasReasoning && (
+          <div className="flex items-start gap-2.5 py-2 border-b border-[#f1f5f9] last:border-b-0">
+            <svg className="w-4 h-4 flex-shrink-0 mt-0.5 text-[#94a3b8]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="8" cy="8" r="6" /><path d="M8 5v3l2 2" /></svg>
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold text-xs text-[#0f172a]">{tool.name}</div>
+              {tool.command && (
+                <div className="mt-1 py-1.5 px-2.5 bg-[#1e293b] text-[#a7f3d0] rounded text-[11px] font-mono whitespace-pre-wrap">
+                  $ {tool.command}
+                </div>
+              )}
+              {tool.detail && <div className="text-[11px] text-[#94a3b8] mt-0.5">{tool.detail}</div>}
             </div>
-          )}
-          {tool.detail && <div className="text-[11px] text-[#94a3b8] mt-0.5">{tool.detail}</div>}
-          {tool.status === 'pending' && (
-            <div className="flex gap-1.5 mt-2 flex-wrap">
-              <button onClick={() => onConfirmTool()} className="px-3 py-1 rounded text-[11px] font-medium text-[#047857] border border-[#a7f3d0] bg-[#f0fdf4] hover:bg-[#a7f3d0] transition-colors cursor-pointer">确认</button>
-              <button onClick={() => onSkipTool()} className="px-3 py-1 rounded text-[11px] font-medium text-[#b45309] border border-[#fcd34d] bg-[#fffbeb] hover:bg-[#fde68a] transition-colors cursor-pointer">跳过</button>
-              <button onClick={() => onStopTools()} className="px-3 py-1 rounded text-[11px] font-medium text-[#b91c1c] border border-[#fecaca] bg-[#fef2f2] hover:bg-[#fecaca] transition-colors cursor-pointer">终止</button>
-            </div>
-          )}
-          {tool.result && (
-            <div className="mt-1 py-1.5 px-2.5 bg-[#f8fafc] rounded text-[11px] font-mono whitespace-pre-wrap max-h-[100px] overflow-y-auto border border-[#f1f5f9]">
-              {tool.result}
-            </div>
-          )}
-        </div>
-        {tool.status !== 'pending' && (
-          <span className={`text-[11px] px-2 py-0.5 rounded-lg font-medium flex-shrink-0 ${tool.status === 'running' ? 'text-[#b45309] bg-[#fffbeb]' : 'text-[#047857] bg-[#ecfdf5]'
-            }`}>
-            {tool.status === 'running' ? '执行中...' : '完成'}
-          </span>
+            {tool.status !== 'pending' && (
+              <span className={`text-[11px] px-2 py-0.5 rounded-lg font-medium flex-shrink-0 ${tool.status === 'running' ? 'text-[#b45309] bg-[#fffbeb]' : 'text-[#047857] bg-[#ecfdf5]'
+                }`}>
+                {tool.status === 'running' ? '执行中...' : '完成'}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Confirm/Skip buttons */}
+        {tool.status === 'pending' && (
+          <div className="flex gap-1.5 mt-1 flex-wrap">
+            <button onClick={() => onConfirmTool()} className="px-3 py-1 rounded text-[11px] font-medium text-[#047857] border border-[#a7f3d0] bg-[#f0fdf4] hover:bg-[#a7f3d0] transition-colors cursor-pointer">确认</button>
+            <button onClick={() => onSkipTool()} className="px-3 py-1 rounded text-[11px] font-medium text-[#b45309] border border-[#fcd34d] bg-[#fffbeb] hover:bg-[#fde68a] transition-colors cursor-pointer">跳过</button>
+            <button onClick={() => onStopTools()} className="px-3 py-1 rounded text-[11px] font-medium text-[#b91c1c] border border-[#fecaca] bg-[#fef2f2] hover:bg-[#fecaca] transition-colors cursor-pointer">终止</button>
+          </div>
+        )}
+
+        {/* Tool result */}
+        {tool.result && (
+          <div className="mt-1 py-1.5 px-2.5 bg-[#f8fafc] rounded text-[11px] font-mono whitespace-pre-wrap max-h-[100px] overflow-y-auto border border-[#f1f5f9] ml-6">
+            {tool.result}
+          </div>
         )}
       </div>
     )
