@@ -174,7 +174,7 @@ export function SkillsConfig() {
                       <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 bg-[#f0fdf4] text-[#047857]">{s.category}</span>
                     </div>
                     <div className="flex-shrink-0 self-center flex flex-col gap-1">
-                      <button
+                      {/* <button
                         onClick={() => handleToggleEnabled(s.skill_id, s.enabled)}
                         className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors border cursor-pointer ${
                           s.enabled
@@ -183,7 +183,7 @@ export function SkillsConfig() {
                         }`}
                       >
                         {s.enabled ? '禁用' : '启用'}
-                      </button>
+                      </button> */}
                       <button onClick={() => handleUninstall(s.skill_id)} className="px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9] cursor-pointer">卸载</button>
                     </div>
                   </div>
