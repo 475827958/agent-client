@@ -163,9 +163,9 @@ export function SkillsConfig() {
           {installedSkillsError && <div className="text-[#dc2626] text-[13px] py-3">{installedSkillsError}</div>}
           {!installedSkillsLoading && !installedSkillsError && (
             <div>
-              <div className="text-[11px] font-semibold text-[#94a3b8] uppercase tracking-wider mb-2">Hub 已安装 ({installedSkills.filter(s => s.source === 'hub').length})</div>
+              <div className="text-[11px] font-semibold text-[#94a3b8] uppercase tracking-wider mb-2">Hub 已安装 ({installedSkills?.length})</div>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5 mb-5">
-                {installedSkills.filter(s => s.source === 'hub').map(s => (
+                {installedSkills?.map(s => (
                   <div key={s.skill_id} className="bg-white border border-l-[3px] border-l-[#a7f3d0] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5">
                     <div className="w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg">{s.icon}</div>
                     <div className="flex-1 min-w-0">
@@ -188,7 +188,7 @@ export function SkillsConfig() {
                     </div>
                   </div>
                 ))}
-                {installedSkills.filter(s => s.source === 'hub').length === 0 && <div className="text-[#94a3b8] text-[13px] py-3">暂无已安装的 Hub Skill</div>}
+                {installedSkills?.length === 0 && <div className="text-[#94a3b8] text-[13px] py-3">暂无已安装的 Hub Skill</div>}
               </div>
 
               <div className="text-[11px] font-semibold text-[#94a3b8] uppercase tracking-wider mb-2">内置 Skills ({installedSkills.filter(s => s.source === 'builtin').length})</div>
@@ -217,36 +217,6 @@ export function SkillsConfig() {
                 ))}
                 {installedSkills.filter(s => s.source === 'builtin').length === 0 && <div className="text-[#94a3b8] text-[13px] py-3">暂无内置 Skill</div>}
               </div>
-
-              {installedSkills.filter(s => s.source === 'custom').length > 0 && (
-                <>
-                  <div className="text-[11px] font-semibold text-[#94a3b8] uppercase tracking-wider mb-2 mt-5">自定义 Skills ({installedSkills.filter(s => s.source === 'custom').length})</div>
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5">
-                    {installedSkills.filter(s => s.source === 'custom').map(s => (
-                      <div key={s.skill_id} className="bg-white border border-l-[3px] border-l-[#fde68a] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5">
-                        <div className="w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg">{s.icon}</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-sm text-[#0f172a]">{s.skill_name}</div>
-                          <div className="text-xs text-[#94a3b8] mt-1">{s.description}</div>
-                          <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 bg-[#f0fdf4] text-[#047857]">自定义</span>
-                        </div>
-                        <div className="flex-shrink-0 self-center flex flex-col gap-1">
-                          <button
-                            onClick={() => handleToggleEnabled(s.skill_id, s.enabled)}
-                            className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors border cursor-pointer ${
-                              s.enabled
-                                ? 'border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9]'
-                                : 'border-[#fde68a] text-[#b45309] bg-[#fffbeb] hover:bg-[#fde68a]'
-                            }`}
-                          >
-                            {s.enabled ? '禁用' : '启用'}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
             </div>
           )}
         </>
