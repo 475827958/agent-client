@@ -9,7 +9,8 @@ function getAPI() {
         grep: async () => [],
         write: async () => {},
         edit: async () => {},
-        exec: async () => ({ stdout: '', stderr: '', exit_code: 0 })
+        exec: async () => ({ stdout: '', stderr: '', exit_code: 0 }),
+        extractSkill: async () => ''
       },
       workspace: {
         select: async () => null

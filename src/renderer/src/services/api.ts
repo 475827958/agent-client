@@ -5,14 +5,6 @@ import { ipcClient } from './ipcClient'
 
 const DEFAULT_BASE_URL = '/api'
 
-/** Skills directory on the client machine */
-const HOME_DIR = (() => {
-  try {
-    return (window as any).__HOME_DIR || ''
-  } catch { return '' }
-})()
-const SKILLS_BASE_DIR = HOME_DIR ? `${HOME_DIR}/.iwork/skills` : ''
-
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -27,23 +19,10 @@ function blobToBase64(blob: Blob): Promise<string> {
   })
 }
 
-async function extractSkillZip(skillId: string, skillName: string, blob: Blob): Promise<string> {
-  if (!SKILLS_BASE_DIR) {
-    console.warn('HOME_DIR not available, skipping zip extraction')
-    return ''
-  }
-
-  const targetDir = `${SKILLS_BASE_DIR}/${skillName}`
-  const b64Path = `${SKILLS_BASE_DIR}/_tmp_${skillId}.b64`
-  const zipPath = `${SKILLS_BASE_DIR}/_tmp_${skillId}.zip`
-
+async function extractSkillZip(_skillId: string, skillName: string, blob: Blob): Promise<string> {
   const base64 = await blobToBase64(blob)
-
-  // Write base64 to temp file, decode, extract, cleanup
-  await ipcClient.file.write(b64Path, base64)
-  await ipcClient.file.exec(`mkdir -p "${targetDir}" && base64 -d "${b64Path}" > "${zipPath}" && unzip -o "${zipPath}" -d "${targetDir}" && rm "${b64Path}" "${zipPath}"`)
-
-  return targetDir
+  // Main process resolves ~/.iwork/skills/{skillName}/, creates dirs, decodes + extracts
+  return ipcClient.file.extractSkill(base64, skillName)
 }
 
 export interface ToolResult {
@@ -727,11 +706,24 @@ export async function fetchInstalledSkills(): Promise<{ installed: InstalledSkil
 
 // POST /skills/install — 服务端登记 + 返回 zip，客户端解压到 ~/.iwork/skills/{name}/
 export async function installSkillApi(skillId: string): Promise<SkillInstallResult> {
+  // Dedicated headers for this endpoint — the response may be JSON or binary zip,
+  // so we explicitly accept both. Don't reuse getAuthHeaders() which sets
+  // Content-Type: application/json as a blanket header.
+  const settings = useSettingsStore.getState().settings
+  const headers: Record<string, string> = {
+    'Accept': 'application/zip, application/json',
+    'Content-Type': 'application/json'
+  }
+  if (settings.apiKey) {
+    headers['Authorization'] = `Bearer ${settings.apiKey}`
+  }
+
   const response = await fetch(getSkillUrl('/skills/install'), {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers,
     body: JSON.stringify({ skill_id: skillId })
   })
+
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: 'Install failed' }))
     if (response.status === 409) throw new Error('该 Skill 已安装')
@@ -739,16 +731,23 @@ export async function installSkillApi(skillId: string): Promise<SkillInstallResu
     throw new Error(err.detail || `Skill install error: ${response.status}`)
   }
 
-  // Check if response is JSON (legacy/no zip) or a zip blob
+  // Detect zip response: check Content-Type header, fallback to Content-Disposition
   const contentType = response.headers.get('Content-Type') || ''
-  if (contentType.includes('application/zip')) {
+  const disposition = response.headers.get('Content-Disposition') || ''
+  const isZip = contentType.includes('application/zip')
+    || contentType.includes('application/octet-stream')
+    || disposition.includes('.zip')
+    || disposition.includes('attachment')
+
+  if (isZip) {
     const skillName = response.headers.get('X-Skill-Name') || skillId
     const blob = await response.blob()
+    console.log(`[installSkill] Received zip: ${blob.size} bytes, type=${contentType || '(none)'}, skill=${skillName}`)
     const extractPath = await extractSkillZip(skillId, skillName, blob)
     return { skill_id: skillId, skill_name: skillName, extract_path: extractPath }
   }
 
-  // Fallback: old JSON response
+  // Fallback: JSON response (legacy backend)
   const data = await response.json()
   return { skill_id: skillId, skill_name: data.skill_name || skillId, extract_path: '' }
 }

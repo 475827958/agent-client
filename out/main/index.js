@@ -58,6 +58,24 @@ const fs = require("fs");
 const child_process = require("child_process");
 const util = require("util");
 const Store = require("electron-store");
+const readline = require("readline");
+function _interopNamespaceDefault(e) {
+  const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
+  if (e) {
+    for (const k in e) {
+      if (k !== "default") {
+        const d = Object.getOwnPropertyDescriptor(e, k);
+        Object.defineProperty(n, k, d.get ? d : {
+          enumerable: true,
+          get: () => e[k]
+        });
+      }
+    }
+  }
+  n.default = e;
+  return Object.freeze(n);
+}
+const readline__namespace = /* @__PURE__ */ _interopNamespaceDefault(readline);
 const execAsync = util.promisify(child_process.exec);
 const execFileAsync = util.promisify(child_process.execFile);
 function resolveShell() {
@@ -225,6 +243,39 @@ function registerFileOps(workspacePath) {
       };
     }
   });
+  electron.ipcMain.handle("file:extractSkill", async (_event, base64Content, skillName) => {
+    const fs2 = await import("fs/promises");
+    const path2 = await import("path");
+    const os = await import("os");
+    const crypto = await import("crypto");
+    const homeDir = os.homedir();
+    const targetDir = path2.join(homeDir, ".iwork", "skills", skillName);
+    await fs2.mkdir(targetDir, { recursive: true });
+    const zipBuffer = Buffer.from(base64Content, "base64");
+    const tmpDir = os.tmpdir();
+    const zipName = `skill_${crypto.randomBytes(4).toString("hex")}.zip`;
+    const zipPath = path2.join(tmpDir, zipName);
+    await fs2.writeFile(zipPath, zipBuffer);
+    const bashPath = resolveShell();
+    try {
+      await execFileAsync(bashPath, ["-c", `unzip -o "${zipPath}" -d "${targetDir}"`], {
+        timeout: 3e4,
+        maxBuffer: 10 * 1024 * 1024,
+        encoding: "buffer"
+      });
+    } catch (err) {
+      try {
+        await fs2.unlink(zipPath);
+      } catch {
+      }
+      throw new Error(`Failed to extract zip: ${decodeBuffer(err.stderr) || err.message}`);
+    }
+    try {
+      await fs2.unlink(zipPath);
+    } catch {
+    }
+    return targetDir;
+  });
   electron.ipcMain.handle("workspace:select", async () => {
     const result = await electron.dialog.showOpenDialog({
       properties: ["openDirectory"]
@@ -252,6 +303,324 @@ function registerSettings() {
     store,
     get: () => store.store
   };
+}
+function resolveEnv(value) {
+  return value.replace(/\$\{(\w+)\}/g, (_, name) => process.env[name] || "");
+}
+function resolveEnvVars(env) {
+  if (!env) return void 0;
+  const resolved = {};
+  for (const [k, v] of Object.entries(env)) {
+    resolved[k] = resolveEnv(v);
+  }
+  return resolved;
+}
+class StdioConnection {
+  constructor(config) {
+    this.config = config;
+  }
+  process = null;
+  nextId = 1;
+  pending = /* @__PURE__ */ new Map();
+  buffer = "";
+  async connect() {
+    const send = (req) => this.sendRpc(req);
+    await this.spawnProcess();
+    await this.initialize(send);
+    return this.listTools(send);
+  }
+  spawnProcess() {
+    return new Promise((resolve, reject) => {
+      const command = this.config.command;
+      const args = this.config.args || [];
+      const env = {
+        ...process.env,
+        ...resolveEnvVars(this.config.env)
+      };
+      const child = child_process.spawn(command, args, {
+        stdio: ["pipe", "pipe", "pipe"],
+        env,
+        shell: process.platform === "win32"
+      });
+      this.process = child;
+      const rl = readline__namespace.createInterface({ input: child.stdout, crlfDelay: Infinity });
+      rl.on("line", (line) => {
+        try {
+          const msg = JSON.parse(line);
+          if (msg.id && this.pending.has(msg.id)) {
+            const p = this.pending.get(msg.id);
+            this.pending.delete(msg.id);
+            p.resolve(msg);
+          }
+        } catch {
+        }
+      });
+      let stderrLog = "";
+      child.stderr?.on("data", (data) => {
+        stderrLog += data.toString();
+      });
+      child.on("error", (err) => {
+        reject(new Error(`Failed to spawn ${command}: ${err.message}`));
+      });
+      child.on("exit", (code, signal) => {
+        if (code !== 0 && code !== null) {
+          const errMsg = stderrLog.trim() || `Process exited with code ${code}`;
+          for (const [, p] of this.pending) {
+            p.reject(new Error(errMsg));
+          }
+          this.pending.clear();
+        }
+      });
+      setTimeout(() => resolve(), 200);
+    });
+  }
+  sendRpc(req) {
+    return new Promise((resolve, reject) => {
+      if (!this.process || this.process.killed) {
+        reject(new Error("Process not running"));
+        return;
+      }
+      const id = this.nextId++;
+      const request = { ...req, id };
+      this.pending.set(id, { resolve, reject });
+      const timeout = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`MCP request timed out: ${req.method}`));
+      }, 3e4);
+      const origResolve = resolve;
+      this.pending.set(id, {
+        resolve: (v) => {
+          clearTimeout(timeout);
+          origResolve(v);
+        },
+        reject: (e) => {
+          clearTimeout(timeout);
+          reject(e);
+        }
+      });
+      this.process.stdin.write(JSON.stringify(request) + "\n");
+    });
+  }
+  async initialize(send) {
+    const resp = await send({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: { name: "agent-electron-app", version: "1.0.0" }
+      }
+    });
+    if (resp.error) {
+      throw new Error(`MCP initialize error: ${resp.error.message}`);
+    }
+    if (this.process && !this.process.killed) {
+      this.process.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "initialized" }) + "\n");
+    }
+  }
+  async listTools(send) {
+    const resp = await send({
+      jsonrpc: "2.0",
+      id: 2,
+      method: "tools/list",
+      params: {}
+    });
+    if (resp.error) {
+      throw new Error(`tools/list error: ${resp.error.message}`);
+    }
+    const result = resp.result;
+    return result?.tools || [];
+  }
+  async callTool(name, args) {
+    const resp = await this.sendRpc({
+      jsonrpc: "2.0",
+      id: this.nextId++,
+      method: "tools/call",
+      params: { name, arguments: args }
+    });
+    if (resp.error) {
+      throw new Error(`tools/call error: ${resp.error.message}`);
+    }
+    return resp.result;
+  }
+  disconnect() {
+    if (this.process && !this.process.killed) {
+      this.process.kill();
+      this.process = null;
+    }
+    for (const [, p] of this.pending) {
+      p.reject(new Error("Connection closed"));
+    }
+    this.pending.clear();
+  }
+}
+class HttpConnection {
+  constructor(config) {
+    this.config = config;
+    this.endpoint = "";
+    this.headers = {};
+  }
+  endpoint;
+  nextId = 1;
+  headers;
+  async connect() {
+    if (this.config.transport === "sse") {
+      this.endpoint = await this.resolveSseEndpoint();
+    } else {
+      this.endpoint = resolveEnv(this.config.url || "");
+    }
+    this.headers = { "Content-Type": "application/json", ...this.config.headers || {} };
+    const send = (req) => this.sendRpc(req);
+    await this.initialize(send);
+    return this.listTools(send);
+  }
+  async resolveSseEndpoint() {
+    const url = resolveEnv(this.config.url || "");
+    const response = await fetch(url, {
+      headers: { Accept: "text/event-stream", ...this.config.headers || {} }
+    });
+    if (!response.ok) {
+      throw new Error(`SSE connection failed: ${response.status}`);
+    }
+    const body = response.body;
+    if (!body) throw new Error("SSE response has no body");
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let endpoint = "";
+    const start = Date.now();
+    while (Date.now() - start < 1e4) {
+      const { done, value } = await reader.read({ timeout: 5e3 });
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        if (line.startsWith("event: endpoint")) {
+          continue;
+        }
+        if (line.startsWith("data: ") && endpoint === "") {
+          const prevIdx = lines.indexOf(line) - 1;
+          if (prevIdx >= 0 && lines[prevIdx] === "event: endpoint") {
+            endpoint = line.slice(6).trim();
+          }
+        }
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6).trim();
+          if (data && (data.startsWith("http://") || data.startsWith("https://"))) {
+            endpoint = data;
+          }
+        }
+      }
+      if (endpoint) break;
+    }
+    reader.cancel();
+    if (!endpoint) throw new Error("Failed to get SSE endpoint");
+    return endpoint;
+  }
+  async sendRpc(req) {
+    const response = await fetch(this.endpoint, {
+      method: "POST",
+      headers: this.headers,
+      body: JSON.stringify(req)
+    });
+    if (!response.ok) {
+      throw new Error(`MCP HTTP error: ${response.status}`);
+    }
+    const data = await response.json();
+    return data;
+  }
+  async initialize(send) {
+    const resp = await send({
+      jsonrpc: "2.0",
+      id: this.nextId++,
+      method: "initialize",
+      params: {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: { name: "agent-electron-app", version: "1.0.0" }
+      }
+    });
+    if (resp.error) {
+      throw new Error(`MCP initialize error: ${resp.error.message}`);
+    }
+    await fetch(this.endpoint, {
+      method: "POST",
+      headers: this.headers,
+      body: JSON.stringify({ jsonrpc: "2.0", method: "initialized" })
+    });
+  }
+  async listTools(send) {
+    const resp = await send({
+      jsonrpc: "2.0",
+      id: this.nextId++,
+      method: "tools/list",
+      params: {}
+    });
+    if (resp.error) {
+      throw new Error(`tools/list error: ${resp.error.message}`);
+    }
+    const result = resp.result;
+    return result?.tools || [];
+  }
+  async callTool(name, args) {
+    const resp = await this.sendRpc({
+      jsonrpc: "2.0",
+      id: this.nextId++,
+      method: "tools/call",
+      params: { name, arguments: args }
+    });
+    if (resp.error) {
+      throw new Error(`tools/call error: ${resp.error.message}`);
+    }
+    return resp.result;
+  }
+  disconnect() {
+  }
+}
+class McpManager {
+  connections = /* @__PURE__ */ new Map();
+  async connect(serverId, config) {
+    this.disconnect(serverId);
+    let conn;
+    if (config.transport === "stdio") {
+      conn = new StdioConnection(config);
+    } else {
+      conn = new HttpConnection(config);
+    }
+    this.connections.set(serverId, conn);
+    return conn.connect();
+  }
+  async callTool(serverId, toolName, input) {
+    const conn = this.connections.get(serverId);
+    if (!conn) throw new Error(`MCP server ${serverId} is not connected`);
+    return conn.callTool(toolName, input);
+  }
+  disconnect(serverId) {
+    const conn = this.connections.get(serverId);
+    if (conn) {
+      conn.disconnect();
+      this.connections.delete(serverId);
+    }
+  }
+  disconnectAll() {
+    for (const [id] of this.connections) {
+      this.disconnect(id);
+    }
+  }
+}
+const mcpManager = new McpManager();
+function registerMcpIpc() {
+  electron.ipcMain.handle("mcp:connect", async (_event, serverId, config) => {
+    return mcpManager.connect(serverId, config);
+  });
+  electron.ipcMain.handle("mcp:disconnect", async (_event, serverId) => {
+    mcpManager.disconnect(serverId);
+  });
+  electron.ipcMain.handle("mcp:call-tool", async (_event, serverId, toolName, input) => {
+    return mcpManager.callTool(serverId, toolName, input);
+  });
 }
 function createWindow() {
   const mainWindow = new electron.BrowserWindow({
@@ -287,6 +656,7 @@ electron.app.whenReady().then(() => {
   electron.app.setAppUserModelId("com.agent.electron-app");
   const { get: getSettings } = registerSettings();
   registerFileOps(() => getSettings().workspacePath);
+  registerMcpIpc();
   createWindow();
   electron.app.on("activate", () => {
     if (electron.BrowserWindow.getAllWindows().length === 0) createWindow();

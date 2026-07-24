@@ -263,6 +263,7 @@ export interface ElectronAPI {
     write: (path: string, content: string) => Promise<void>
     edit: (path: string, oldStr: string, newStr: string) => Promise<void>
     exec: (command: string, timeoutMs?: number) => Promise<{ stdout: string; stderr: string; exit_code: number }>
+    extractSkill: (base64: string, skillName: string) => Promise<string>
   }
   workspace: {
     select: () => Promise<string | null>

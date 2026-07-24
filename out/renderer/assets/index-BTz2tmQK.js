@@ -7179,7 +7179,8 @@ function getAPI() {
         },
         edit: async () => {
         },
-        exec: async () => ({ stdout: "", stderr: "", exit_code: 0 })
+        exec: async () => ({ stdout: "", stderr: "", exit_code: 0 }),
+        extractSkill: async () => ""
       },
       workspace: {
         select: async () => null
@@ -7194,6 +7195,14 @@ function getAPI() {
           workspacePath: "",
           fullAccess: false
         })
+      },
+      mcp: {
+        connect: async () => [],
+        disconnect: async () => {
+        },
+        callTool: async () => {
+          throw new Error("MCP not available");
+        }
       }
     };
   }
@@ -7217,6 +7226,81 @@ const useSettingsStore = create$1((set, get) => ({
     await ipcClient.settings.save(updated);
   }
 }));
+const scriptRel = function detectScriptRel() {
+  const relList = typeof document !== "undefined" && document.createElement("link").relList;
+  return relList && relList.supports && relList.supports("modulepreload") ? "modulepreload" : "preload";
+}();
+const assetsURL = function(dep, importerUrl) {
+  return new URL(dep, importerUrl).href;
+};
+const seen = {};
+const __vitePreload = function preload(baseModule, deps, importerUrl) {
+  let promise = Promise.resolve();
+  if (deps && deps.length > 0) {
+    const links = document.getElementsByTagName("link");
+    const cspNonceMeta = document.querySelector(
+      "meta[property=csp-nonce]"
+    );
+    const cspNonce = cspNonceMeta?.nonce || cspNonceMeta?.getAttribute("nonce");
+    promise = Promise.allSettled(
+      deps.map((dep) => {
+        dep = assetsURL(dep, importerUrl);
+        if (dep in seen) return;
+        seen[dep] = true;
+        const isCss = dep.endsWith(".css");
+        const cssSelector = isCss ? '[rel="stylesheet"]' : "";
+        const isBaseRelative = !!importerUrl;
+        if (isBaseRelative) {
+          for (let i = links.length - 1; i >= 0; i--) {
+            const link22 = links[i];
+            if (link22.href === dep && (!isCss || link22.rel === "stylesheet")) {
+              return;
+            }
+          }
+        } else if (document.querySelector(`link[href="${dep}"]${cssSelector}`)) {
+          return;
+        }
+        const link2 = document.createElement("link");
+        link2.rel = isCss ? "stylesheet" : scriptRel;
+        if (!isCss) {
+          link2.as = "script";
+        }
+        link2.crossOrigin = "";
+        link2.href = dep;
+        if (cspNonce) {
+          link2.setAttribute("nonce", cspNonce);
+        }
+        document.head.appendChild(link2);
+        if (isCss) {
+          return new Promise((res, rej) => {
+            link2.addEventListener("load", res);
+            link2.addEventListener(
+              "error",
+              () => rej(new Error(`Unable to preload CSS for ${dep}`))
+            );
+          });
+        }
+      })
+    );
+  }
+  function handlePreloadError(err) {
+    const e = new Event("vite:preloadError", {
+      cancelable: true
+    });
+    e.payload = err;
+    window.dispatchEvent(e);
+    if (!e.defaultPrevented) {
+      throw err;
+    }
+  }
+  return promise.then((res) => {
+    for (const item of res || []) {
+      if (item.status !== "rejected") continue;
+      handlePreloadError(item.reason);
+    }
+    return baseModule().catch(handlePreloadError);
+  });
+};
 async function* parseNDJSONStream(reader) {
   const decoder = new TextDecoder();
   let buffer = "";
@@ -7245,6 +7329,37 @@ async function* parseNDJSONStream(reader) {
   }
 }
 const DEFAULT_BASE_URL = "/api";
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result;
+      const comma = result.indexOf(",");
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+async function extractSkillZip(_skillId, skillName, blob) {
+  const base64 = await blobToBase64(blob);
+  return ipcClient.file.extractSkill(base64, skillName);
+}
+async function tryExecuteMcpTool(toolName, input) {
+  const { useConfigStore: useConfigStore2 } = await __vitePreload(async () => {
+    const { useConfigStore: useConfigStore3 } = await Promise.resolve().then(() => configStore);
+    return { useConfigStore: useConfigStore3 };
+  }, true ? void 0 : void 0, import.meta.url);
+  const { mcpConnectionStatuses } = useConfigStore2.getState();
+  for (const serverId of Object.keys(mcpConnectionStatuses)) {
+    const prefix = serverId + "_";
+    if (toolName.startsWith(prefix) && mcpConnectionStatuses[serverId].status === "connected") {
+      const actualToolName = toolName.slice(prefix.length);
+      return ipcClient.mcp.callTool(serverId, actualToolName, input);
+    }
+  }
+  return null;
+}
 function resolveWorkspacePath(workspaceRoot, targetPath) {
   const sep = workspaceRoot.includes("\\") ? "\\" : "/";
   const isWin = sep === "\\";
@@ -7344,8 +7459,14 @@ async function executeClientTool(toolName, input, workspacePath) {
         output = result.stdout || result.stderr || "(no output)";
         break;
       }
-      default:
-        throw new Error(`Unknown client tool: ${toolName}`);
+      default: {
+        const mcpResult = await tryExecuteMcpTool(toolName, input);
+        if (mcpResult !== null) {
+          output = typeof mcpResult === "string" ? mcpResult : JSON.stringify(mcpResult);
+        } else {
+          throw new Error(`Unknown client tool: ${toolName}`);
+        }
+      }
     }
     return {
       status: "success",
@@ -7469,6 +7590,7 @@ async function sendChatMessage(opts) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
         Authorization: settings.apiKey ? `Bearer ${settings.apiKey}` : ""
       },
       body: JSON.stringify({
@@ -7594,12 +7716,463 @@ async function submitToolResult(sessionId, requestId, result) {
     throw new Error(err.message || "Tool result submission failed");
   }
 }
+function getAuthHeaders() {
+  const settings = useSettingsStore.getState().settings;
+  return {
+    "Content-Type": "application/json",
+    Authorization: settings.apiKey ? `Bearer ${settings.apiKey}` : ""
+  };
+}
+function getMcpUrl(path2) {
+  const settings = useSettingsStore.getState().settings;
+  const baseUrl = settings.apiBaseUrl || DEFAULT_BASE_URL;
+  return `${baseUrl}${path2}`;
+}
+async function fetchMcpHub() {
+  const response = await fetch(getMcpUrl("/mcp/hub"), { headers: getAuthHeaders() });
+  if (!response.ok) throw new Error(`MCP Hub fetch error: ${response.status}`);
+  return response.json();
+}
+async function fetchMcpInstalled() {
+  const response = await fetch(getMcpUrl("/mcp/installed"), { headers: getAuthHeaders() });
+  if (!response.ok) throw new Error(`MCP Installed fetch error: ${response.status}`);
+  return response.json();
+}
+async function installMcpApi(serverId) {
+  const response = await fetch(getMcpUrl("/mcp/install"), {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ server_id: serverId })
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Install failed" }));
+    if (response.status === 409) throw new Error("该 MCP 已安装");
+    if (response.status === 404) throw new Error("server_id 不在 Hub 中");
+    throw new Error(err.detail || `MCP install error: ${response.status}`);
+  }
+  return response.json();
+}
+async function uninstallMcpApi(serverId) {
+  const response = await fetch(getMcpUrl(`/mcp/uninstall/${serverId}`), {
+    method: "DELETE",
+    headers: getAuthHeaders()
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Uninstall failed" }));
+    throw new Error(err.detail || `MCP uninstall error: ${response.status}`);
+  }
+  return response.json();
+}
+async function fetchMcpCustom() {
+  const response = await fetch(getMcpUrl("/mcp/custom"), { headers: getAuthHeaders() });
+  if (!response.ok) throw new Error(`MCP Custom fetch error: ${response.status}`);
+  return response.json();
+}
+async function createCustomMcpApi(req) {
+  const response = await fetch(getMcpUrl("/mcp/custom"), {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(req)
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Create custom MCP failed" }));
+    throw new Error(err.detail || `MCP custom create error: ${response.status}`);
+  }
+  return response.json();
+}
+async function deleteCustomMcpApi(serverId) {
+  const response = await fetch(getMcpUrl(`/mcp/custom/${serverId}`), {
+    method: "DELETE",
+    headers: getAuthHeaders()
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Delete custom MCP failed" }));
+    throw new Error(err.detail || `MCP custom delete error: ${response.status}`);
+  }
+  return response.json();
+}
+async function reportMcpTools(sessionId, serverId, tools) {
+  const response = await fetch(getMcpUrl(`/sessions/${sessionId}/mcp/tools`), {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ server_id: serverId, tools })
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Report tools failed" }));
+    throw new Error(err.detail || `MCP tools report error: ${response.status}`);
+  }
+  return response.json();
+}
+function getSkillUrl(path2) {
+  const settings = useSettingsStore.getState().settings;
+  const baseUrl = settings.apiBaseUrl || DEFAULT_BASE_URL;
+  return `${baseUrl}${path2}`;
+}
+async function fetchSkillHub() {
+  const response = await fetch(getSkillUrl("/skills/hub"), { headers: getAuthHeaders() });
+  if (!response.ok) throw new Error(`Skill Hub fetch error: ${response.status}`);
+  return response.json();
+}
+async function fetchInstalledSkills() {
+  const response = await fetch(getSkillUrl("/skills/installed"), { headers: getAuthHeaders() });
+  if (!response.ok) throw new Error(`Skill Installed fetch error: ${response.status}`);
+  return response.json();
+}
+async function installSkillApi(skillId) {
+  const settings = useSettingsStore.getState().settings;
+  const headers = {
+    "Accept": "application/zip, application/json",
+    "Content-Type": "application/json"
+  };
+  if (settings.apiKey) {
+    headers["Authorization"] = `Bearer ${settings.apiKey}`;
+  }
+  const response = await fetch(getSkillUrl("/skills/install"), {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ skill_id: skillId })
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Install failed" }));
+    if (response.status === 409) throw new Error("该 Skill 已安装");
+    if (response.status === 404) throw new Error("skill_id 不在 Hub 中");
+    throw new Error(err.detail || `Skill install error: ${response.status}`);
+  }
+  const contentType = response.headers.get("Content-Type") || "";
+  const disposition = response.headers.get("Content-Disposition") || "";
+  const isZip = contentType.includes("application/zip") || contentType.includes("application/octet-stream") || disposition.includes(".zip") || disposition.includes("attachment");
+  if (isZip) {
+    const skillName = response.headers.get("X-Skill-Name") || skillId;
+    const blob = await response.blob();
+    console.log(`[installSkill] Received zip: ${blob.size} bytes, type=${contentType || "(none)"}, skill=${skillName}`);
+    const extractPath = await extractSkillZip(skillId, skillName, blob);
+    return { skill_id: skillId, skill_name: skillName, extract_path: extractPath };
+  }
+  const data = await response.json();
+  return { skill_id: skillId, skill_name: data.skill_name || skillId, extract_path: "" };
+}
+async function uninstallSkillApi(skillId) {
+  const response = await fetch(getSkillUrl(`/skills/uninstall/${skillId}`), {
+    method: "DELETE",
+    headers: getAuthHeaders()
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Uninstall failed" }));
+    throw new Error(err.detail || `Skill uninstall error: ${response.status}`);
+  }
+  return response.json();
+}
+async function enableSkillApi(skillId) {
+  const response = await fetch(getSkillUrl("/skills/enable"), {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ skill_id: skillId })
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Enable failed" }));
+    throw new Error(err.detail || `Skill enable error: ${response.status}`);
+  }
+  return response.json();
+}
+async function disableSkillApi(skillId) {
+  const response = await fetch(getSkillUrl("/skills/disable"), {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ skill_id: skillId })
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Disable failed" }));
+    throw new Error(err.detail || `Skill disable error: ${response.status}`);
+  }
+  return response.json();
+}
+async function fetchCustomSkillsApi() {
+  const response = await fetch(getSkillUrl("/skills/custom"), { headers: getAuthHeaders() });
+  if (!response.ok) throw new Error(`Custom Skills fetch error: ${response.status}`);
+  return response.json();
+}
+async function createCustomSkillApi(req) {
+  const response = await fetch(getSkillUrl("/skills/custom"), {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(req)
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Create custom skill failed" }));
+    throw new Error(err.detail || `Custom skill create error: ${response.status}`);
+  }
+  return response.json();
+}
+async function deleteCustomSkillApi(skillId) {
+  const response = await fetch(getSkillUrl(`/skills/custom/${skillId}`), {
+    method: "DELETE",
+    headers: getAuthHeaders()
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Delete custom skill failed" }));
+    throw new Error(err.detail || `Custom skill delete error: ${response.status}`);
+  }
+  return response.json();
+}
 const useModeStore = create$1((set) => ({
   inputMode: "build",
   sceneMode: "office",
   setInputMode: (mode) => set({ inputMode: mode }),
   setSceneMode: (mode) => set({ sceneMode: mode })
 }));
+const useConfigStore = create$1((set, get) => ({
+  // Skills — API-backed
+  hubSkills: [],
+  hubSkillsLoading: false,
+  hubSkillsError: null,
+  installedSkills: [],
+  installedSkillsLoading: false,
+  installedSkillsError: null,
+  customSkills: [],
+  customSkillsLoading: false,
+  customSkillsError: null,
+  // MCP — API-backed
+  mcpHub: [],
+  mcpHubLoading: false,
+  mcpHubError: null,
+  installedMcps: [],
+  installedLoading: false,
+  installedError: null,
+  customMcps: [],
+  customLoading: false,
+  customError: null,
+  installingMcpIds: /* @__PURE__ */ new Set(),
+  installingSkillIds: /* @__PURE__ */ new Set(),
+  mcpConnectionStatuses: {},
+  mcpDiscoveredTools: {},
+  // Skills actions
+  loadSkillHub: async () => {
+    const s = get();
+    if (s.hubSkillsLoading) return;
+    set({ hubSkillsLoading: true, hubSkillsError: null });
+    try {
+      const data = await fetchSkillHub();
+      set({ hubSkills: data.skills, hubSkillsLoading: false });
+    } catch (err) {
+      set({ hubSkillsError: err.message || "加载 Skill Hub 失败", hubSkillsLoading: false });
+    }
+  },
+  loadInstalledSkills: async () => {
+    const s = get();
+    if (s.installedSkillsLoading) return;
+    set({ installedSkillsLoading: true, installedSkillsError: null });
+    try {
+      const data = await fetchInstalledSkills();
+      set({ installedSkills: data.installed, installedSkillsLoading: false });
+    } catch (err) {
+      set({ installedSkillsError: err.message || "加载已安装 Skill 失败", installedSkillsLoading: false });
+    }
+  },
+  loadCustomSkills: async () => {
+    const s = get();
+    if (s.customSkillsLoading) return;
+    set({ customSkillsLoading: true, customSkillsError: null });
+    try {
+      const data = await fetchCustomSkillsApi();
+      set({ customSkills: data.custom, customSkillsLoading: false });
+    } catch (err) {
+      set({ customSkillsError: err.message || "加载自定义 Skill 失败", customSkillsLoading: false });
+    }
+  },
+  loadAllSkills: async () => {
+    await Promise.all([get().loadSkillHub(), get().loadInstalledSkills(), get().loadCustomSkills()]);
+  },
+  installSkill: async (skillId) => {
+    const s = get();
+    if (s.installingSkillIds.has(skillId)) return;
+    set({ installingSkillIds: /* @__PURE__ */ new Set([...s.installingSkillIds, skillId]) });
+    try {
+      await installSkillApi(skillId);
+      await get().loadInstalledSkills();
+    } catch (err) {
+      throw err;
+    } finally {
+      set((st) => {
+        const next = new Set(st.installingSkillIds);
+        next.delete(skillId);
+        return { installingSkillIds: next };
+      });
+    }
+  },
+  uninstallSkill: async (skillId) => {
+    try {
+      await uninstallSkillApi(skillId);
+      await get().loadInstalledSkills();
+    } catch (err) {
+      throw err;
+    }
+  },
+  enableSkill: async (skillId) => {
+    await enableSkillApi(skillId);
+    await get().loadInstalledSkills();
+  },
+  disableSkill: async (skillId) => {
+    await disableSkillApi(skillId);
+    await get().loadInstalledSkills();
+  },
+  createCustomSkill: async (req) => {
+    await createCustomSkillApi(req);
+    await Promise.all([get().loadCustomSkills(), get().loadInstalledSkills()]);
+  },
+  deleteCustomSkill: async (skillId) => {
+    await deleteCustomSkillApi(skillId);
+    await Promise.all([get().loadCustomSkills(), get().loadInstalledSkills()]);
+  },
+  // MCP actions
+  loadMcpHub: async () => {
+    const s = get();
+    if (s.mcpHubLoading) return;
+    set({ mcpHubLoading: true, mcpHubError: null });
+    try {
+      const data = await fetchMcpHub();
+      set({ mcpHub: data.servers, mcpHubLoading: false });
+    } catch (err) {
+      set({ mcpHubError: err.message || "加载 Hub 失败", mcpHubLoading: false });
+    }
+  },
+  loadInstalledMcps: async () => {
+    const s = get();
+    if (s.installedLoading) return;
+    set({ installedLoading: true, installedError: null });
+    try {
+      const data = await fetchMcpInstalled();
+      set({ installedMcps: data.installed, installedLoading: false });
+    } catch (err) {
+      set({ installedError: err.message || "加载已安装列表失败", installedLoading: false });
+    }
+  },
+  loadCustomMcps: async () => {
+    const s = get();
+    if (s.customLoading) return;
+    set({ customLoading: true, customError: null });
+    try {
+      const data = await fetchMcpCustom();
+      set({ customMcps: data.custom, customLoading: false });
+    } catch (err) {
+      set({ customError: err.message || "加载自定义 MCP 失败", customLoading: false });
+    }
+  },
+  loadAllMcps: async () => {
+    await Promise.all([get().loadMcpHub(), get().loadInstalledMcps(), get().loadCustomMcps()]);
+  },
+  installMcp: async (serverId) => {
+    const s = get();
+    if (s.installingMcpIds.has(serverId)) return;
+    set({ installingMcpIds: /* @__PURE__ */ new Set([...s.installingMcpIds, serverId]) });
+    try {
+      const config = await installMcpApi(serverId);
+      set((st) => ({
+        mcpConnectionStatuses: {
+          ...st.mcpConnectionStatuses,
+          [serverId]: { server_id: serverId, status: "connecting", tool_count: 0 }
+        }
+      }));
+      const tools = await ipcClient.mcp.connect(serverId, config);
+      set((st) => ({
+        mcpDiscoveredTools: { ...st.mcpDiscoveredTools, [serverId]: tools },
+        mcpConnectionStatuses: {
+          ...st.mcpConnectionStatuses,
+          [serverId]: { server_id: serverId, status: "connected", tool_count: tools.length }
+        }
+      }));
+      await get().loadInstalledMcps();
+    } catch (err) {
+      set((st) => ({
+        mcpConnectionStatuses: {
+          ...st.mcpConnectionStatuses,
+          [serverId]: { server_id: serverId, status: "error", tool_count: 0, error: err.message }
+        }
+      }));
+      throw err;
+    } finally {
+      set((st) => {
+        const next = new Set(st.installingMcpIds);
+        next.delete(serverId);
+        return { installingMcpIds: next };
+      });
+    }
+  },
+  uninstallMcp: async (serverId) => {
+    try {
+      try {
+        await ipcClient.mcp.disconnect(serverId);
+      } catch {
+      }
+      await uninstallMcpApi(serverId);
+      set((st) => {
+        const { [serverId]: _, ...restStatuses } = st.mcpConnectionStatuses;
+        const { [serverId]: __, ...restTools } = st.mcpDiscoveredTools;
+        return { mcpConnectionStatuses: restStatuses, mcpDiscoveredTools: restTools };
+      });
+      await get().loadInstalledMcps();
+    } catch (err) {
+      throw err;
+    }
+  },
+  createCustomMcp: async (req) => {
+    await createCustomMcpApi(req);
+    await get().loadCustomMcps();
+    await get().loadInstalledMcps();
+  },
+  deleteCustomMcp: async (serverId) => {
+    await deleteCustomMcpApi(serverId);
+    await get().loadCustomMcps();
+    await get().loadInstalledMcps();
+  },
+  setMcpConnectionStatus: (serverId, partial) => {
+    set((st) => ({
+      mcpConnectionStatuses: {
+        ...st.mcpConnectionStatuses,
+        [serverId]: {
+          server_id: serverId,
+          status: "disconnected",
+          tool_count: 0,
+          ...st.mcpConnectionStatuses[serverId],
+          ...partial
+        }
+      }
+    }));
+  },
+  // Build mcp_servers payload for CreateSessionRequest
+  getMcpServersForSession: () => {
+    const { mcpConnectionStatuses, mcpDiscoveredTools } = get();
+    const servers = [];
+    for (const [serverId, status] of Object.entries(mcpConnectionStatuses)) {
+      if (status.status === "connected" && status.tool_count > 0) {
+        const tools = mcpDiscoveredTools[serverId] || [];
+        servers.push({
+          server_id: serverId,
+          server_name: serverId,
+          enabled_tools: tools.length > 0 ? tools.map((t2) => t2.name) : void 0
+        });
+      }
+    }
+    return servers;
+  },
+  // Report all connected MCP tools to a given session
+  reportMcpToolsToSession: async (sessionId) => {
+    const { mcpConnectionStatuses, mcpDiscoveredTools } = get();
+    for (const [serverId, status] of Object.entries(mcpConnectionStatuses)) {
+      if (status.status === "connected") {
+        const tools = mcpDiscoveredTools[serverId] || [];
+        try {
+          await reportMcpTools(sessionId, serverId, tools);
+        } catch (err) {
+          console.error(`Failed to report tools for ${serverId}:`, err);
+        }
+      }
+    }
+  }
+}));
+const configStore = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
+  __proto__: null,
+  useConfigStore
+}, Symbol.toStringTag, { value: "Module" }));
 function genUUID() {
   return crypto.randomUUID();
 }
@@ -7641,8 +8214,10 @@ const useTaskStore = create$1((set, get) => ({
         workspace: settings.workspacePath,
         model: settings.model,
         mode: modeStore.inputMode,
-        client_tools: CLIENT_TOOLS
+        client_tools: CLIENT_TOOLS,
+        mcp_servers: useConfigStore.getState().getMcpServersForSession()
       });
+      useConfigStore.getState().reportMcpToolsToSession(data.id);
       set((s) => ({
         tasks: s.tasks.map(
           (t2) => t2.id === id2 ? { ...t2, sessionId: data.id } : t2
@@ -7735,7 +8310,7 @@ const useTaskStore = create$1((set, get) => ({
     return state.tasks.find((t2) => t2.id === state.currentTaskId);
   }
 }));
-function Sidebar({ onOpenConfig, activeConfig }) {
+function Sidebar({ onOpenConfig, onCloseConfig, activeConfig }) {
   const tasks = useTaskStore((s) => s.tasks);
   const currentId = useTaskStore((s) => s.currentTaskId);
   const create2 = useTaskStore((s) => s.create);
@@ -7754,7 +8329,10 @@ function Sidebar({ onOpenConfig, activeConfig }) {
     /* @__PURE__ */ jsxRuntimeExports.jsxs(
       "button",
       {
-        onClick: () => create2(),
+        onClick: () => {
+          onCloseConfig();
+          create2();
+        },
         className: "flex items-center justify-center gap-2.5 py-2.5 mb-1 rounded-md bg-[#0f172a] text-white text-[13px] font-medium hover:bg-[#334155] transition-colors w-full",
         children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 3v10M3 8h10" }) }),
@@ -7835,7 +8413,10 @@ function Sidebar({ onOpenConfig, activeConfig }) {
     /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-col gap-px overflow-y-auto flex-1 min-h-0", children: tasks.map((t2) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
       "div",
       {
-        onClick: () => select(t2.id),
+        onClick: () => {
+          onCloseConfig();
+          select(t2.id);
+        },
         onContextMenu: (e) => {
           e.preventDefault();
           const menu = document.getElementById("ctxMenu");
@@ -8208,7 +8789,9 @@ function createEventHandler(taskStore, set, lastSeqRef) {
       case "build.step_skipped":
         taskStore.updateLastAssistantMessage((m2) => ({
           ...m2,
-          tools: m2.tools?.filter((t2) => t2.id !== event.tool_call_id)
+          tools: m2.tools?.map(
+            (t2) => t2.id === event.tool_call_id ? { ...t2, status: "skipped" } : t2
+          )
         }));
         break;
       case "build.aborted":
@@ -8266,7 +8849,7 @@ function createEventHandler(taskStore, set, lastSeqRef) {
 const useChatStore = create$1((set, get) => ({
   isProcessing: false,
   currentEditingPlanMsgIdx: null,
-  sendMessage: async (text2, files) => {
+  sendMessage: async (text2, files, skillInvocations) => {
     if (!text2) return;
     if (get().isProcessing) {
       useQueueStore.getState().addToQueue(text2);
@@ -8297,6 +8880,8 @@ const useChatStore = create$1((set, get) => ({
       id: genMsgId(),
       role: "user",
       content: text2,
+      files,
+      skillInvocations: skillInvocations && skillInvocations.length > 0 ? skillInvocations : void 0,
       timestamp: Date.now()
     };
     taskStore.addMessage(userMsg);
@@ -8324,6 +8909,7 @@ const useChatStore = create$1((set, get) => ({
       workspace: settings.workspacePath,
       model: settings.model,
       files,
+      skillInvocations: skillInvocations && skillInvocations.length > 0 ? skillInvocations : void 0,
       onEvent: handleEvent,
       onError: (err) => {
         taskStore.updateLastAssistantMessage((m2) => ({
@@ -8398,7 +8984,7 @@ const useChatStore = create$1((set, get) => ({
     if (!task) return;
     taskStore.updateLastAssistantMessage((m2) => ({
       ...m2,
-      tools: m2.tools?.filter((t2) => t2.status !== "pending")
+      tools: m2.tools?.map((t2) => t2.status === "pending" ? { ...t2, status: "skipped" } : t2)
     }));
     buildApi.skip(task.sessionId).catch((err) => {
       console.error("Build skip failed:", err);
@@ -8410,7 +8996,7 @@ const useChatStore = create$1((set, get) => ({
     if (!task) return;
     taskStore.updateLastAssistantMessage((m2) => ({
       ...m2,
-      tools: m2.tools?.filter((t2) => t2.status !== "pending")
+      tools: m2.tools?.map((t2) => t2.status === "pending" ? { ...t2, status: "skipped" } : t2)
     }));
     buildApi.abort(task.sessionId).catch((err) => {
       console.error("Build abort failed:", err);
@@ -10972,15 +11558,15 @@ function initializeDocument(effects) {
       }
       const indexBeforeExits = self2.events.length;
       let indexBeforeFlow = indexBeforeExits;
-      let seen;
+      let seen2;
       let point2;
       while (indexBeforeFlow--) {
         if (self2.events[indexBeforeFlow][0] === "exit" && self2.events[indexBeforeFlow][1].type === "chunkFlow") {
-          if (seen) {
+          if (seen2) {
             point2 = self2.events[indexBeforeFlow][1].end;
             break;
           }
-          seen = true;
+          seen2 = true;
         }
       }
       exitContainers(continued);
@@ -12277,7 +12863,7 @@ function factoryDestination(effects, ok2, nok, type, literalType, literalMarkerT
 function factoryLabel(effects, ok2, nok, type, markerType, stringType) {
   const self2 = this;
   let size = 0;
-  let seen;
+  let seen2;
   return start;
   function start(code2) {
     effects.enter(type);
@@ -12288,7 +12874,7 @@ function factoryLabel(effects, ok2, nok, type, markerType, stringType) {
     return atBreak;
   }
   function atBreak(code2) {
-    if (size > 999 || code2 === null || code2 === 91 || code2 === 93 && !seen || // To do: remove in the future once we’ve switched from
+    if (size > 999 || code2 === null || code2 === 91 || code2 === 93 && !seen2 || // To do: remove in the future once we’ve switched from
     // `micromark-extension-footnote` to `micromark-extension-gfm-footnote`,
     // which doesn’t need this.
     // Hidden footnotes hook.
@@ -12321,7 +12907,7 @@ function factoryLabel(effects, ok2, nok, type, markerType, stringType) {
       return atBreak(code2);
     }
     effects.consume(code2);
-    if (!seen) seen = !markdownSpace(code2);
+    if (!seen2) seen2 = !markdownSpace(code2);
     return code2 === 92 ? labelEscape : labelInside;
   }
   function labelEscape(code2) {
@@ -12394,18 +12980,18 @@ function factoryTitle(effects, ok2, nok, type, markerType, stringType) {
   }
 }
 function factoryWhitespace(effects, ok2) {
-  let seen;
+  let seen2;
   return start;
   function start(code2) {
     if (markdownLineEnding(code2)) {
       effects.enter("lineEnding");
       effects.consume(code2);
       effects.exit("lineEnding");
-      seen = true;
+      seen2 = true;
       return start;
     }
     if (markdownSpace(code2)) {
-      return factorySpace(effects, start, seen ? "linePrefix" : "lineSuffix")(code2);
+      return factorySpace(effects, start, seen2 ? "linePrefix" : "lineSuffix")(code2);
     }
     return ok2(code2);
   }
@@ -19939,7 +20525,7 @@ function tokenizeWwwAutolink(effects, ok2, nok) {
 function tokenizeProtocolAutolink(effects, ok2, nok) {
   const self2 = this;
   let buffer = "";
-  let seen = false;
+  let seen2 = false;
   return protocolStart;
   function protocolStart(code2) {
     if ((code2 === 72 || code2 === 104) && previousProtocol.call(self2, self2.previous) && !previousUnbalanced(self2.events)) {
@@ -19969,10 +20555,10 @@ function tokenizeProtocolAutolink(effects, ok2, nok) {
   function protocolSlashesInside(code2) {
     if (code2 === 47) {
       effects.consume(code2);
-      if (seen) {
+      if (seen2) {
         return afterProtocol;
       }
-      seen = true;
+      seen2 = true;
       return protocolSlashesInside;
     }
     return nok(code2);
@@ -20008,7 +20594,7 @@ function tokenizeWwwPrefix(effects, ok2, nok) {
 function tokenizeDomain(effects, ok2, nok) {
   let underscoreInLastSegment;
   let underscoreInLastLastSegment;
-  let seen;
+  let seen2;
   return domainInside;
   function domainInside(code2) {
     if (code2 === 46 || code2 === 95) {
@@ -20017,7 +20603,7 @@ function tokenizeDomain(effects, ok2, nok) {
     if (code2 === null || markdownLineEndingOrSpace(code2) || unicodeWhitespace(code2) || code2 !== 45 && unicodePunctuation(code2)) {
       return domainAfter(code2);
     }
-    seen = true;
+    seen2 = true;
     effects.consume(code2);
     return domainInside;
   }
@@ -20032,7 +20618,7 @@ function tokenizeDomain(effects, ok2, nok) {
     return domainInside;
   }
   function domainAfter(code2) {
-    if (underscoreInLastLastSegment || underscoreInLastSegment || !seen) {
+    if (underscoreInLastLastSegment || underscoreInLastSegment || !seen2) {
       return nok(code2);
     }
     return ok2(code2);
@@ -20635,7 +21221,7 @@ function tokenizeTable(effects, ok2, nok) {
   const self2 = this;
   let size = 0;
   let sizeB = 0;
-  let seen;
+  let seen2;
   return start;
   function start(code2) {
     let index2 = self2.events.length - 1;
@@ -20661,7 +21247,7 @@ function tokenizeTable(effects, ok2, nok) {
     if (code2 === 124) {
       return headRowBreak(code2);
     }
-    seen = true;
+    seen2 = true;
     sizeB += 1;
     return headRowBreak(code2);
   }
@@ -20685,15 +21271,15 @@ function tokenizeTable(effects, ok2, nok) {
       return factorySpace(effects, headRowBreak, "whitespace")(code2);
     }
     sizeB += 1;
-    if (seen) {
-      seen = false;
+    if (seen2) {
+      seen2 = false;
       size += 1;
     }
     if (code2 === 124) {
       effects.enter("tableCellDivider");
       effects.consume(code2);
       effects.exit("tableCellDivider");
-      seen = true;
+      seen2 = true;
       return headRowBreak;
     }
     effects.enter("data");
@@ -20720,7 +21306,7 @@ function tokenizeTable(effects, ok2, nok) {
       return nok(code2);
     }
     effects.enter("tableDelimiterRow");
-    seen = false;
+    seen2 = false;
     if (markdownSpace(code2)) {
       return factorySpace(effects, headDelimiterBefore, "linePrefix", self2.parser.constructs.disable.null.includes("codeIndented") ? void 0 : 4)(code2);
     }
@@ -20731,7 +21317,7 @@ function tokenizeTable(effects, ok2, nok) {
       return headDelimiterValueBefore(code2);
     }
     if (code2 === 124) {
-      seen = true;
+      seen2 = true;
       effects.enter("tableCellDivider");
       effects.consume(code2);
       effects.exit("tableCellDivider");
@@ -20748,7 +21334,7 @@ function tokenizeTable(effects, ok2, nok) {
   function headDelimiterValueBefore(code2) {
     if (code2 === 58) {
       sizeB += 1;
-      seen = true;
+      seen2 = true;
       effects.enter("tableDelimiterMarker");
       effects.consume(code2);
       effects.exit("tableDelimiterMarker");
@@ -20776,7 +21362,7 @@ function tokenizeTable(effects, ok2, nok) {
       return headDelimiterFiller;
     }
     if (code2 === 58) {
-      seen = true;
+      seen2 = true;
       effects.exit("tableDelimiterFiller");
       effects.enter("tableDelimiterMarker");
       effects.consume(code2);
@@ -20797,7 +21383,7 @@ function tokenizeTable(effects, ok2, nok) {
       return headDelimiterBefore(code2);
     }
     if (code2 === null || markdownLineEnding(code2)) {
-      if (!seen || size !== sizeB) {
+      if (!seen2 || size !== sizeB) {
         return headDelimiterNok(code2);
       }
       effects.exit("tableDelimiterRow");
@@ -21100,8 +21686,7 @@ function remarkGfm(options) {
   fromMarkdownExtensions.push(gfmFromMarkdown());
   toMarkdownExtensions.push(gfmToMarkdown(settings));
 }
-const CHARS_PER_TICK = 3;
-const TICK_MS = 33;
+const TICK_MS = 50;
 function TypewriterText({ text: text2, isStreaming, onDone }) {
   const [revealedLen, setRevealedLen] = reactExports.useState(() => {
     if (!isStreaming) return text2.length;
@@ -21117,11 +21702,10 @@ function TypewriterText({ text: text2, isStreaming, onDone }) {
     }
     timerRef.current = setInterval(() => {
       setRevealedLen((prev) => {
-        if (prev >= text2.length) {
-          clearInterval(timerRef.current);
-          return prev;
-        }
-        return Math.min(prev + CHARS_PER_TICK, text2.length);
+        if (prev >= text2.length) return prev;
+        const nextNL = text2.indexOf("\n", prev);
+        if (nextNL >= 0) return nextNL + 1;
+        return text2.length;
       });
     }, TICK_MS);
     return () => clearInterval(timerRef.current);
@@ -21156,13 +21740,24 @@ function MessageItem({ message, msgIndex }) {
   if (isUser) {
     return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-3 max-w-[740px] self-end flex-row-reverse animate-[msgIn_0.2s_ease-out]", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[30px] h-[30px] rounded-md bg-[#f0fdf4] text-[#047857] flex items-center justify-center text-[13px] font-semibold flex-shrink-0", children: "Z" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-[#ecfdf5] text-[#064e3b] rounded-[14px_14px_4px_14px] py-3 px-4 text-sm leading-relaxed", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Markdown, { remarkPlugins: [remarkGfm], children: message.content }) })
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-[#ecfdf5] text-[#064e3b] rounded-[14px_14px_4px_14px] py-3 px-4 text-sm leading-relaxed", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Markdown, { remarkPlugins: [remarkGfm], children: message.content }),
+        message.files && message.files.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-[#d1fae5]", children: message.files.map((f2, i) => /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/60 text-[11px] text-[#047857] font-medium", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "12", height: "12", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M3 2h6l4 4v8a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M9 2v4h4" })
+          ] }),
+          f2.split(/[/\\]/).pop()
+        ] }, i)) }),
+        message.skillInvocations && message.skillInvocations.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-[#d1fae5]", children: message.skillInvocations.map((s, i) => /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/60 text-[11px] text-[#047857] font-medium", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "12", height: "12", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M13 2l-8 8-3-3" }) }),
+          s.skill_name
+        ] }, i)) })
+      ] })
     ] });
   }
   const hasAnySegment = message.segments && message.segments.length > 0;
-  message.tools?.some((t2) => t2.status === "running");
   const hasPending = message.tools?.some((t2) => t2.status === "pending");
-  message.tools?.length || 0;
   const isCollapsed = processCollapsed && !hasPending;
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-3 max-w-[740px] animate-[msgIn_0.2s_ease-out]", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[30px] h-[30px] rounded-md bg-[#f0fdf4] text-[#a7f3d0] flex items-center justify-center text-[15px] font-semibold flex-shrink-0", children: "AI" }),
@@ -21222,26 +21817,6 @@ function SegmentsView({
   for (const t2 of tools) {
     toolMap.set(t2.id, t2);
   }
-  for (let i = 0; i < segments.length; i++) {
-    segments[i].type;
-  }
-  const groups = [];
-  let pendingThinkingTools = [];
-  for (let i = 0; i < segments.length; i++) {
-    const seg = segments[i];
-    if (seg.type === "thinking" || seg.type === "tool_call") {
-      pendingThinkingTools.push({ seg, idx: i });
-    } else {
-      if (pendingThinkingTools.length > 0) {
-        groups.push({ kind: "thinking-tools", segs: pendingThinkingTools });
-        pendingThinkingTools = [];
-      }
-      groups.push({ kind: "content", seg, idx: i });
-    }
-  }
-  if (pendingThinkingTools.length > 0) {
-    groups.push({ kind: "thinking-tools", segs: pendingThinkingTools });
-  }
   const lastTextSegIdx = (() => {
     for (let i = segments.length - 1; i >= 0; i--) {
       if (segments[i].type === "text") return i;
@@ -21273,206 +21848,234 @@ function SegmentsView({
   const renderTool = (toolCallId, key) => {
     const tool = toolCallId ? toolMap.get(toolCallId) : void 0;
     if (!tool) return null;
-    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start gap-2.5 py-2 border-b border-[#f1f5f9] not-italic text-[#0f172a] last:border-b-0", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-4 h-4 flex-shrink-0 mt-0.5 text-[#94a3b8]", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "8", cy: "8", r: "6" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 5v3l2 2" })
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-xs text-[#0f172a]", children: tool.name }),
+    const hasReasoning = tool.detail && !tool.detail.startsWith("{");
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-1.5 not-italic text-[#0f172a]", children: [
+      hasReasoning && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-3 bg-[#f0f9ff] border border-[#bae6fd] rounded-[8px]", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-[10px] font-semibold text-[#0369a1] uppercase tracking-wider mb-1", children: [
+          "执行步骤: ",
+          tool.name
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#0f172a] mb-1.5 leading-relaxed", children: tool.detail }),
         tool.command && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-1 py-1.5 px-2.5 bg-[#1e293b] text-[#a7f3d0] rounded text-[11px] font-mono whitespace-pre-wrap", children: [
           "$ ",
           tool.command
         ] }),
-        tool.detail && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-[#94a3b8] mt-0.5", children: tool.detail }),
-        tool.status === "pending" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-1.5 mt-2 flex-wrap", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onConfirmTool(), className: "px-3 py-1 rounded text-[11px] font-medium text-[#047857] border border-[#a7f3d0] bg-[#f0fdf4] hover:bg-[#a7f3d0] transition-colors cursor-pointer", children: "确认" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onSkipTool(), className: "px-3 py-1 rounded text-[11px] font-medium text-[#b45309] border border-[#fcd34d] bg-[#fffbeb] hover:bg-[#fde68a] transition-colors cursor-pointer", children: "跳过" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onStopTools(), className: "px-3 py-1 rounded text-[11px] font-medium text-[#b91c1c] border border-[#fecaca] bg-[#fef2f2] hover:bg-[#fecaca] transition-colors cursor-pointer", children: "终止" })
-        ] }),
-        tool.result && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-1 py-1.5 px-2.5 bg-[#f8fafc] rounded text-[11px] font-mono whitespace-pre-wrap max-h-[100px] overflow-y-auto border border-[#f1f5f9]", children: tool.result })
+        tool.status !== "pending" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-2 pt-2 border-t border-[#bae6fd]", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `text-[11px] font-medium px-2.5 py-0.5 rounded-md inline-flex items-center gap-1 ${tool.status === "skipped" ? "text-[#b45309] bg-[#fffbeb] border border-[#fcd34d]" : "text-[#047857] bg-[#d1fae5] border border-[#a7f3d0]"}`, children: tool.status === "skipped" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "11", height: "11", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M4 4l8 8M12 4l-8 8" }) }),
+          "已跳过"
+        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "11", height: "11", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M3 8l4 4 6-8" }) }),
+          "已确认，正在执行..."
+        ] }) }) })
       ] }),
-      tool.status !== "pending" && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `text-[11px] px-2 py-0.5 rounded-lg font-medium flex-shrink-0 ${tool.status === "running" ? "text-[#b45309] bg-[#fffbeb]" : "text-[#047857] bg-[#ecfdf5]"}`, children: tool.status === "running" ? "执行中..." : "完成" })
+      !hasReasoning && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start gap-2.5 py-2 border-b border-[#f1f5f9] last:border-b-0", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-4 h-4 flex-shrink-0 mt-0.5 text-[#94a3b8]", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "8", cy: "8", r: "6" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 5v3l2 2" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-xs text-[#0f172a]", children: tool.name }),
+          tool.command && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-1 py-1.5 px-2.5 bg-[#1e293b] text-[#a7f3d0] rounded text-[11px] font-mono whitespace-pre-wrap", children: [
+            "$ ",
+            tool.command
+          ] }),
+          tool.detail && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-[#94a3b8] mt-0.5", children: tool.detail })
+        ] }),
+        tool.status !== "pending" && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `text-[11px] px-2 py-0.5 rounded-lg font-medium flex-shrink-0 ${tool.status === "running" ? "text-[#b45309] bg-[#fffbeb]" : "text-[#047857] bg-[#ecfdf5]"}`, children: tool.status === "running" ? "执行中..." : "完成" })
+      ] }),
+      tool.status === "pending" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-1.5 mt-1 flex-wrap", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onConfirmTool(), className: "px-3 py-1 rounded text-[11px] font-medium text-[#047857] border border-[#a7f3d0] bg-[#f0fdf4] hover:bg-[#a7f3d0] transition-colors cursor-pointer", children: "确认" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onSkipTool(), className: "px-3 py-1 rounded text-[11px] font-medium text-[#b45309] border border-[#fcd34d] bg-[#fffbeb] hover:bg-[#fde68a] transition-colors cursor-pointer", children: "跳过" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onStopTools(), className: "px-3 py-1 rounded text-[11px] font-medium text-[#b91c1c] border border-[#fecaca] bg-[#fef2f2] hover:bg-[#fecaca] transition-colors cursor-pointer", children: "终止" })
+      ] }),
+      tool.result && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-1 py-1.5 px-2.5 bg-[#f8fafc] rounded text-[11px] font-mono whitespace-pre-wrap max-h-[100px] overflow-y-auto border border-[#f1f5f9] ml-6", children: tool.result })
     ] }, key);
   };
-  const renderThinkingToolHeader = () => {
-    const hasRunning = tools.some((t2) => t2.status === "running");
-    const hasPending = tools.some((t2) => t2.status === "pending");
-    const toolCount = tools.length;
-    return /* @__PURE__ */ jsxRuntimeExports.jsxs(
-      "div",
-      {
-        onClick: onToggleCollapse,
-        className: "flex items-center gap-2 px-3 py-2 cursor-pointer text-xs font-medium text-[#64748b] bg-[#f8fafc] select-none hover:bg-[#f1f5f9] transition-colors",
-        children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `inline-block transition-transform text-[10px] text-[#94a3b8] ${processCollapsed ? "-rotate-90" : ""}`, children: "▼" }),
-          "思考与工具调用",
-          toolCount > 0 ? ` (${toolCount})` : "",
-          hasPending && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[#0369a1] text-[11px] ml-1", children: "等待确认..." }),
-          hasRunning && !hasPending && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[#b45309] text-[11px] ml-1", children: "执行中..." })
-        ]
+  const renderItems = [];
+  let pending = [];
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    if (seg.type === "thinking") {
+      pending.push({ seg, idx: i });
+    } else {
+      if (pending.length > 0) {
+        renderItems.push({ kind: "thinking", segs: pending });
+        pending = [];
       }
-    );
-  };
-  return /* @__PURE__ */ jsxRuntimeExports.jsx(jsxRuntimeExports.Fragment, { children: groups.map((group, gi2) => {
-    if (group.kind === "content") {
-      const seg = group.seg;
-      const i = group.idx;
-      if (seg.type === "text") {
-        const isLastText = i === lastTextSegIdx;
-        if (isLastText && isStreaming) {
-          return /* @__PURE__ */ jsxRuntimeExports.jsx(TypewriterText, { text: seg.content, isStreaming: true, onDone: () => handleTextDone(i) }, `txt-${i}`);
-        }
-        return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-1 mb-2 prose-sm max-w-none text-[#0f172a]", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Markdown, { remarkPlugins: [remarkGfm], children: seg.content }) }, `txt-${i}`);
+      renderItems.push({ kind: "other", seg, idx: i });
+    }
+  }
+  if (pending.length > 0) {
+    renderItems.push({ kind: "thinking", segs: pending });
+  }
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(jsxRuntimeExports.Fragment, { children: renderItems.map((item, ri2) => {
+    if (item.kind === "thinking") {
+      const firstIdx = item.segs[0].idx;
+      if (!canShowNonText(firstIdx)) return null;
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `mt-2.5 border border-[#e2e8f0] rounded-md overflow-hidden ${processCollapsed ? "section-collapsed" : ""}`, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "div",
+          {
+            onClick: onToggleCollapse,
+            className: "flex items-center gap-2 px-3 py-2 cursor-pointer text-xs font-medium text-[#64748b] bg-[#f8fafc] select-none hover:bg-[#f1f5f9] transition-colors",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `inline-block transition-transform text-[10px] text-[#94a3b8] ${processCollapsed ? "-rotate-90" : ""}`, children: "▼" }),
+              "思考过程"
+            ]
+          }
+        ),
+        !processCollapsed && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-3.5 py-2.5 text-[13px] text-[#64748b] leading-relaxed bg-white border-t border-[#f1f5f9] max-h-[300px] overflow-y-auto", children: item.segs.map(({ seg: seg2, idx }) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mb-2.5 last:mb-0", children: seg2.type === "thinking" ? seg2.content : null }, `think-${idx}`)) })
+      ] }, `thinking-${ri2}`);
+    }
+    const seg = item.seg;
+    const i = item.idx;
+    if (seg.type === "text") {
+      const isLastText = i === lastTextSegIdx;
+      if (isLastText && isStreaming) {
+        return /* @__PURE__ */ jsxRuntimeExports.jsx(TypewriterText, { text: seg.content, isStreaming: true, onDone: () => handleTextDone(i) }, `txt-${i}`);
       }
+      return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-1 mb-2 prose-sm max-w-none text-[#0f172a]", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Markdown, { remarkPlugins: [remarkGfm], children: seg.content }) }, `txt-${i}`);
+    }
+    if (seg.type === "tool_call") {
       if (!canShowNonText(i)) return null;
-      const event = seg;
-      if (event.type === "generated") {
-        return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-0 -mx-1 mb-1 p-4 rounded-[10px] border border-l-[3px] bg-[#f0fdf4] border-[#a7f3d0] border-l-[#10b981]", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] font-semibold text-[#047857] uppercase tracking-wider mb-2", children: "执行计划" }),
-          planStatus === "pending" && !planEditing && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 flex-wrap", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onConfirmPlan(), className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white border border-[#0f172a] hover:bg-[#334155] transition-colors cursor-pointer", children: "确认计划" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onEditPlan(msgIndex), className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-white text-[#64748b] border border-[#e2e8f0] hover:bg-[#f1f5f9] hover:text-[#0f172a] transition-colors cursor-pointer", children: "编辑" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onRejectPlan(), className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-white text-[#b91c1c] border border-[#fecaca] hover:bg-[#fef2f2] transition-colors cursor-pointer", children: "拒绝" })
-          ] }),
-          planEditing && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs text-[#0369a1] font-medium flex items-center gap-1.5", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "14", height: "14", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 14h2l8-8-2-2-8 8v2z" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M12 3l2 2" })
-            ] }),
-            "正在右侧面板编辑计划..."
-          ] })
-        ] }, event.id);
-      }
-      if (event.type === "confirmed") {
-        return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "-mx-1 mb-1 p-3 rounded-[10px] border border-l-[3px] bg-[#ecfdf5] border-[#a7f3d0] border-l-[#10b981]", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs text-[#047857] font-medium bg-[#d1fae5] px-2.5 py-1 rounded-md inline-flex items-center gap-1", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "12", height: "12", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M3 8l4 4 6-8" }) }),
-          "计划已确认，正在自动执行..."
-        ] }) }, event.id);
-      }
-      if (event.type === "rejected") {
-        return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "-mx-1 mb-1 p-3 rounded-[10px] border border-l-[3px] bg-[#fef2f2] border-[#fecaca] border-l-[#ef4444]", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs text-[#b91c1c] font-medium bg-[#fee2e2] px-2.5 py-1 rounded-md inline-flex items-center gap-1", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "12", height: "12", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M4 4l8 8M12 4l-8 8" }) }),
-          "计划已取消"
-        ] }) }, event.id);
-      }
-      if (event.type === "edited") {
-        return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "-mx-1 mb-1 p-3 rounded-[10px] border border-l-[3px] bg-[#f0fdf4] border-[#a7f3d0] border-l-[#10b981]", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs text-[#0369a1] font-medium bg-[#dbeafe] px-2.5 py-1 rounded-md inline-flex items-center gap-1", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "12", height: "12", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+      return renderTool(seg.toolCallId, `tool-${i}`);
+    }
+    if (!canShowNonText(i)) return null;
+    const event = seg;
+    if (event.type === "generated") {
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-0 -mx-1 mb-1 p-4 rounded-[10px] border border-l-[3px] bg-[#f0fdf4] border-[#a7f3d0] border-l-[#10b981]", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] font-semibold text-[#047857] uppercase tracking-wider mb-2", children: "执行计划" }),
+        planStatus === "pending" && !planEditing && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 flex-wrap", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onConfirmPlan(), className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white border border-[#0f172a] hover:bg-[#334155] transition-colors cursor-pointer", children: "确认计划" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onEditPlan(msgIndex), className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-white text-[#64748b] border border-[#e2e8f0] hover:bg-[#f1f5f9] hover:text-[#0f172a] transition-colors cursor-pointer", children: "编辑" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => onRejectPlan(), className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-white text-[#b91c1c] border border-[#fecaca] hover:bg-[#fef2f2] transition-colors cursor-pointer", children: "拒绝" })
+        ] }),
+        planEditing && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs text-[#0369a1] font-medium flex items-center gap-1.5", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "14", height: "14", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 14h2l8-8-2-2-8 8v2z" }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M12 3l2 2" })
           ] }),
-          "计划已编辑"
-        ] }) }, event.id);
-      }
-      if (event.type === "question") {
-        const isConfirm = event.input_type === "confirm";
-        const options = isConfirm ? ["是 / 确定", "否 / 取消"] : event.options || [];
-        if (event.answer) {
-          return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-1.5 p-3 bg-[#f0f9ff] border border-[#bae6fd] rounded-[8px]", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] font-semibold text-[#0369a1] uppercase tracking-wider mb-1", children: "需求澄清" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#0f172a] mb-1.5 leading-relaxed", children: event.question }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-xs text-[#0369a1] font-medium bg-white border border-[#bae6fd] rounded-md px-2.5 py-1.5 inline-block", children: [
-              "回答: ",
-              event.answer
-            ] })
-          ] }, event.id);
-        }
+          "正在右侧面板编辑计划..."
+        ] })
+      ] }, event.id);
+    }
+    if (event.type === "confirmed") {
+      return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "-mx-1 mb-1 p-3 rounded-[10px] border border-l-[3px] bg-[#ecfdf5] border-[#a7f3d0] border-l-[#10b981]", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs text-[#047857] font-medium bg-[#d1fae5] px-2.5 py-1 rounded-md inline-flex items-center gap-1", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "12", height: "12", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M3 8l4 4 6-8" }) }),
+        "计划已确认，正在自动执行..."
+      ] }) }, event.id);
+    }
+    if (event.type === "rejected") {
+      return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "-mx-1 mb-1 p-3 rounded-[10px] border border-l-[3px] bg-[#fef2f2] border-[#fecaca] border-l-[#ef4444]", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs text-[#b91c1c] font-medium bg-[#fee2e2] px-2.5 py-1 rounded-md inline-flex items-center gap-1", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "12", height: "12", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M4 4l8 8M12 4l-8 8" }) }),
+        "计划已取消"
+      ] }) }, event.id);
+    }
+    if (event.type === "edited") {
+      return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "-mx-1 mb-1 p-3 rounded-[10px] border border-l-[3px] bg-[#f0fdf4] border-[#a7f3d0] border-l-[#10b981]", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs text-[#0369a1] font-medium bg-[#dbeafe] px-2.5 py-1 rounded-md inline-flex items-center gap-1", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "12", height: "12", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 14h2l8-8-2-2-8 8v2z" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M12 3l2 2" })
+        ] }),
+        "计划已编辑"
+      ] }) }, event.id);
+    }
+    if (event.type === "question") {
+      const isConfirm = event.input_type === "confirm";
+      const options = isConfirm ? ["是 / 确定", "否 / 取消"] : event.options || [];
+      if (event.answer) {
         return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-1.5 p-3 bg-[#f0f9ff] border border-[#bae6fd] rounded-[8px]", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] font-semibold text-[#0369a1] uppercase tracking-wider mb-1", children: "需求澄清" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#0f172a] mb-2.5 leading-relaxed", children: event.question }),
-          event.input_type === "text" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "textarea",
-              {
-                className: "w-full px-3 py-2 border border-[#bae6fd] rounded-md text-[13px] text-[#0f172a] outline-none resize-y mb-2 focus:border-[#0ea5e9] focus:shadow-[0_0_0_3px_rgba(14,165,233,0.15)] transition-colors",
-                placeholder: "输入你的回答...",
-                rows: 2,
-                value: textAnswer,
-                onChange: (e) => onTextAnswer(e.target.value),
-                onKeyDown: (e) => {
-                  if (e.key === "Enter" && !e.shiftKey && textAnswer.trim()) {
-                    e.preventDefault();
-                    onSelectValue(textAnswer.trim());
-                    onSubmitAnswer(msgIndex, textAnswer.trim());
-                    onTextAnswer("");
-                  }
-                }
-              }
-            ),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "button",
-              {
-                onClick: () => {
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#0f172a] mb-1.5 leading-relaxed", children: event.question }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-xs text-[#0369a1] font-medium bg-white border border-[#bae6fd] rounded-md px-2.5 py-1.5 inline-block", children: [
+            "回答: ",
+            event.answer
+          ] })
+        ] }, event.id);
+      }
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-1.5 p-3 bg-[#f0f9ff] border border-[#bae6fd] rounded-[8px]", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] font-semibold text-[#0369a1] uppercase tracking-wider mb-1", children: "需求澄清" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#0f172a] mb-2.5 leading-relaxed", children: event.question }),
+        event.input_type === "text" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "textarea",
+            {
+              className: "w-full px-3 py-2 border border-[#bae6fd] rounded-md text-[13px] text-[#0f172a] outline-none resize-y mb-2 focus:border-[#0ea5e9] focus:shadow-[0_0_0_3px_rgba(14,165,233,0.15)] transition-colors",
+              placeholder: "输入你的回答...",
+              rows: 2,
+              value: textAnswer,
+              onChange: (e) => onTextAnswer(e.target.value),
+              onKeyDown: (e) => {
+                if (e.key === "Enter" && !e.shiftKey && textAnswer.trim()) {
+                  e.preventDefault();
+                  onSelectValue(textAnswer.trim());
                   onSubmitAnswer(msgIndex, textAnswer.trim());
                   onTextAnswer("");
-                },
-                disabled: !textAnswer.trim(),
-                className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white hover:bg-[#334155] transition-colors border-none cursor-pointer disabled:opacity-40",
-                children: "提交"
+                }
               }
-            )
-          ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-col gap-1.5 mb-2.5", children: options.map((opt) => {
-              const isSelected = selectedPlanValue === opt;
-              return /* @__PURE__ */ jsxRuntimeExports.jsxs(
-                "button",
-                {
-                  type: "button",
-                  onClick: () => {
-                    onSelectValue(opt);
-                    onSelectOption(msgIndex, opt);
-                  },
-                  className: `px-3 py-2 border rounded-md text-[13px] text-left cursor-pointer flex items-center gap-2 ${isSelected ? "border-[#0ea5e9] bg-[#0ea5e9]/10 text-[#0369a1] font-semibold shadow-[0_0_0_1px_#0ea5e9]" : "border-[#bae6fd] bg-white text-[#0f172a] hover:border-[#0ea5e9] hover:bg-[#f0f9ff]"}`,
-                  children: [
-                    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-none ${isSelected ? "border-[#0ea5e9] bg-[#0ea5e9]" : "border-[#94a3b8]"}`, children: isSelected && /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "10", height: "10", viewBox: "0 0 16 16", fill: "none", stroke: "white", strokeWidth: "3", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M3 8l4 4 6-8" }) }) }),
-                    opt
-                  ]
-                },
-                opt
-              );
-            }) }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              onClick: () => {
+                onSubmitAnswer(msgIndex, textAnswer.trim());
+                onTextAnswer("");
+              },
+              disabled: !textAnswer.trim(),
+              className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white hover:bg-[#334155] transition-colors border-none cursor-pointer disabled:opacity-40",
+              children: "提交"
+            }
+          )
+        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-col gap-1.5 mb-2.5", children: options.map((opt) => {
+            const isSelected = selectedPlanValue === opt;
+            return /* @__PURE__ */ jsxRuntimeExports.jsxs(
               "button",
               {
                 type: "button",
                 onClick: () => {
-                  onSubmitAnswer(msgIndex, selectedPlanValue || void 0);
-                  onSelectValue("");
+                  onSelectValue(opt);
+                  onSelectOption(msgIndex, opt);
                 },
-                disabled: !selectedPlanValue,
-                className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white hover:bg-[#334155] transition-colors border-none cursor-pointer disabled:opacity-40",
-                children: "提交"
-              }
-            )
-          ] })
-        ] }, event.id);
-      }
-      if (seg.type === "system_status") {
-        return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-1.5 p-3 bg-[#fefce8] border border-[#fde68a] rounded-[8px]", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] font-semibold text-[#a16207] uppercase tracking-wider mb-1", children: "系统状态" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#0f172a] leading-relaxed", children: seg.message })
-        ] }, `status-${i}`);
-      }
-      return null;
+                className: `px-3 py-2 border rounded-md text-[13px] text-left cursor-pointer flex items-center gap-2 ${isSelected ? "border-[#0ea5e9] bg-[#0ea5e9]/10 text-[#0369a1] font-semibold shadow-[0_0_0_1px_#0ea5e9]" : "border-[#bae6fd] bg-white text-[#0f172a] hover:border-[#0ea5e9] hover:bg-[#f0f9ff]"}`,
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-none ${isSelected ? "border-[#0ea5e9] bg-[#0ea5e9]" : "border-[#94a3b8]"}`, children: isSelected && /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "10", height: "10", viewBox: "0 0 16 16", fill: "none", stroke: "white", strokeWidth: "3", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M3 8l4 4 6-8" }) }) }),
+                  opt
+                ]
+              },
+              opt
+            );
+          }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              type: "button",
+              onClick: () => {
+                onSubmitAnswer(msgIndex, selectedPlanValue || void 0);
+                onSelectValue("");
+              },
+              disabled: !selectedPlanValue,
+              className: "px-[18px] py-[7px] rounded-md text-xs font-medium bg-[#0f172a] text-white hover:bg-[#334155] transition-colors border-none cursor-pointer disabled:opacity-40",
+              children: "提交"
+            }
+          )
+        ] })
+      ] }, event.id);
     }
-    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `mt-2.5 border border-[#e2e8f0] rounded-md overflow-hidden ${processCollapsed ? "section-collapsed" : ""}`, children: [
-      renderThinkingToolHeader(),
-      !processCollapsed && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-3.5 py-2.5 text-[13px] text-[#94a3b8] italic leading-relaxed bg-white border-t border-[#f1f5f9] max-h-[500px] overflow-y-auto", children: group.segs.map(({ seg, idx }) => {
-        if (seg.type === "thinking") {
-          return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mb-2.5 not-italic text-[#64748b]", children: seg.content }, `think-${idx}`);
-        }
-        if (seg.type === "tool_call") {
-          return renderTool(seg.toolCallId, `tool-${idx}`);
-        }
-        return null;
-      }) })
-    ] }, `thinktools-${gi2}`);
+    if (seg.type === "system_status") {
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-1.5 p-3 bg-[#fefce8] border border-[#fde68a] rounded-[8px]", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] font-semibold text-[#a16207] uppercase tracking-wider mb-1", children: "系统状态" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#0f172a] leading-relaxed", children: seg.message })
+      ] }, `status-${i}`);
+    }
+    return null;
   }) });
 }
 function MessageList({ scrollContainerRef }) {
   const task = useTaskStore((s) => s.getCurrentTask());
   const bottomRef = reactExports.useRef(null);
+  const contentRef = reactExports.useRef(null);
   const isAtBottomRef = reactExports.useRef(true);
   const prevMsgCountRef = reactExports.useRef(task?.messages.length ?? 0);
   const prevSegCountRef = reactExports.useRef(0);
@@ -21490,7 +22093,7 @@ function MessageList({ scrollContainerRef }) {
     return () => el2.removeEventListener("scroll", handleScroll);
   }, [scrollContainerRef, handleScroll]);
   reactExports.useEffect(() => {
-    const el2 = scrollContainerRef.current;
+    const el2 = contentRef.current;
     if (!el2) return;
     const ro = new ResizeObserver(() => {
       if (isAtBottomRef.current) {
@@ -21499,7 +22102,7 @@ function MessageList({ scrollContainerRef }) {
     });
     ro.observe(el2);
     return () => ro.disconnect();
-  }, [scrollContainerRef]);
+  }, []);
   reactExports.useEffect(() => {
     const count = task?.messages.length ?? 0;
     if (count > prevMsgCountRef.current) {
@@ -21552,23 +22155,14 @@ function MessageList({ scrollContainerRef }) {
       ] })
     ] }) });
   }
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-5", children: [
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { ref: contentRef, className: "flex flex-col gap-5", children: [
     task.messages.map((msg, idx) => /* @__PURE__ */ jsxRuntimeExports.jsx(MessageItem, { message: msg, msgIndex: idx }, msg.id)),
     /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: bottomRef })
   ] });
 }
 const MODELS = ["deepseek-v4-pro"];
 const SLASH_COMMANDS = [
-  { command: "/help", label: "帮助", description: "获取使用帮助与指令列表" },
-  { command: "/clear", label: "清空对话", description: "清空当前会话的所有消息" },
-  { command: "/file", label: "引用文件", description: "选择并引用项目中的文件内容" },
-  { command: "/search", label: "搜索代码库", description: "在代码库中搜索关键词或符号" },
-  { command: "/explain", label: "解释代码", description: "解释选中代码段的逻辑与用途" },
-  { command: "/fix", label: "修复问题", description: "查找并修复代码中的错误" },
-  { command: "/refactor", label: "重构代码", description: "优化代码结构与可读性" },
-  { command: "/test", label: "生成测试", description: "为选中代码生成单元测试" },
-  { command: "/doc", label: "生成文档", description: "为函数或类生成文档注释" },
-  { command: "/optimize", label: "性能优化", description: "分析并优化代码性能瓶颈" }
+  { command: "/clear", label: "清空对话", description: "清空当前会话的所有消息" }
 ];
 function basename(p2) {
   return p2.replace(/^.*[/\\]/, "");
@@ -21620,6 +22214,51 @@ function fileColor(p2) {
   };
   return colors[ext] || "#94a3b8";
 }
+function findPlainTextOffset(ed2, target) {
+  let charIdx = 0;
+  function walk(node2) {
+    if (node2.nodeType === Node.TEXT_NODE) {
+      const len = (node2.textContent || "").length;
+      if (charIdx + len >= target) return { node: node2, offset: target - charIdx };
+      charIdx += len;
+    } else if (node2.nodeType === Node.ELEMENT_NODE) {
+      const el2 = node2;
+      if (el2.hasAttribute("data-file") || el2.hasAttribute("data-skill-id")) return null;
+      if (el2.tagName === "BR") {
+        charIdx += 1;
+      } else if (el2.tagName === "DIV") {
+        if (charIdx > 0) charIdx += 1;
+        for (const c of Array.from(node2.childNodes)) {
+          const r2 = walk(c);
+          if (r2) return r2;
+        }
+        if (charIdx <= target) charIdx += 1;
+      } else {
+        for (const c of Array.from(node2.childNodes)) {
+          const r2 = walk(c);
+          if (r2) return r2;
+        }
+      }
+    }
+    return null;
+  }
+  for (const c of Array.from(ed2.childNodes)) {
+    const r2 = walk(c);
+    if (r2) return r2;
+  }
+  return null;
+}
+function findSlashPosInEditor(ed2, endContainer, endOffset) {
+  const plainBefore = getEditorPlainText(ed2, endContainer, endOffset);
+  const lastNl = plainBefore.lastIndexOf("\n");
+  const line = plainBefore.slice(lastNl + 1);
+  for (let i = line.length - 1; i >= 0; i--) {
+    if (line[i] === "/" && (i === 0 || line[i - 1] === " ")) {
+      return lastNl + 1 + i;
+    }
+  }
+  return -1;
+}
 function createFileChipDOM(filePath, onRemove) {
   const color2 = fileColor(filePath);
   const span = document.createElement("span");
@@ -21635,9 +22274,54 @@ function createFileChipDOM(filePath, onRemove) {
   });
   return span;
 }
+function createSkillChipDOM(skillId, skillName, icon, onRemove) {
+  const span = document.createElement("span");
+  span.setAttribute("data-skill-id", skillId);
+  span.setAttribute("data-skill-name", skillName);
+  span.setAttribute("contenteditable", "false");
+  span.style.cssText = `display:inline-flex;align-items:center;gap:2px;padding:1px 6px;border-radius:4px;font-size:13px;font-weight:500;border:1px solid #a7f3d0;background:#f0fdf4;color:#047857;cursor:default;vertical-align:middle;margin:0 2px;user-select:none;`;
+  span.innerHTML = `<span>${"⚡"}</span> <span style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${skillName}</span><button style="margin-left:1px;width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;opacity:0.4;background:none;border:none;cursor:pointer;font-size:12px;line-height:1;padding:0;color:inherit;flex-shrink:0" tabindex="-1">&times;</button>`;
+  const btn = span.lastElementChild;
+  btn.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onRemove(span);
+  });
+  return span;
+}
+function getEditorPlainText(ed2, endContainer, endOffset) {
+  let text2 = "";
+  let stopped = false;
+  function walk(n2) {
+    if (stopped) return;
+    if (endContainer && n2 === endContainer) {
+      if (n2.nodeType === Node.TEXT_NODE)
+        text2 += (n2.textContent || "").slice(0, endOffset);
+      stopped = true;
+      return;
+    }
+    if (n2.nodeType === Node.TEXT_NODE) {
+      text2 += n2.textContent || "";
+    } else if (n2.nodeType === Node.ELEMENT_NODE) {
+      const el2 = n2;
+      if (el2.hasAttribute("data-file") || el2.hasAttribute("data-skill-id")) return;
+      if (el2.tagName === "BR") text2 += "\n";
+      else if (el2.tagName === "DIV") {
+        if (text2 && !text2.endsWith("\n")) text2 += "\n";
+        for (const c of Array.from(n2.childNodes)) walk(c);
+        if (!text2.endsWith("\n")) text2 += "\n";
+      } else {
+        for (const c of Array.from(n2.childNodes)) walk(c);
+      }
+    }
+  }
+  for (const c of Array.from(ed2.childNodes)) walk(c);
+  return text2;
+}
 function readEditor(ed2) {
   let text2 = "";
   const files = [];
+  const skills = [];
   function walk(n2) {
     if (n2.nodeType === Node.TEXT_NODE) {
       text2 += n2.textContent || "";
@@ -21645,6 +22329,11 @@ function readEditor(ed2) {
       const el2 = n2;
       if (el2.hasAttribute("data-file")) {
         files.push(el2.getAttribute("data-file") || "");
+      } else if (el2.hasAttribute("data-skill-id")) {
+        skills.push({
+          skill_id: el2.getAttribute("data-skill-id") || "",
+          skill_name: el2.getAttribute("data-skill-name") || ""
+        });
       } else if (el2.tagName === "BR") {
         text2 += "\n";
       } else {
@@ -21661,7 +22350,7 @@ function readEditor(ed2) {
       walk(c);
     }
   }
-  return { text: text2, files };
+  return { text: text2, files, skills };
 }
 function getAtTrigger(ed2) {
   const sel = window.getSelection();
@@ -21681,7 +22370,7 @@ function getAtTrigger(ed2) {
       textBefore += node2.textContent || "";
     } else if (node2.nodeType === Node.ELEMENT_NODE) {
       const el2 = node2;
-      if (el2.hasAttribute("data-file")) return;
+      if (el2.hasAttribute("data-file") || el2.hasAttribute("data-skill-id")) return;
       if (el2.tagName === "BR") textBefore += "\n";
       else for (const c of Array.from(node2.childNodes)) walk(c);
     }
@@ -21713,6 +22402,7 @@ function ChatInput() {
   const [showCommands, setShowCommands] = reactExports.useState(false);
   const [commandFilter, setCommandFilter] = reactExports.useState("");
   const [selectedCmdIdx, setSelectedCmdIdx] = reactExports.useState(0);
+  const [installedSkills, setInstalledSkills] = reactExports.useState([]);
   const editableRef = reactExports.useRef(null);
   const cmdMenuRef = reactExports.useRef(null);
   const [showFilePicker, setShowFilePicker] = reactExports.useState(false);
@@ -21723,7 +22413,7 @@ function ChatInput() {
   const fileMenuRef = reactExports.useRef(null);
   const atPosRef = reactExports.useRef(-1);
   const insertingRef = reactExports.useRef(false);
-  const isEmptyRef = reactExports.useRef(true);
+  const [isEmpty, setIsEmpty] = reactExports.useState(true);
   reactExports.useEffect(() => {
     const ed2 = editableRef.current;
     if (!ed2) return;
@@ -21749,15 +22439,27 @@ function ChatInput() {
       }
       const sel = window.getSelection();
       if (sel && sel.rangeCount) {
-        const r2 = sel.getRangeAt(0).cloneRange();
-        r2.setStart(ed2, 0);
-        const txt = r2.toString();
-        const lastNl = txt.lastIndexOf("\n");
-        const line = txt.slice(lastNl + 1);
-        if (line.startsWith("/") && !line.includes(" ")) {
+        const toCursor = getEditorPlainText(ed2, sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset);
+        const lastNl = toCursor.lastIndexOf("\n");
+        const line = toCursor.slice(lastNl + 1);
+        let slashPos = -1;
+        for (let i = line.length - 1; i >= 0; i--) {
+          if (line[i] === "/" && (i === 0 || line[i - 1] === " ")) {
+            slashPos = i;
+            break;
+          }
+        }
+        const filter = slashPos >= 0 ? line.slice(slashPos + 1) : "";
+        if (slashPos >= 0 && !filter.includes(" ")) {
           setShowCommands(true);
-          setCommandFilter(line);
+          setCommandFilter("/" + filter);
           setSelectedCmdIdx(0);
+          if (installedSkills.length === 0) {
+            fetchInstalledSkills().then((data) => {
+              setInstalledSkills(data.installed || []);
+            }).catch(() => {
+            });
+          }
         } else {
           setShowCommands(false);
         }
@@ -21772,13 +22474,9 @@ function ChatInput() {
   const updateEmptyState = reactExports.useCallback(() => {
     const ed2 = editableRef.current;
     if (!ed2) return;
-    const { text: text2, files } = readEditor(ed2);
-    isEmptyRef.current = text2.trim() === "" && files.length === 0;
-    if (isEmptyRef.current) {
-      ed2.classList.add("is-empty");
-    } else {
-      ed2.classList.remove("is-empty");
-    }
+    const { text: text2, files, skills } = readEditor(ed2);
+    const empty2 = text2.trim() === "" && files.length === 0 && skills.length === 0;
+    setIsEmpty(empty2);
   }, []);
   const filteredFiles = workspaceFiles.filter((f2) => {
     if (!fileFilter) return true;
@@ -21788,6 +22486,16 @@ function ChatInput() {
   const filteredCommands = SLASH_COMMANDS.filter(
     (c) => c.command.startsWith(commandFilter) || c.label.includes(commandFilter.replace("/", ""))
   );
+  const filteredSkills = installedSkills.filter(
+    (s) => {
+      const kw = commandFilter.replace("/", "").toLowerCase();
+      return !kw || s.skill_name.toLowerCase().includes(kw) || s.description.toLowerCase().includes(kw);
+    }
+  );
+  const slashItems = [
+    ...filteredSkills.map((s) => ({ kind: "skill", skill: s })),
+    ...filteredCommands.map((c) => ({ kind: "command", cmd: c }))
+  ];
   const insertFileRef = reactExports.useCallback((filePath) => {
     const ed2 = editableRef.current;
     if (!ed2) return;
@@ -21828,7 +22536,7 @@ function ChatInput() {
           charCount += len;
         } else if (node2.nodeType === Node.ELEMENT_NODE) {
           const el2 = node2;
-          if (el2.hasAttribute("data-file")) return null;
+          if (el2.hasAttribute("data-file") || el2.hasAttribute("data-skill-id")) return null;
           if (el2.tagName === "BR") charCount += 1;
           else for (const c of Array.from(node2.childNodes)) {
             const result = findPos(c, targetPos);
@@ -21882,29 +22590,10 @@ function ChatInput() {
     ed2.focus();
     const sel = window.getSelection();
     if (!sel || !sel.rangeCount) return;
-    const range = sel.getRangeAt(0).cloneRange();
-    range.setStart(ed2, 0);
-    const textBefore = range.toString();
-    const lastNl = textBefore.lastIndexOf("\n");
     const currentRange = sel.getRangeAt(0);
-    let charIdx = 0;
-    function findNodeOffset(node2, target) {
-      if (node2.nodeType === Node.TEXT_NODE) {
-        const len = (node2.textContent || "").length;
-        if (charIdx + len >= target) return { node: node2, offset: target - charIdx };
-        charIdx += len;
-      } else if (node2.nodeType === Node.ELEMENT_NODE) {
-        const el2 = node2;
-        if (el2.hasAttribute("data-file")) return null;
-        if (el2.tagName === "BR") charIdx += 1;
-        else for (const c of Array.from(node2.childNodes)) {
-          const r2 = findNodeOffset(c, target);
-          if (r2) return r2;
-        }
-      }
-      return null;
-    }
-    const start = findNodeOffset(ed2, lastNl + 1);
+    const slashPlainPos = findSlashPosInEditor(ed2, currentRange.endContainer, currentRange.endOffset);
+    if (slashPlainPos < 0) return;
+    const start = findPlainTextOffset(ed2, slashPlainPos);
     if (!start) return;
     const newRange = document.createRange();
     newRange.setStart(start.node, start.offset);
@@ -21912,6 +22601,36 @@ function ChatInput() {
     newRange.deleteContents();
     newRange.insertNode(document.createTextNode(cmd.command + " "));
     newRange.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+    setShowCommands(false);
+    updateEmptyState();
+  }, [updateEmptyState]);
+  const insertSkill = reactExports.useCallback((skill) => {
+    const ed2 = editableRef.current;
+    if (!ed2) return;
+    ed2.focus();
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const currentRange = sel.getRangeAt(0);
+    const slashPlainPos = findSlashPosInEditor(ed2, currentRange.endContainer, currentRange.endOffset);
+    if (slashPlainPos < 0) return;
+    const start = findPlainTextOffset(ed2, slashPlainPos);
+    if (!start) return;
+    const newRange = document.createRange();
+    newRange.setStart(start.node, start.offset);
+    newRange.setEnd(currentRange.endContainer, currentRange.endOffset);
+    newRange.deleteContents();
+    const chip = createSkillChipDOM(skill.skill_id, skill.skill_name, skill.icon, (el2) => {
+      el2.remove();
+      updateEmptyState();
+    });
+    newRange.insertNode(chip);
+    const spaceNode = document.createTextNode(" ");
+    newRange.setStartAfter(chip);
+    newRange.insertNode(spaceNode);
+    newRange.setStartAfter(spaceNode);
+    newRange.collapse(true);
     sel.removeAllRanges();
     sel.addRange(newRange);
     setShowCommands(false);
@@ -21948,7 +22667,7 @@ function ChatInput() {
       if (showCommands) {
         if (e.key === "ArrowDown") {
           e.preventDefault();
-          setSelectedCmdIdx((p2) => Math.min(p2 + 1, filteredCommands.length - 1));
+          setSelectedCmdIdx((p2) => Math.min(p2 + 1, slashItems.length - 1));
           return;
         }
         if (e.key === "ArrowUp") {
@@ -21958,7 +22677,11 @@ function ChatInput() {
         }
         if (e.key === "Enter" || e.key === "Tab") {
           e.preventDefault();
-          if (filteredCommands[selectedCmdIdx]) insertCommand(filteredCommands[selectedCmdIdx]);
+          const item = slashItems[selectedCmdIdx];
+          if (item) {
+            if (item.kind === "command") insertCommand(item.cmd);
+            else insertSkill(item.skill);
+          }
           return;
         }
         if (e.key === "Escape") {
@@ -21972,21 +22695,25 @@ function ChatInput() {
         handleSend();
       }
     },
-    [showFilePicker, showCommands, filteredFiles, filteredCommands, selectedFileIdx, selectedCmdIdx, insertFileRef, insertCommand]
+    [showFilePicker, showCommands, filteredFiles, slashItems, selectedFileIdx, selectedCmdIdx, insertFileRef, insertCommand, insertSkill]
   );
   const handleSend = reactExports.useCallback(() => {
     const ed2 = editableRef.current;
     if (!ed2) return;
-    const { text: text2, files } = readEditor(ed2);
+    const { text: text2, files, skills } = readEditor(ed2);
     const trimmed = text2.trim();
-    if (!trimmed || isProcessing) return;
+    if (!trimmed && files.length === 0 && skills.length === 0) return;
     if (!settings.workspacePath) {
       alert("请先选择工作空间（workspace）目录");
       return;
     }
-    sendMessage(trimmed, files.length > 0 ? files : void 0);
+    sendMessage(
+      trimmed || " ",
+      files.length > 0 ? files : void 0,
+      skills.length > 0 ? skills : void 0
+    );
     ed2.innerHTML = "";
-    isEmptyRef.current = true;
+    setIsEmpty(true);
     updateEmptyState();
   }, [isProcessing, settings.workspacePath, sendMessage, updateEmptyState]);
   const closeAllDropdowns = () => {
@@ -22029,28 +22756,45 @@ function ChatInput() {
       },
       i
     )) }),
-    showCommands && filteredCommands.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx(
+    showCommands && slashItems.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx(
       "div",
       {
         ref: cmdMenuRef,
-        className: "max-w-[740px] w-full mx-auto bg-white border border-[#e2e8f0] rounded-[10px] shadow-lg overflow-hidden animate-[msgIn_0.15s_ease-out]",
-        children: filteredCommands.map((cmd, idx) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
-          "button",
-          {
-            onMouseDown: (e) => {
-              e.preventDefault();
-              insertCommand(cmd);
-            },
-            onMouseEnter: () => setSelectedCmdIdx(idx),
-            className: `w-full flex items-center gap-3 px-4 py-2.5 text-left border-none bg-transparent cursor-pointer transition-colors ${idx === selectedCmdIdx ? "bg-[#f0fdf4]" : "hover:bg-[#f8fafc]"} ${idx !== 0 ? "border-t border-[#f1f5f9]" : ""}`,
-            children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[13px] font-semibold text-[#047857] w-[70px] flex-shrink-0", children: cmd.command }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[13px] text-[#0f172a] font-medium", children: cmd.label }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[12px] text-[#94a3b8] ml-auto hidden sm:block", children: cmd.description })
-            ]
-          },
-          cmd.command
-        ))
+        className: "max-w-[740px] w-full mx-auto bg-white border border-[#e2e8f0] rounded-[10px] shadow-lg overflow-hidden animate-[msgIn_0.15s_ease-out] max-h-[400px] overflow-y-auto",
+        children: (() => {
+          let lastKind = null;
+          return slashItems.map((item, idx) => {
+            const sectionLabel = item.kind === "skill" ? "Skills" : "Commands";
+            const showLabel = item.kind !== lastKind;
+            lastKind = item.kind;
+            return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+              showLabel && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] font-semibold text-[#94a3b8] uppercase tracking-wider px-4 pt-2.5 pb-1", children: sectionLabel }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  onMouseDown: (e) => {
+                    e.preventDefault();
+                    if (item.kind === "command") insertCommand(item.cmd);
+                    else insertSkill(item.skill);
+                  },
+                  onMouseEnter: () => setSelectedCmdIdx(idx),
+                  className: `w-full flex items-center gap-3 px-4 py-2.5 text-left border-none bg-transparent cursor-pointer transition-colors ${idx === selectedCmdIdx ? "bg-[#f0fdf4]" : "hover:bg-[#f8fafc]"}`,
+                  children: item.kind === "command" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[13px] font-semibold text-[#047857] w-[70px] flex-shrink-0", children: item.cmd.command }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[13px] text-[#0f172a] font-medium", children: item.cmd.label }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[12px] text-[#94a3b8] ml-auto hidden sm:block", children: item.cmd.description })
+                  ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "w-[16px] h-[16px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-[12px]", children: "⚡" }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[13px] text-[#0f172a] font-medium", children: item.skill.skill_name }),
+                      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[12px] text-[#94a3b8] ml-2 hidden sm:inline", children: item.skill.description })
+                    ] })
+                  ] })
+                }
+              )
+            ] }, item.kind === "command" ? "cmd-" + item.cmd.command : "skill-" + item.skill.skill_id);
+          });
+        })()
       }
     ),
     showFilePicker && /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -22085,43 +22829,54 @@ function ChatInput() {
         className: "max-w-[740px] w-full mx-auto border rounded-[24px] py-2.5 px-4 transition-colors focus-within:border-[#a7f3d0]",
         style: { borderColor: "rgba(0,0,0,.1)" },
         children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-end gap-2", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "div",
-            {
-              ref: editableRef,
-              contentEditable: !isProcessing,
-              suppressContentEditableWarning: true,
-              onInput: updateEmptyState,
-              onKeyDown: handleKeyDown,
-              onPaste: (e) => {
-                e.preventDefault();
-                const text2 = e.clipboardData.getData("text/plain");
-                const sel = window.getSelection();
-                if (sel && sel.rangeCount) {
-                  sel.getRangeAt(0).deleteContents();
-                  sel.getRangeAt(0).insertNode(document.createTextNode(text2));
-                  sel.getRangeAt(0).collapse(false);
-                }
-              },
-              className: `flex-1 border-none bg-transparent outline-none text-[15px] text-[#0f172a] leading-relaxed min-h-[44px] max-h-[200px] overflow-y-auto py-1 whitespace-pre-wrap break-words ${isEmptyRef.current ? "is-empty" : ""}`,
-              "data-placeholder": "输入任务，@引用文件， /调用技能与指令",
-              style: { wordBreak: "break-word" },
-              role: "textbox",
-              "aria-multiline": "true"
-            }
-          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative flex-1", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "div",
+              {
+                ref: editableRef,
+                contentEditable: true,
+                suppressContentEditableWarning: true,
+                onInput: updateEmptyState,
+                onKeyDown: handleKeyDown,
+                onPaste: (e) => {
+                  e.preventDefault();
+                  const text2 = e.clipboardData.getData("text/plain");
+                  const sel = window.getSelection();
+                  if (sel && sel.rangeCount) {
+                    sel.getRangeAt(0).deleteContents();
+                    sel.getRangeAt(0).insertNode(document.createTextNode(text2));
+                    sel.getRangeAt(0).collapse(false);
+                  }
+                },
+                className: "border-none bg-transparent outline-none text-[15px] text-[#0f172a] leading-relaxed min-h-[44px] max-h-[200px] overflow-y-auto py-1 whitespace-pre-wrap break-words",
+                style: { wordBreak: "break-word" },
+                role: "textbox",
+                "aria-multiline": "true"
+              }
+            ),
+            isEmpty && /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "div",
+              {
+                className: "absolute top-0 left-0 text-[15px] text-[#94a3b8] leading-relaxed py-1 pointer-events-none select-none whitespace-nowrap",
+                "aria-hidden": "true",
+                children: "输入任务，@引用文件， /调用技能与指令"
+              }
+            )
+          ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsx(
             "button",
             {
               onClick: handleSend,
-              disabled: isProcessing,
               className: "flex-shrink-0 w-[32px] h-[32px] rounded-full flex items-center justify-center border-none cursor-pointer transition-all",
               style: {
-                backgroundColor: isEmptyRef.current ? "#f1f5f9" : "#a7f3d0",
-                color: isEmptyRef.current ? "#94a3b8" : "#047857",
+                backgroundColor: isEmpty ? "#f1f5f9" : "#a7f3d0",
+                color: isEmpty ? "#94a3b8" : "#047857",
                 opacity: 1
               },
-              children: isProcessing ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[16px] h-[16px] border-[2px] border-[#047857] border-t-transparent rounded-full animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round", children: [
+              children: isProcessing ? /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "12", y1: "5", x2: "12", y2: "19" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "5", y1: "12", x2: "19", y2: "12" })
+              ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round", children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "12", y1: "19", x2: "12", y2: "5" }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "5 12 12 5 19 12" })
               ] })
@@ -22224,15 +22979,8 @@ function ChatInput() {
           m2
         )) })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ml-auto text-[11px] text-[#94a3b8]", children: isProcessing ? "AI 正在处理中..." : "Enter 发送 · Shift+Enter 换行" })
-    ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("style", { children: `
-        .is-empty:before {
-          content: attr(data-placeholder);
-          color: #94a3b8;
-          pointer-events: none;
-        }
-      ` })
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ml-auto text-[11px] text-[#94a3b8]", children: isProcessing ? queue.length > 0 ? `队列中 ${queue.length} 个待处理 · 输入将加入队列` : "AI 正在处理中... Enter 加入队列" : "Enter 发送 · Shift+Enter 换行" })
+    ] })
   ] });
 }
 function ChatPanel() {
@@ -22266,6 +23014,21 @@ function PlanEditorPanel() {
   const [text2, setText] = reactExports.useState("");
   const textareaRef = reactExports.useRef(null);
   const isOpen = currentEditingPlanMsgIdx != null;
+  reactExports.useEffect(() => {
+    if (currentEditingPlanMsgIdx != null) {
+      const task = useTaskStore.getState().getCurrentTask();
+      const msg = task?.messages[currentEditingPlanMsgIdx];
+      if (msg) {
+        const segs = msg.segments || [];
+        const generatedIdx = segs.findIndex((s) => s.type === "generated");
+        const textSegs = segs.slice(0, generatedIdx >= 0 ? generatedIdx : void 0);
+        const planText = textSegs.filter((s) => s.type === "text").map((s) => s.content).join("");
+        setText(planText || msg.content || "");
+      }
+    } else {
+      setText("");
+    }
+  }, [currentEditingPlanMsgIdx]);
   reactExports.useEffect(() => {
     if (isOpen) {
       setTimeout(() => {
@@ -22324,103 +23087,76 @@ function PlanEditorPanel() {
     ] })
   ] });
 }
-const HUB_SKILLS = [
-  { id: "h1", name: "GitHub 集成", desc: "管理 Issues、PR、仓库操作", icon: "🐙", category: "开发" },
-  { id: "h2", name: "Slack 通知", desc: "发送消息、管理频道通知", icon: "💬", category: "协作" },
-  { id: "h3", name: "PDF 解析器", desc: "解析和提取 PDF 内容", icon: "📕", category: "文档" },
-  { id: "h4", name: "图片生成", desc: "通过 AI 生成和编辑图片", icon: "🎨", category: "创作" },
-  { id: "h5", name: "邮件助手", desc: "自动读取、分类和回复邮件", icon: "📧", category: "办公" },
-  { id: "h6", name: "数据可视化", desc: "生成图表和数据分析报告", icon: "📊", category: "数据" },
-  { id: "h7", name: "API 测试", desc: "REST API 自动化测试工具", icon: "🧪", category: "开发" },
-  { id: "h8", name: "翻译助手", desc: "多语言实时翻译", icon: "🌍", category: "办公" }
-];
-const MCP_HUB = [
-  { id: "mh1", name: "GitHub MCP", desc: "管理 Issues、PR、仓库操作", icon: "🐙", category: "开发" },
-  { id: "mh2", name: "Slack MCP", desc: "发送消息、管理频道通知", icon: "💬", category: "协作" },
-  { id: "mh3", name: "PostgreSQL MCP", desc: "数据库查询和管理", icon: "🗄️", category: "数据" },
-  { id: "mh4", name: "Filesystem MCP", desc: "安全文件系统访问", icon: "📁", category: "文件" },
-  { id: "mh5", name: "Redis MCP", desc: "缓存管理和数据操作", icon: "🔴", category: "数据" },
-  { id: "mh6", name: "Docker MCP", desc: "容器管理和部署操作", icon: "🐳", category: "运维" },
-  { id: "mh7", name: "Jira MCP", desc: "任务跟踪和项目管理", icon: "📋", category: "协作" },
-  { id: "mh8", name: "Notion MCP", desc: "文档和知识库管理", icon: "📝", category: "办公" }
-];
-let memId = 10;
-let ruleId = 10;
-const useConfigStore = create$1((set) => ({
-  hubSkills: HUB_SKILLS,
-  installedSkillIds: ["h1", "h3", "h8"],
-  customSkills: [
-    { id: "c1", name: "自定义日志分析", desc: "解析应用日志并生成报告", icon: "📋", source: "create", time: "1周前" },
-    { id: "c2", name: "数据库备份脚本", desc: "定时备份 PostgreSQL 数据库", icon: "💾", source: "upload", fileName: "db-backup.skill", time: "2周前" }
-  ],
-  mcpHub: MCP_HUB,
-  installedMcpIds: ["mh1", "mh3", "mh4"],
-  customMcps: [
-    { id: "cm1", name: "内部 API MCP", desc: "公司内部 API 接口调用", icon: "🔌", source: "create", time: "3天前" }
-  ],
-  memoryItems: [
-    { id: "m1", text: "用户偏好简洁回复，不要冗余解释", time: "3天前" },
-    { id: "m2", text: "项目使用 TypeScript + React + Tailwind CSS 技术栈", time: "1周前" },
-    { id: "m3", text: "用户是高级前端工程师，熟悉 React 生态", time: "2周前" }
-  ],
-  rulesItems: [
-    { id: "r1", text: "所有 API 调用需要统一的错误处理", time: "1周前" },
-    { id: "r2", text: "组件命名使用 PascalCase，文件与组件同名", time: "2周前" }
-  ],
-  // Skills
-  installSkill: (id2) => set((s) => ({
-    installedSkillIds: s.installedSkillIds.includes(id2) ? s.installedSkillIds : [...s.installedSkillIds, id2]
-  })),
-  uninstallSkill: (id2) => set((s) => ({
-    installedSkillIds: s.installedSkillIds.filter((x2) => x2 !== id2)
-  })),
-  addCustomSkill: (skill) => set((s) => ({ customSkills: [skill, ...s.customSkills] })),
-  deleteCustomSkill: (id2) => set((s) => ({ customSkills: s.customSkills.filter((x2) => x2.id !== id2) })),
-  // MCP
-  installMcp: (id2) => set((s) => ({
-    installedMcpIds: s.installedMcpIds.includes(id2) ? s.installedMcpIds : [...s.installedMcpIds, id2]
-  })),
-  uninstallMcp: (id2) => set((s) => ({
-    installedMcpIds: s.installedMcpIds.filter((x2) => x2 !== id2)
-  })),
-  addCustomMcp: (mcp) => set((s) => ({ customMcps: [mcp, ...s.customMcps] })),
-  deleteCustomMcp: (id2) => set((s) => ({ customMcps: s.customMcps.filter((x2) => x2.id !== id2) })),
-  // Memory
-  addMemory: (text2) => set((s) => ({
-    memoryItems: [{ id: `m${memId++}`, text: text2, time: "刚才" }, ...s.memoryItems]
-  })),
-  updateMemory: (id2, text2) => set((s) => ({
-    memoryItems: s.memoryItems.map((m2) => m2.id === id2 ? { ...m2, text: text2 } : m2)
-  })),
-  deleteMemory: (id2) => set((s) => ({
-    memoryItems: s.memoryItems.filter((m2) => m2.id !== id2)
-  })),
-  // Rules
-  addRule: (text2) => set((s) => ({
-    rulesItems: [{ id: `r${ruleId++}`, text: text2, time: "刚才" }, ...s.rulesItems]
-  })),
-  updateRule: (id2, text2) => set((s) => ({
-    rulesItems: s.rulesItems.map((r2) => r2.id === id2 ? { ...r2, text: text2 } : r2)
-  })),
-  deleteRule: (id2) => set((s) => ({
-    rulesItems: s.rulesItems.filter((r2) => r2.id !== id2)
-  }))
-}));
+function Spinner$1() {
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4 animate-spin text-[#94a3b8]", viewBox: "0 0 16 16", fill: "none", children: /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "8", cy: "8", r: "6", stroke: "currentColor", strokeWidth: "2", strokeDasharray: "28", strokeDashoffset: "8" }) });
+}
 function SkillsConfig() {
   const [tab2, setTab] = reactExports.useState("hub");
   const [search2, setSearch] = reactExports.useState("");
+  const [showCreate, setShowCreate] = reactExports.useState(false);
+  const [actionError, setActionError] = reactExports.useState(null);
   const {
     hubSkills,
-    installedSkillIds,
+    hubSkillsLoading,
+    hubSkillsError,
+    installedSkills,
+    installedSkillsLoading,
+    installedSkillsError,
     customSkills,
+    customSkillsLoading,
+    customSkillsError,
+    installingSkillIds,
+    loadAllSkills,
     installSkill,
     uninstallSkill,
-    addCustomSkill,
+    enableSkill,
+    disableSkill,
+    createCustomSkill,
     deleteCustomSkill
   } = useConfigStore();
+  reactExports.useEffect(() => {
+    loadAllSkills();
+  }, []);
+  const installedIds = new Set(installedSkills.map((s) => s.skill_id));
   const filtered = hubSkills.filter(
-    (s) => !search2 || s.name.toLowerCase().includes(search2.toLowerCase()) || s.desc.toLowerCase().includes(search2.toLowerCase()) || s.category.toLowerCase().includes(search2.toLowerCase())
+    (s) => !search2 || s.skill_name.toLowerCase().includes(search2.toLowerCase()) || s.description.toLowerCase().includes(search2.toLowerCase()) || s.category.toLowerCase().includes(search2.toLowerCase())
   );
+  const handleInstall = async (skillId) => {
+    setActionError(null);
+    try {
+      await installSkill(skillId);
+    } catch (err) {
+      setActionError(err.message || "安装失败");
+    }
+  };
+  const handleUninstall = async (skillId) => {
+    setActionError(null);
+    try {
+      await uninstallSkill(skillId);
+    } catch (err) {
+      setActionError(err.message || "卸载失败");
+    }
+  };
+  const handleToggleEnabled = async (skillId, currentlyEnabled) => {
+    setActionError(null);
+    try {
+      if (currentlyEnabled) {
+        await disableSkill(skillId);
+      } else {
+        await enableSkill(skillId);
+      }
+    } catch (err) {
+      setActionError(err.message || "操作失败");
+    }
+  };
+  const handleDeleteCustom = async (skillId) => {
+    setActionError(null);
+    try {
+      await deleteCustomSkill(skillId);
+    } catch (err) {
+      setActionError(err.message || "删除失败");
+    }
+  };
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 mb-5", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex gap-0.5 bg-[#f1f5f9] rounded-md p-0.5", children: ["hub", "installed", "custom"].map((t2) => /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -22448,122 +23184,277 @@ function SkillsConfig() {
         )
       ] })
     ] }),
-    tab2 === "hub" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5", children: [
-      filtered.map((s) => {
-        const installed = installedSkillIds.includes(s.id);
-        return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5 hover:border-[#cbd5e1] hover:shadow-sm transition-all", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg", children: s.icon }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.name }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.desc }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 bg-[#f0fdf4] text-[#047857]", children: s.category })
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 self-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "button",
-            {
-              onClick: () => installed ? uninstallSkill(s.id) : installSkill(s.id),
-              className: `px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors border cursor-pointer ${installed ? "border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9]" : "border-[#a7f3d0] text-[#047857] bg-[#f0fdf4] hover:bg-[#a7f3d0]"}`,
-              children: installed ? "已安装" : "安装"
-            }
-          ) })
-        ] }, s.id);
-      }),
-      filtered.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#94a3b8] text-[13px] py-3", children: "未找到匹配的 Skill" })
+    actionError && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-3 px-3 py-2 bg-[#fef2f2] border border-[#fecaca] rounded-md text-[13px] text-[#dc2626] flex items-center gap-2", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: actionError }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setActionError(null), className: "ml-auto text-[#94a3b8] hover:text-[#0f172a] cursor-pointer", children: "×" })
     ] }),
-    tab2 === "installed" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] font-semibold text-[#94a3b8] uppercase tracking-wider mb-2", children: "Hub 已安装" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5 mb-5", children: [
-        hubSkills.filter((s) => installedSkillIds.includes(s.id)).map((s) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-l-[3px] border-l-[#a7f3d0] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg", children: s.icon }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.name }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.desc }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 bg-[#f0fdf4] text-[#047857]", children: s.category })
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 self-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => uninstallSkill(s.id), className: "px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9] cursor-pointer", children: "卸载" }) })
-        ] }, s.id)),
-        hubSkills.filter((s) => installedSkillIds.includes(s.id)).length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#94a3b8] text-[13px] py-3", children: "暂无已安装的 Hub Skill" })
+    tab2 === "hub" && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+      hubSkillsLoading && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 text-[#94a3b8] text-[13px] py-4", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Spinner$1, {}),
+        " 加载 Hub 列表..."
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] font-semibold text-[#94a3b8] uppercase tracking-wider mb-2", children: "内置 Skills" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5", children: [
-        { id: "s1", name: "文件操作", desc: "读取、写入、搜索本地文件", icon: "📄" },
-        { id: "s2", name: "Shell 执行", desc: "执行命令行指令和脚本", icon: "⚡" },
-        { id: "s3", name: "浏览器操控", desc: "自动打开浏览器执行网页操作", icon: "🌐" },
-        { id: "s4", name: "代码分析", desc: "分析代码结构、依赖和潜在问题", icon: "🔍" },
-        { id: "s5", name: "文档生成", desc: "自动生成 README、API 文档等", icon: "📝" }
-      ].map((s) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-l-[3px] border-l-[#a7f3d0] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg", children: s.icon }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.name }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.desc }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 bg-[#f0fdf4] text-[#047857]", children: "内置" })
+      hubSkillsError && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#dc2626] text-[13px] py-3", children: hubSkillsError }),
+      !hubSkillsLoading && !hubSkillsError && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5", children: [
+        filtered.map((s) => {
+          const installed = installedIds.has(s.skill_id);
+          const installing = installingSkillIds.has(s.skill_id);
+          return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5 hover:border-[#cbd5e1] hover:shadow-sm transition-all", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg", children: s.icon }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.skill_name }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.description }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-1.5 mt-1.5 flex-wrap", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#f0fdf4] text-[#047857]", children: s.category }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#f1f5f9] text-[#64748b]", children: [
+                  "v",
+                  s.version
+                ] })
+              ] })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 self-center", children: installing ? /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "inline-flex items-center gap-1 px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9]", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(Spinner$1, {}),
+              " 安装中"
+            ] }) : /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                onClick: () => installed ? handleUninstall(s.skill_id) : handleInstall(s.skill_id),
+                className: `px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors border cursor-pointer ${installed ? "border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9]" : "border-[#a7f3d0] text-[#047857] bg-[#f0fdf4] hover:bg-[#a7f3d0]"}`,
+                children: installed ? "已安装" : "安装"
+              }
+            ) })
+          ] }, s.skill_id);
+        }),
+        filtered.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#94a3b8] text-[13px] py-3", children: "未找到匹配的 Skill" })
+      ] })
+    ] }),
+    tab2 === "installed" && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+      installedSkillsLoading && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 text-[#94a3b8] text-[13px] py-4", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Spinner$1, {}),
+        " 加载已安装列表..."
+      ] }),
+      installedSkillsError && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#dc2626] text-[13px] py-3", children: installedSkillsError }),
+      !installedSkillsLoading && !installedSkillsError && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-[11px] font-semibold text-[#94a3b8] uppercase tracking-wider mb-2", children: [
+          "Hub 已安装 (",
+          installedSkills?.length,
+          ")"
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5 mb-5", children: [
+          installedSkills?.map((s) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-l-[3px] border-l-[#a7f3d0] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg", children: s.icon }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.skill_name }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.description }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 bg-[#f0fdf4] text-[#047857]", children: s.category })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 self-center flex flex-col gap-1", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => handleUninstall(s.skill_id), className: "px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9] cursor-pointer", children: "卸载" }) })
+          ] }, s.skill_id)),
+          installedSkills?.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#94a3b8] text-[13px] py-3", children: "暂无已安装的 Hub Skill" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-[11px] font-semibold text-[#94a3b8] uppercase tracking-wider mb-2", children: [
+          "内置 Skills (",
+          installedSkills.filter((s) => s.source === "builtin").length,
+          ")"
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5", children: [
+          installedSkills.filter((s) => s.source === "builtin").map((s) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-l-[3px] border-l-[#a7f3d0] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg", children: s.icon }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.skill_name }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.description }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 bg-[#f0fdf4] text-[#047857]", children: "内置" })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 self-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                onClick: () => handleToggleEnabled(s.skill_id, s.enabled),
+                className: `px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors border cursor-pointer ${s.enabled ? "border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9]" : "border-[#fde68a] text-[#b45309] bg-[#fffbeb] hover:bg-[#fde68a]"}`,
+                children: s.enabled ? "禁用" : "启用"
+              }
+            ) })
+          ] }, s.skill_id)),
+          installedSkills.filter((s) => s.source === "builtin").length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#94a3b8] text-[13px] py-3", children: "暂无内置 Skill" })
         ] })
-      ] }, s.id)) })
+      ] })
     ] }),
-    tab2 === "custom" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 mb-5", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs(
-          "button",
-          {
-            onClick: () => {
-              const name2 = prompt("输入 Skill 名称:");
-              if (name2) addCustomSkill({ id: "c" + Date.now(), name: name2, desc: "自定义创建的 Skill", icon: "✨", source: "create", time: "刚才" });
-            },
-            className: "flex items-center gap-1.5 px-4 py-2 border border-dashed border-[#e2e8f0] rounded-md text-[13px] text-[#64748b] hover:border-[#a7f3d0] hover:text-[#047857] hover:bg-[#f0fdf4] transition-colors cursor-pointer bg-white",
-            children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 10V2M4 6l4-4 4 4" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 12v2h12v-2" })
-              ] }),
-              "上传 Skill"
-            ]
-          }
-        ),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs(
-          "button",
-          {
-            onClick: () => {
-              const name2 = prompt("输入 Skill 名称:");
-              if (name2) addCustomSkill({ id: "c" + Date.now(), name: name2, desc: "自定义创建的 Skill", icon: "✨", source: "create", time: "刚才" });
-            },
-            className: "flex items-center gap-1.5 px-4 py-2 border border-dashed border-[#e2e8f0] rounded-md text-[13px] text-[#64748b] hover:border-[#a7f3d0] hover:text-[#047857] hover:bg-[#f0fdf4] transition-colors cursor-pointer bg-white",
-            children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 3v10M3 8h10" }) }),
-              "自己创建"
-            ]
-          }
-        )
+    tab2 === "custom" && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex gap-2 mb-5", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "button",
+        {
+          onClick: () => setShowCreate(true),
+          className: "flex items-center gap-1.5 px-4 py-2 border border-dashed border-[#e2e8f0] rounded-md text-[13px] text-[#64748b] hover:border-[#a7f3d0] hover:text-[#047857] hover:bg-[#f0fdf4] transition-colors cursor-pointer bg-white",
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 3v10M3 8h10" }) }),
+            "创建自定义 Skill"
+          ]
+        }
+      ) }),
+      customSkillsLoading && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 text-[#94a3b8] text-[13px] py-4", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Spinner$1, {}),
+        " 加载中..."
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5", children: [
+      customSkillsError && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#dc2626] text-[13px] py-3", children: customSkillsError }),
+      !customSkillsLoading && !customSkillsError && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5", children: [
         customSkills.map((s) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-l-[3px] border-l-[#a7f3d0] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg", children: s.icon }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.name }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.desc }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 ${s.source === "create" ? "bg-[#f0fdf4] text-[#047857]" : "bg-[#fffbeb] text-[#b45309]"}`, children: s.source === "create" ? "自建" : `上传 · ${s.fileName || ""}` })
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.skill_name }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.description }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-1.5 mt-1.5", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#f0fdf4] text-[#047857]", children: s.category }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#f1f5f9] text-[#64748b]", children: new Date(s.created_at).toLocaleDateString() })
+            ] })
           ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 self-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => deleteCustomSkill(s.id), className: "px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9] cursor-pointer", children: "删除" }) })
-        ] }, s.id)),
-        customSkills.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#94a3b8] text-[13px] py-3", children: "暂无自定义 Skill，点击上方按钮添加" })
-      ] })
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 self-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => handleDeleteCustom(s.skill_id), className: "px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9] cursor-pointer", children: "删除" }) })
+        ] }, s.skill_id)),
+        customSkills.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#94a3b8] text-[13px] py-3", children: "暂无自定义 Skill，点击上方按钮创建" })
+      ] }),
+      showCreate && /* @__PURE__ */ jsxRuntimeExports.jsx(
+        CreateSkillModal,
+        {
+          onClose: () => setShowCreate(false),
+          onSubmit: async (req) => {
+            setActionError(null);
+            try {
+              await createCustomSkill(req);
+              setShowCreate(false);
+            } catch (err) {
+              setActionError(err.message || "创建失败");
+            }
+          }
+        }
+      )
     ] })
   ] });
 }
+function CreateSkillModal({ onClose, onSubmit }) {
+  const [name2, setName] = reactExports.useState("");
+  const [desc, setDesc] = reactExports.useState("");
+  const [prompt2, setPrompt] = reactExports.useState("");
+  const [submitting, setSubmitting] = reactExports.useState(false);
+  const handleSubmit = async () => {
+    if (!name2.trim() || !prompt2.trim()) return;
+    setSubmitting(true);
+    try {
+      await onSubmit({
+        skill_name: name2.trim(),
+        description: desc.trim() || void 0,
+        prompt: prompt2.trim()
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  const isValid = name2.trim() && prompt2.trim().length >= 10;
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed inset-0 z-50 flex items-center justify-center bg-black/20", onClick: onClose, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white rounded-xl shadow-lg p-6 w-[480px] max-h-[80vh] overflow-y-auto", onClick: (e) => e.stopPropagation(), children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between mb-4", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-[15px] font-semibold text-[#0f172a]", children: "创建自定义 Skill" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "text-[#94a3b8] hover:text-[#0f172a] cursor-pointer", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M4 4l8 8M12 4l-8 8" }) }) })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3.5", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-[12px] font-medium text-[#64748b] mb-1", children: "名称 *" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("input", { className: "w-full px-2.5 py-[7px] border border-[#e2e8f0] rounded-md text-[13px] outline-none focus:border-[#a7f3d0]", placeholder: "例如：我的代码审查 Skill", value: name2, onChange: (e) => setName(e.target.value) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-[12px] font-medium text-[#64748b] mb-1", children: "描述" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("input", { className: "w-full px-2.5 py-[7px] border border-[#e2e8f0] rounded-md text-[13px] outline-none focus:border-[#a7f3d0]", placeholder: "这个 Skill 的用途", value: desc, onChange: (e) => setDesc(e.target.value) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "block text-[12px] font-medium text-[#64748b] mb-1", children: [
+          "Prompt * ",
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[#94a3b8] font-normal", children: "（最少 10 字符）" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "textarea",
+          {
+            className: "w-full px-2.5 py-[7px] border border-[#e2e8f0] rounded-md text-[13px] outline-none focus:border-[#a7f3d0] min-h-[120px] resize-y",
+            placeholder: "编写 Skill 的指令 prompt...",
+            value: prompt2,
+            onChange: (e) => setPrompt(e.target.value)
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-[11px] text-[#94a3b8] mt-1", children: [
+          prompt2.length,
+          " / 10 字符"
+        ] })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-end gap-2 mt-5", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "px-4 py-1.5 rounded-md text-[13px] border border-[#e2e8f0] text-[#64748b] cursor-pointer", children: "取消" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: handleSubmit, disabled: !isValid || submitting, className: `px-4 py-1.5 rounded-md text-[13px] font-medium cursor-pointer border ${isValid && !submitting ? "border-[#a7f3d0] text-[#047857] bg-[#f0fdf4] hover:bg-[#a7f3d0]" : "border-[#e2e8f0] text-[#cbd5e1] bg-[#f8fafc] cursor-not-allowed"}`, children: submitting ? "创建中..." : "创建" })
+    ] })
+  ] }) });
+}
+function Spinner() {
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4 animate-spin text-[#94a3b8]", viewBox: "0 0 16 16", fill: "none", children: /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "8", cy: "8", r: "6", stroke: "currentColor", strokeWidth: "2", strokeDasharray: "28", strokeDashoffset: "8" }) });
+}
+const connectionStatusColors = {
+  disconnected: "bg-[#f1f5f9] text-[#94a3b8]",
+  connecting: "bg-[#fffbeb] text-[#b45309]",
+  connected: "bg-[#f0fdf4] text-[#047857]",
+  error: "bg-[#fef2f2] text-[#dc2626]"
+};
+const connectionStatusLabel = {
+  disconnected: "未连接",
+  connecting: "连接中",
+  connected: "已连接",
+  error: "连接失败"
+};
 function McpConfig() {
   const [tab2, setTab] = reactExports.useState("hub");
   const [search2, setSearch] = reactExports.useState("");
+  const [showCreate, setShowCreate] = reactExports.useState(false);
+  const [actionError, setActionError] = reactExports.useState(null);
   const {
     mcpHub,
-    installedMcpIds,
+    mcpHubLoading,
+    mcpHubError,
+    installedMcps,
+    installedLoading,
+    installedError,
     customMcps,
+    customLoading,
+    customError,
+    installingMcpIds,
+    mcpConnectionStatuses,
+    loadAllMcps,
     installMcp,
     uninstallMcp,
-    addCustomMcp,
+    createCustomMcp,
     deleteCustomMcp
   } = useConfigStore();
+  reactExports.useEffect(() => {
+    loadAllMcps();
+  }, []);
+  const installedIds = new Set(installedMcps.map((s) => s.server_id));
   const filtered = mcpHub.filter(
-    (s) => !search2 || s.name.toLowerCase().includes(search2.toLowerCase()) || s.desc.toLowerCase().includes(search2.toLowerCase()) || s.category.toLowerCase().includes(search2.toLowerCase())
+    (s) => !search2 || s.server_name.toLowerCase().includes(search2.toLowerCase()) || s.description.toLowerCase().includes(search2.toLowerCase()) || s.category.toLowerCase().includes(search2.toLowerCase())
   );
+  const handleInstall = async (serverId) => {
+    setActionError(null);
+    try {
+      await installMcp(serverId);
+    } catch (err) {
+      setActionError(err.message || "安装失败");
+    }
+  };
+  const handleUninstall = async (serverId) => {
+    setActionError(null);
+    try {
+      await uninstallMcp(serverId);
+    } catch (err) {
+      setActionError(err.message || "卸载失败");
+    }
+  };
+  const handleDeleteCustom = async (serverId) => {
+    setActionError(null);
+    try {
+      await deleteCustomMcp(serverId);
+    } catch (err) {
+      setActionError(err.message || "删除失败");
+    }
+  };
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 mb-5", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex gap-0.5 bg-[#f1f5f9] rounded-md p-0.5", children: ["hub", "installed", "custom"].map((t2) => /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -22591,91 +23482,198 @@ function McpConfig() {
         )
       ] })
     ] }),
-    tab2 === "hub" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5", children: [
-      filtered.map((s) => {
-        const installed = installedMcpIds.includes(s.id);
-        return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5 hover:border-[#cbd5e1] hover:shadow-sm transition-all", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg", children: s.icon }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.name }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.desc }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 bg-[#fffbeb] text-[#b45309]", children: s.category })
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 self-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "button",
-            {
-              onClick: () => installed ? uninstallMcp(s.id) : installMcp(s.id),
-              className: `px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors border cursor-pointer ${installed ? "border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9]" : "border-[#a7f3d0] text-[#047857] bg-[#f0fdf4] hover:bg-[#a7f3d0]"}`,
-              children: installed ? "已安装" : "安装"
-            }
-          ) })
-        ] }, s.id);
-      }),
-      filtered.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#94a3b8] text-[13px] py-3", children: "未找到匹配的 MCP" })
+    actionError && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-3 px-3 py-2 bg-[#fef2f2] border border-[#fecaca] rounded-md text-[13px] text-[#dc2626] flex items-center gap-2", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: actionError }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setActionError(null), className: "ml-auto text-[#94a3b8] hover:text-[#0f172a] cursor-pointer", children: "×" })
     ] }),
-    tab2 === "installed" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] font-semibold text-[#94a3b8] uppercase tracking-wider mb-2", children: "Hub 已安装" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5", children: [
-        mcpHub.filter((s) => installedMcpIds.includes(s.id)).map((s) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-l-[3px] border-l-[#a7f3d0] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg", children: s.icon }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.name }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.desc }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 bg-[#fffbeb] text-[#b45309]", children: s.category })
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 self-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => uninstallMcp(s.id), className: "px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9] cursor-pointer", children: "卸载" }) })
-        ] }, s.id)),
-        mcpHub.filter((s) => installedMcpIds.includes(s.id)).length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#94a3b8] text-[13px] py-3", children: "暂无已安装的 Hub MCP" })
+    tab2 === "hub" && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+      mcpHubLoading && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 text-[#94a3b8] text-[13px] py-4", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Spinner, {}),
+        " 加载 Hub 列表..."
+      ] }),
+      mcpHubError && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#dc2626] text-[13px] py-3", children: mcpHubError }),
+      !mcpHubLoading && !mcpHubError && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5", children: [
+        filtered.map((s) => {
+          const installed = installedIds.has(s.server_id);
+          const installing = installingMcpIds.has(s.server_id);
+          const connStatus = mcpConnectionStatuses[s.server_id];
+          return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5 hover:border-[#cbd5e1] hover:shadow-sm transition-all", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg", children: s.icon }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.server_name }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.description }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-1.5 mt-1.5 flex-wrap", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#fffbeb] text-[#b45309]", children: s.category }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#f1f5f9] text-[#64748b]", children: s.transport }),
+                connStatus?.status === "connected" && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#f0fdf4] text-[#047857]", children: [
+                  connStatus.tool_count,
+                  " tools"
+                ] }),
+                connStatus?.status === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#fef2f2] text-[#dc2626]", title: connStatus.error, children: "错误" })
+              ] })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 self-center", children: installing ? /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "inline-flex items-center gap-1 px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9]", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(Spinner, {}),
+              " 安装中"
+            ] }) : /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                onClick: () => installed ? handleUninstall(s.server_id) : handleInstall(s.server_id),
+                className: `px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors border cursor-pointer ${installed ? "border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9]" : "border-[#a7f3d0] text-[#047857] bg-[#f0fdf4] hover:bg-[#a7f3d0]"}`,
+                children: installed ? "已安装" : "安装"
+              }
+            ) })
+          ] }, s.server_id);
+        }),
+        filtered.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#94a3b8] text-[13px] py-3", children: "未找到匹配的 MCP" })
       ] })
     ] }),
-    tab2 === "custom" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 mb-5", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs(
-          "button",
-          {
-            onClick: () => {
-              const name2 = prompt("输入 MCP 名称:");
-              if (name2) addCustomMcp({ id: "cm" + Date.now(), name: name2, desc: "自定义创建的 MCP", icon: "🔧", source: "create", time: "刚才" });
-            },
-            className: "flex items-center gap-1.5 px-4 py-2 border border-dashed border-[#e2e8f0] rounded-md text-[13px] text-[#64748b] hover:border-[#a7f3d0] hover:text-[#047857] hover:bg-[#f0fdf4] transition-colors cursor-pointer bg-white",
-            children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 10V2M4 6l4-4 4 4" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M2 12v2h12v-2" })
-              ] }),
-              "上传 MCP"
-            ]
-          }
-        ),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs(
-          "button",
-          {
-            onClick: () => {
-              const name2 = prompt("输入 MCP 名称:");
-              if (name2) addCustomMcp({ id: "cm" + Date.now(), name: name2, desc: "自定义创建的 MCP", icon: "🔧", source: "create", time: "刚才" });
-            },
-            className: "flex items-center gap-1.5 px-4 py-2 border border-dashed border-[#e2e8f0] rounded-md text-[13px] text-[#64748b] hover:border-[#a7f3d0] hover:text-[#047857] hover:bg-[#f0fdf4] transition-colors cursor-pointer bg-white",
-            children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 3v10M3 8h10" }) }),
-              "自己创建"
-            ]
-          }
-        )
+    tab2 === "installed" && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+      installedLoading && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 text-[#94a3b8] text-[13px] py-4", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Spinner, {}),
+        " 加载已安装列表..."
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5", children: [
+      installedError && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#dc2626] text-[13px] py-3", children: installedError }),
+      !installedLoading && !installedError && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5", children: [
+        installedMcps.map((s) => {
+          const connStatus = mcpConnectionStatuses[s.server_id];
+          return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-l-[3px] border-l-[#a7f3d0] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg", children: s.icon }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.server_name }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.description }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-1.5 mt-1.5 flex-wrap items-center", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#fffbeb] text-[#b45309]", children: s.category }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#f1f5f9] text-[#64748b]", children: s.transport }),
+                connStatus && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: `inline-block text-[10px] font-medium px-1.5 py-0.5 rounded ${connectionStatusColors[connStatus.status]}`, children: [
+                  connectionStatusLabel[connStatus.status],
+                  connStatus.tool_count > 0 && ` · ${connStatus.tool_count} tools`
+                ] })
+              ] })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 self-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => handleUninstall(s.server_id), className: "px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9] cursor-pointer", children: "卸载" }) })
+          ] }, s.server_id);
+        }),
+        installedMcps.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#94a3b8] text-[13px] py-3", children: "暂无已安装的 MCP，前往 Hub 安装" })
+      ] }) })
+    ] }),
+    tab2 === "custom" && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex gap-2 mb-5", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "button",
+        {
+          onClick: () => setShowCreate(true),
+          className: "flex items-center gap-1.5 px-4 py-2 border border-dashed border-[#e2e8f0] rounded-md text-[13px] text-[#64748b] hover:border-[#a7f3d0] hover:text-[#047857] hover:bg-[#f0fdf4] transition-colors cursor-pointer bg-white",
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 3v10M3 8h10" }) }),
+            "添加自定义 MCP"
+          ]
+        }
+      ) }),
+      customLoading && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 text-[#94a3b8] text-[13px] py-4", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Spinner, {}),
+        " 加载中..."
+      ] }),
+      customError && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#dc2626] text-[13px] py-3", children: customError }),
+      !customLoading && !customError && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5", children: [
         customMcps.map((s) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white border border-l-[3px] border-l-[#a7f3d0] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg", children: s.icon }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-0", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.name }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.desc }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 ${s.source === "create" ? "bg-[#f0fdf4] text-[#047857]" : "bg-[#fffbeb] text-[#b45309]"}`, children: s.source === "create" ? "自建" : `上传 · ${s.fileName || ""}` })
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-semibold text-sm text-[#0f172a]", children: s.server_name }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-[#94a3b8] mt-1", children: s.description }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-1.5 mt-1.5", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#f0fdf4] text-[#047857]", children: "自建" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#f1f5f9] text-[#64748b]", children: s.transport })
+            ] })
           ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 self-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => deleteCustomMcp(s.id), className: "px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9] cursor-pointer", children: "删除" }) })
-        ] }, s.id)),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-shrink-0 self-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => handleDeleteCustom(s.server_id), className: "px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9] cursor-pointer", children: "删除" }) })
+        ] }, s.server_id)),
         customMcps.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[#94a3b8] text-[13px] py-3", children: "暂无自定义 MCP，点击上方按钮添加" })
-      ] })
+      ] }),
+      showCreate && /* @__PURE__ */ jsxRuntimeExports.jsx(
+        CreateMcpModal,
+        {
+          onClose: () => setShowCreate(false),
+          onSubmit: async (req) => {
+            setActionError(null);
+            try {
+              await createCustomMcp(req);
+              setShowCreate(false);
+            } catch (err) {
+              setActionError(err.message || "创建失败");
+            }
+          }
+        }
+      )
     ] })
   ] });
+}
+function CreateMcpModal({ onClose, onSubmit }) {
+  const [name2, setName] = reactExports.useState("");
+  const [desc, setDesc] = reactExports.useState("");
+  const [transport, setTransport] = reactExports.useState("stdio");
+  const [command, setCommand] = reactExports.useState("");
+  const [args, setArgs] = reactExports.useState("");
+  const [url, setUrl] = reactExports.useState("");
+  const [submitting, setSubmitting] = reactExports.useState(false);
+  const handleSubmit = async () => {
+    if (!name2.trim()) return;
+    setSubmitting(true);
+    try {
+      const req = {
+        server_name: name2.trim(),
+        description: desc.trim() || void 0,
+        transport: transport || void 0,
+        command: transport === "stdio" ? command.trim() || null : null,
+        args: transport === "stdio" && args.trim() ? args.split(",").map((s) => s.trim()).filter(Boolean) : [],
+        url: transport !== "stdio" ? url.trim() || null : null
+      };
+      await onSubmit(req);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed inset-0 z-50 flex items-center justify-center bg-black/20", onClick: onClose, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white rounded-xl shadow-lg p-6 w-[420px] max-h-[80vh] overflow-y-auto", onClick: (e) => e.stopPropagation(), children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between mb-4", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-[15px] font-semibold text-[#0f172a]", children: "添加自定义 MCP" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "text-[#94a3b8] hover:text-[#0f172a] cursor-pointer", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M4 4l8 8M12 4l-8 8" }) }) })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3.5", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-[12px] font-medium text-[#64748b] mb-1", children: "名称 *" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("input", { className: "w-full px-2.5 py-[7px] border border-[#e2e8f0] rounded-md text-[13px] outline-none focus:border-[#a7f3d0]", placeholder: "例如：我的 API MCP", value: name2, onChange: (e) => setName(e.target.value) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-[12px] font-medium text-[#64748b] mb-1", children: "描述" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("input", { className: "w-full px-2.5 py-[7px] border border-[#e2e8f0] rounded-md text-[13px] outline-none focus:border-[#a7f3d0]", placeholder: "这个 MCP 的用途", value: desc, onChange: (e) => setDesc(e.target.value) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-[12px] font-medium text-[#64748b] mb-1", children: "传输方式" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("select", { className: "w-full px-2.5 py-[7px] border border-[#e2e8f0] rounded-md text-[13px] outline-none focus:border-[#a7f3d0] bg-white", value: transport, onChange: (e) => setTransport(e.target.value), children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "stdio", children: "stdio (本地进程)" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "sse", children: "SSE" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "streamable-http", children: "Streamable HTTP" })
+        ] })
+      ] }),
+      transport === "stdio" && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-[12px] font-medium text-[#64748b] mb-1", children: "启动命令" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("input", { className: "w-full px-2.5 py-[7px] border border-[#e2e8f0] rounded-md text-[13px] outline-none focus:border-[#a7f3d0]", placeholder: "例如：npx", value: command, onChange: (e) => setCommand(e.target.value) })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-[12px] font-medium text-[#64748b] mb-1", children: "参数（逗号分隔）" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("input", { className: "w-full px-2.5 py-[7px] border border-[#e2e8f0] rounded-md text-[13px] outline-none focus:border-[#a7f3d0]", placeholder: "例如：-y, @company/mcp-server", value: args, onChange: (e) => setArgs(e.target.value) })
+        ] })
+      ] }),
+      transport !== "stdio" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-[12px] font-medium text-[#64748b] mb-1", children: "URL" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("input", { className: "w-full px-2.5 py-[7px] border border-[#e2e8f0] rounded-md text-[13px] outline-none focus:border-[#a7f3d0]", placeholder: "例如：https://mcp.example.com/mcp", value: url, onChange: (e) => setUrl(e.target.value) })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-end gap-2 mt-5", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "px-4 py-1.5 rounded-md text-[13px] border border-[#e2e8f0] text-[#64748b] cursor-pointer", children: "取消" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: handleSubmit, disabled: !name2.trim() || submitting, className: `px-4 py-1.5 rounded-md text-[13px] font-medium cursor-pointer border ${name2.trim() && !submitting ? "border-[#a7f3d0] text-[#047857] bg-[#f0fdf4] hover:bg-[#a7f3d0]" : "border-[#e2e8f0] text-[#cbd5e1] bg-[#f8fafc] cursor-not-allowed"}`, children: submitting ? "创建中..." : "创建" })
+    ] })
+  ] }) });
 }
 function MemoryConfig() {
   const { memoryItems, rulesItems, updateMemory, deleteMemory, addMemory, updateRule, deleteRule, addRule } = useConfigStore();
@@ -22810,6 +23808,7 @@ function AppLayout() {
       Sidebar,
       {
         onOpenConfig: (page) => setConfigPage(configPage === page ? null : page),
+        onCloseConfig: () => setConfigPage(null),
         activeConfig: configPage
       }
     ),

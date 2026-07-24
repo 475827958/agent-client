@@ -9,7 +9,9 @@ const api = {
     edit: (path: string, oldStr: string, newStr: string) =>
       ipcRenderer.invoke('file:edit', path, oldStr, newStr),
     exec: (command: string, timeoutMs?: number) =>
-      ipcRenderer.invoke('file:exec', command, timeoutMs)
+      ipcRenderer.invoke('file:exec', command, timeoutMs),
+    extractSkill: (base64: string, skillName: string) =>
+      ipcRenderer.invoke('file:extractSkill', base64, skillName)
   },
   workspace: {
     select: () => ipcRenderer.invoke('workspace:select')

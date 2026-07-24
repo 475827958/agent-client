@@ -207,6 +207,45 @@ export function registerFileOps(workspacePath: () => string): void {
     }
   })
 
+  ipcMain.handle('file:extractSkill', async (_event, base64Content: string, skillName: string): Promise<string> => {
+    const fs = await import('fs/promises')
+    const path = await import('path')
+    const os = await import('os')
+    const crypto = await import('crypto')
+
+    // Resolve target directory: ~/.iwork/skills/{skillName}/
+    const homeDir = os.homedir()
+    const targetDir = path.join(homeDir, '.iwork', 'skills', skillName)
+
+    // Ensure parent directories exist
+    await fs.mkdir(targetDir, { recursive: true })
+
+    // Decode base64 → binary zip
+    const zipBuffer = Buffer.from(base64Content, 'base64')
+
+    // Write to temp zip file
+    const tmpDir = os.tmpdir()
+    const zipName = `skill_${crypto.randomBytes(4).toString('hex')}.zip`
+    const zipPath = path.join(tmpDir, zipName)
+    await fs.writeFile(zipPath, zipBuffer)
+
+    // Extract using shell (Git Bash on Windows, /bin/bash on macOS/Linux)
+    const bashPath = resolveShell()
+    try {
+      await execFileAsync(bashPath, ['-c', `unzip -o "${zipPath}" -d "${targetDir}"`], {
+        timeout: 30000,
+        maxBuffer: 10 * 1024 * 1024,
+        encoding: 'buffer' as BufferEncoding
+      })
+    } catch (err: any) {
+      try { await fs.unlink(zipPath) } catch {}
+      throw new Error(`Failed to extract zip: ${decodeBuffer(err.stderr) || err.message}`)
+    }
+
+    try { await fs.unlink(zipPath) } catch {}
+    return targetDir
+  })
+
   ipcMain.handle('workspace:select', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory']
