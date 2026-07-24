@@ -9,6 +9,7 @@ import {
   reportMcpTools
 } from '../services/api'
 import { ipcClient } from '../services/ipcClient'
+import { useTaskStore } from './taskStore'
 
 interface ConfigState {
   // Skills — API-backed
@@ -245,8 +246,12 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
         }
       }))
 
+      console.log('....')
+
       // 3. Connect client-side based on transport type
       const tools = await ipcClient.mcp.connect(serverId, config)
+
+      console.log(tools)
 
       // 4. Store discovered tools and update status
       set((st) => ({
@@ -256,6 +261,16 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
           [serverId]: { server_id: serverId, status: 'connected', tool_count: tools.length }
         }
       }))
+
+      // 5. Report tools to the current session if one is active
+      const currentTask = useTaskStore.getState().getCurrentTask()
+      if (currentTask?.sessionId) {
+        try {
+          await reportMcpTools(currentTask.sessionId, serverId, tools)
+        } catch (err) {
+          console.error(`Failed to report tools for ${serverId}:`, err)
+        }
+      }
 
       await get().loadInstalledMcps()
     } catch (err: any) {

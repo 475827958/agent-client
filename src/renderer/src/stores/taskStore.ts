@@ -74,9 +74,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         mcp_servers: useConfigStore.getState().getMcpServersForSession()
       })
 
-      // Report all connected MCP tools to the newly created session
-      useConfigStore.getState().reportMcpToolsToSession(data.id)
-
       set((s) => ({
         tasks: s.tasks.map((t) =>
           t.id === id ? { ...t, sessionId: data.id } : t

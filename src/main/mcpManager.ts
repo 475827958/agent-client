@@ -222,23 +222,36 @@ class HttpConnection {
   }
 
   async connect(): Promise<McpToolDef[]> {
-    if (this.config.transport === 'sse') {
-      this.endpoint = await this.resolveSseEndpoint()
-    } else {
-      this.endpoint = resolveEnv(this.config.url || '')
-    }
-    this.headers = { 'Content-Type': 'application/json', ...(this.config.headers || {}) }
+    try {
+      if (this.config.transport === 'sse') {
+        this.endpoint = await this.resolveSseEndpoint()
+      } else {
+        this.endpoint = resolveEnv(this.config.url || '')
+      }
+      this.headers = { 'Content-Type': 'application/json', ...(this.config.headers || {}) }
 
-    const send = (req: JsonRpcRequest) => this.sendRpc(req)
-    await this.initialize(send)
-    return this.listTools(send)
+      const send = (req: JsonRpcRequest) => this.sendRpc(req)
+      await this.initialize(send)
+      return this.listTools(send)
+    } catch (err: any) {
+      console.error(`[MCP HTTP/SSE] connect failed for ${this.config.server_id}:`, err)
+      throw err
+    }
   }
 
   private async resolveSseEndpoint(): Promise<string> {
     const url = resolveEnv(this.config.url || '')
-    const response = await fetch(url, {
-      headers: { Accept: 'text/event-stream', ...(this.config.headers || {}) }
-    })
+    console.log(`[MCP SSE] Connecting to ${url}`)
+
+    let response: Response
+    try {
+      response = await fetch(url, {
+        headers: { Accept: 'text/event-stream', ...(this.config.headers || {}) }
+      })
+    } catch (err: any) {
+      console.error(`[MCP SSE] fetch failed for ${url}:`, err)
+      throw new Error(`SSE fetch failed: ${err.message || err}`)
+    }
 
     if (!response.ok) {
       throw new Error(`SSE connection failed: ${response.status}`)
@@ -251,11 +264,15 @@ class HttpConnection {
     const decoder = new TextDecoder()
     let buffer = ''
     let endpoint = ''
+    let pendingEndpointEvent = false
 
     // Read SSE stream for up to 10 seconds to find endpoint
     const start = Date.now()
     while (Date.now() - start < 10000) {
-      const { done, value } = await reader.read({ timeout: 5000 })
+      const timeoutPromise = new Promise<ReadableStreamReadResult<Uint8Array>>(
+        (_, reject) => setTimeout(() => reject(new Error('SSE read timeout')), 1000)
+      )
+      const { done, value } = await Promise.race([reader.read(), timeoutPromise])
       if (done) break
 
       buffer += decoder.decode(value, { stream: true })
@@ -263,30 +280,29 @@ class HttpConnection {
       buffer = lines.pop() || ''
 
       for (const line of lines) {
-        if (line.startsWith('event: endpoint')) {
-          // The next data line contains the endpoint URL
+        const trimmed = line.trim()
+        if (!trimmed) {
+          pendingEndpointEvent = false
           continue
         }
-        if (line.startsWith('data: ') && endpoint === '') {
-          // Check if previous event was 'endpoint'
-          const prevIdx = lines.indexOf(line) - 1
-          if (prevIdx >= 0 && lines[prevIdx] === 'event: endpoint') {
-            endpoint = line.slice(6).trim()
-          }
+
+        if (trimmed === 'event: endpoint') {
+          pendingEndpointEvent = true
+          continue
         }
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6).trim()
-          if (data && (data.startsWith('http://') || data.startsWith('https://'))) {
-            endpoint = data
-          }
+
+        if (pendingEndpointEvent && trimmed.startsWith('data: ')) {
+          endpoint = trimmed.slice(6).trim()
+          pendingEndpointEvent = false
         }
       }
 
       if (endpoint) break
     }
 
-    reader.cancel()
+    try { await reader.cancel() } catch {}
     if (!endpoint) throw new Error('Failed to get SSE endpoint')
+    console.log(`[MCP SSE] Got endpoint: ${endpoint}`)
     return endpoint
   }
 
