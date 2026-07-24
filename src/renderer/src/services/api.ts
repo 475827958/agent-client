@@ -1,9 +1,50 @@
-import type { ServerEvent, AppMode, SceneMode, McpHubServer, McpInstalledServer, CustomMcpServer, CreateCustomMcpRequest, HubSkill, InstalledSkill, CustomSkillDef, CreateCustomSkillRequest } from '../types'
+import type { ServerEvent, AppMode, SceneMode, McpHubServer, McpInstalledServer, CustomMcpServer, CreateCustomMcpRequest, HubSkill, InstalledSkill, CustomSkillDef, CreateCustomSkillRequest, McpInstallResponse, McpToolDef, SkillInstallResult } from '../types'
 import { useSettingsStore } from '../stores/settingsStore'
 import { parseNDJSONStream } from './ndjson'
 import { ipcClient } from './ipcClient'
 
 const DEFAULT_BASE_URL = '/api'
+
+/** Skills directory on the client machine */
+const HOME_DIR = (() => {
+  try {
+    return (window as any).__HOME_DIR || ''
+  } catch { return '' }
+})()
+const SKILLS_BASE_DIR = HOME_DIR ? `${HOME_DIR}/.iwork/skills` : ''
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const result = reader.result as string
+      // strip data:application/zip;base64, prefix
+      const comma = result.indexOf(',')
+      resolve(comma >= 0 ? result.slice(comma + 1) : result)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
+async function extractSkillZip(skillId: string, skillName: string, blob: Blob): Promise<string> {
+  if (!SKILLS_BASE_DIR) {
+    console.warn('HOME_DIR not available, skipping zip extraction')
+    return ''
+  }
+
+  const targetDir = `${SKILLS_BASE_DIR}/${skillName}`
+  const b64Path = `${SKILLS_BASE_DIR}/_tmp_${skillId}.b64`
+  const zipPath = `${SKILLS_BASE_DIR}/_tmp_${skillId}.zip`
+
+  const base64 = await blobToBase64(blob)
+
+  // Write base64 to temp file, decode, extract, cleanup
+  await ipcClient.file.write(b64Path, base64)
+  await ipcClient.file.exec(`mkdir -p "${targetDir}" && base64 -d "${b64Path}" > "${zipPath}" && unzip -o "${zipPath}" -d "${targetDir}" && rm "${b64Path}" "${zipPath}"`)
+
+  return targetDir
+}
 
 export interface ToolResult {
   status: 'success' | 'error'
@@ -15,6 +56,27 @@ export interface ToolResult {
 
 export function isClientTool(toolName: string): boolean {
   return CLIENT_TOOLS.some(t => t.name === toolName)
+}
+
+/**
+ * Try to execute a tool as an MCP tool call.
+ * Tool names from the backend follow the pattern {server_id}_{tool_name}.
+ * Returns the result if matched, or null if not an MCP tool.
+ */
+async function tryExecuteMcpTool(toolName: string, input: Record<string, unknown>): Promise<unknown | null> {
+  // Lazy import to avoid circular dependency with configStore
+  const { useConfigStore } = await import('../stores/configStore')
+  const { mcpConnectionStatuses } = useConfigStore.getState()
+
+  for (const serverId of Object.keys(mcpConnectionStatuses)) {
+    const prefix = serverId + '_'
+    if (toolName.startsWith(prefix) && mcpConnectionStatuses[serverId].status === 'connected') {
+      const actualToolName = toolName.slice(prefix.length)
+      return ipcClient.mcp.callTool(serverId, actualToolName, input)
+    }
+  }
+
+  return null
 }
 
 /**
@@ -137,8 +199,15 @@ export async function executeClientTool(
         output = result.stdout || result.stderr || '(no output)'
         break
       }
-      default:
-        throw new Error(`Unknown client tool: ${toolName}`)
+      default: {
+        // Route MCP tools: tool name format is {server_id}_{tool_name}
+        const mcpResult = await tryExecuteMcpTool(toolName, input)
+        if (mcpResult !== null) {
+          output = typeof mcpResult === 'string' ? mcpResult : JSON.stringify(mcpResult)
+        } else {
+          throw new Error(`Unknown client tool: ${toolName}`)
+        }
+      }
     }
 
     return {
@@ -553,8 +622,8 @@ export async function fetchMcpInstalled(): Promise<{ installed: McpInstalledServ
   return response.json()
 }
 
-// POST /mcp/install
-export async function installMcpApi(serverId: string): Promise<{ installed: boolean; server_id: string }> {
+// POST /mcp/install — 服务端登记 + 返回完整配置，客户端按 transport 建立连接
+export async function installMcpApi(serverId: string): Promise<McpInstallResponse> {
   const response = await fetch(getMcpUrl('/mcp/install'), {
     method: 'POST',
     headers: getAuthHeaders(),
@@ -562,6 +631,8 @@ export async function installMcpApi(serverId: string): Promise<{ installed: bool
   })
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: 'Install failed' }))
+    if (response.status === 409) throw new Error('该 MCP 已安装')
+    if (response.status === 404) throw new Error('server_id 不在 Hub 中')
     throw new Error(err.detail || `MCP install error: ${response.status}`)
   }
   return response.json()
@@ -614,6 +685,24 @@ export async function deleteCustomMcpApi(serverId: string): Promise<{ deleted: b
   return response.json()
 }
 
+// POST /sessions/{id}/mcp/tools — 客户端发现 MCP 工具后上报
+export async function reportMcpTools(
+  sessionId: string,
+  serverId: string,
+  tools: McpToolDef[]
+): Promise<{ received: boolean; tool_count: number }> {
+  const response = await fetch(getMcpUrl(`/sessions/${sessionId}/mcp/tools`), {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ server_id: serverId, tools })
+  })
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Report tools failed' }))
+    throw new Error(err.detail || `MCP tools report error: ${response.status}`)
+  }
+  return response.json()
+}
+
 // ===== Skill 管理 API (section 3.9) =====
 
 function getSkillUrl(path: string): string {
@@ -636,8 +725,8 @@ export async function fetchInstalledSkills(): Promise<{ installed: InstalledSkil
   return response.json()
 }
 
-// POST /skills/install
-export async function installSkillApi(skillId: string): Promise<{ installed: boolean; skill_id: string }> {
+// POST /skills/install — 服务端登记 + 返回 zip，客户端解压到 ~/.iwork/skills/{name}/
+export async function installSkillApi(skillId: string): Promise<SkillInstallResult> {
   const response = await fetch(getSkillUrl('/skills/install'), {
     method: 'POST',
     headers: getAuthHeaders(),
@@ -645,9 +734,23 @@ export async function installSkillApi(skillId: string): Promise<{ installed: boo
   })
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: 'Install failed' }))
+    if (response.status === 409) throw new Error('该 Skill 已安装')
+    if (response.status === 404) throw new Error('skill_id 不在 Hub 中')
     throw new Error(err.detail || `Skill install error: ${response.status}`)
   }
-  return response.json()
+
+  // Check if response is JSON (legacy/no zip) or a zip blob
+  const contentType = response.headers.get('Content-Type') || ''
+  if (contentType.includes('application/zip')) {
+    const skillName = response.headers.get('X-Skill-Name') || skillId
+    const blob = await response.blob()
+    const extractPath = await extractSkillZip(skillId, skillName, blob)
+    return { skill_id: skillId, skill_name: skillName, extract_path: extractPath }
+  }
+
+  // Fallback: old JSON response
+  const data = await response.json()
+  return { skill_id: skillId, skill_name: data.skill_name || skillId, extract_path: '' }
 }
 
 // DELETE /skills/uninstall/{skill_id}

@@ -1,12 +1,14 @@
 import { create } from 'zustand'
-import type { HubSkill, InstalledSkill, CustomSkillDef, CreateCustomSkillRequest, McpHubServer, McpInstalledServer, CustomMcpServer, CreateCustomMcpRequest } from '../types'
+import type { HubSkill, InstalledSkill, CustomSkillDef, CreateCustomSkillRequest, McpHubServer, McpInstalledServer, CustomMcpServer, CreateCustomMcpRequest, McpConnectionStatus, McpToolDef, McpInstallResponse } from '../types'
 import {
   fetchMcpHub, fetchMcpInstalled, fetchMcpCustom,
   installMcpApi, uninstallMcpApi, createCustomMcpApi, deleteCustomMcpApi,
   fetchSkillHub, fetchInstalledSkills, fetchCustomSkillsApi,
   installSkillApi, uninstallSkillApi, enableSkillApi, disableSkillApi,
-  createCustomSkillApi, deleteCustomSkillApi
+  createCustomSkillApi, deleteCustomSkillApi,
+  reportMcpTools
 } from '../services/api'
+import { ipcClient } from '../services/ipcClient'
 
 interface ConfigState {
   // Skills — API-backed
@@ -31,6 +33,15 @@ interface ConfigState {
   customLoading: boolean
   customError: string | null
 
+  // Installing state
+  installingMcpIds: Set<string>
+  installingSkillIds: Set<string>
+
+  // MCP connection statuses per server
+  mcpConnectionStatuses: Record<string, McpConnectionStatus>
+  // Discovered tools per server (from tools/list after connect)
+  mcpDiscoveredTools: Record<string, McpToolDef[]>
+
   // Skills actions
   loadSkillHub: () => Promise<void>
   loadInstalledSkills: () => Promise<void>
@@ -52,6 +63,11 @@ interface ConfigState {
   uninstallMcp: (serverId: string) => Promise<void>
   createCustomMcp: (req: CreateCustomMcpRequest) => Promise<void>
   deleteCustomMcp: (serverId: string) => Promise<void>
+  setMcpConnectionStatus: (serverId: string, status: Partial<McpConnectionStatus>) => void
+
+  // MCP session helpers
+  getMcpServersForSession: () => { server_id: string; server_name: string; enabled_tools?: string[] }[]
+  reportMcpToolsToSession: (sessionId: string) => Promise<void>
 }
 
 export const useConfigStore = create<ConfigState>((set, get) => ({
@@ -76,6 +92,12 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   customMcps: [],
   customLoading: false,
   customError: null,
+
+  installingMcpIds: new Set<string>(),
+  installingSkillIds: new Set<string>(),
+
+  mcpConnectionStatuses: {},
+  mcpDiscoveredTools: {},
 
   // Skills actions
   loadSkillHub: async () => {
@@ -119,11 +141,20 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   },
 
   installSkill: async (skillId) => {
+    const s = get()
+    if (s.installingSkillIds.has(skillId)) return
+    set({ installingSkillIds: new Set([...s.installingSkillIds, skillId]) })
     try {
       await installSkillApi(skillId)
       await get().loadInstalledSkills()
     } catch (err: any) {
       throw err
+    } finally {
+      set((st) => {
+        const next = new Set(st.installingSkillIds)
+        next.delete(skillId)
+        return { installingSkillIds: next }
+      })
     }
   },
 
@@ -198,17 +229,71 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   },
 
   installMcp: async (serverId) => {
+    const s = get()
+    if (s.installingMcpIds.has(serverId)) return
+    set({ installingMcpIds: new Set([...s.installingMcpIds, serverId]) })
+
     try {
-      await installMcpApi(serverId)
+      // 1. Call API to register on server + get config
+      const config: McpInstallResponse = await installMcpApi(serverId)
+
+      // 2. Set connecting status
+      set((st) => ({
+        mcpConnectionStatuses: {
+          ...st.mcpConnectionStatuses,
+          [serverId]: { server_id: serverId, status: 'connecting', tool_count: 0 }
+        }
+      }))
+
+      // 3. Connect client-side based on transport type
+      const tools = await ipcClient.mcp.connect(serverId, config)
+
+      // 4. Store discovered tools and update status
+      set((st) => ({
+        mcpDiscoveredTools: { ...st.mcpDiscoveredTools, [serverId]: tools },
+        mcpConnectionStatuses: {
+          ...st.mcpConnectionStatuses,
+          [serverId]: { server_id: serverId, status: 'connected', tool_count: tools.length }
+        }
+      }))
+
       await get().loadInstalledMcps()
     } catch (err: any) {
+      set((st) => ({
+        mcpConnectionStatuses: {
+          ...st.mcpConnectionStatuses,
+          [serverId]: { server_id: serverId, status: 'error', tool_count: 0, error: err.message }
+        }
+      }))
       throw err
+    } finally {
+      set((st) => {
+        const next = new Set(st.installingMcpIds)
+        next.delete(serverId)
+        return { installingMcpIds: next }
+      })
     }
   },
 
   uninstallMcp: async (serverId) => {
     try {
+      // 1. Disconnect client-side (kill process / close HTTP)
+      try {
+        await ipcClient.mcp.disconnect(serverId)
+      } catch {
+        // disconnect error is non-fatal — the process may already be dead
+      }
+
+      // 2. Unregister from server
       await uninstallMcpApi(serverId)
+
+      // 3. Clean up local state
+      set((st) => {
+        const { [serverId]: _, ...restStatuses } = st.mcpConnectionStatuses
+        const { [serverId]: __, ...restTools } = st.mcpDiscoveredTools
+        return { mcpConnectionStatuses: restStatuses, mcpDiscoveredTools: restTools }
+      })
+
       await get().loadInstalledMcps()
     } catch (err: any) {
       throw err
@@ -225,5 +310,55 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
     await deleteCustomMcpApi(serverId)
     await get().loadCustomMcps()
     await get().loadInstalledMcps()
+  },
+
+  setMcpConnectionStatus: (serverId, partial) => {
+    set((st) => ({
+      mcpConnectionStatuses: {
+        ...st.mcpConnectionStatuses,
+        [serverId]: {
+          server_id: serverId,
+          status: 'disconnected' as const,
+          tool_count: 0,
+          ...st.mcpConnectionStatuses[serverId],
+          ...partial
+        }
+      }
+    }))
+  },
+
+  // Build mcp_servers payload for CreateSessionRequest
+  getMcpServersForSession: () => {
+    const { mcpConnectionStatuses, mcpDiscoveredTools } = get()
+    const servers: { server_id: string; server_name: string; enabled_tools?: string[] }[] = []
+
+    for (const [serverId, status] of Object.entries(mcpConnectionStatuses)) {
+      if (status.status === 'connected' && status.tool_count > 0) {
+        const tools = mcpDiscoveredTools[serverId] || []
+        servers.push({
+          server_id: serverId,
+          server_name: serverId,
+          enabled_tools: tools.length > 0 ? tools.map(t => t.name) : undefined
+        })
+      }
+    }
+
+    return servers
+  },
+
+  // Report all connected MCP tools to a given session
+  reportMcpToolsToSession: async (sessionId) => {
+    const { mcpConnectionStatuses, mcpDiscoveredTools } = get()
+
+    for (const [serverId, status] of Object.entries(mcpConnectionStatuses)) {
+      if (status.status === 'connected') {
+        const tools = mcpDiscoveredTools[serverId] || []
+        try {
+          await reportMcpTools(sessionId, serverId, tools)
+        } catch (err) {
+          console.error(`Failed to report tools for ${serverId}:`, err)
+        }
+      }
+    }
   }
 }))

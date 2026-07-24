@@ -17,6 +17,12 @@ const api = {
   settings: {
     save: (settings: unknown) => ipcRenderer.invoke('settings:save', settings),
     load: () => ipcRenderer.invoke('settings:load')
+  },
+  mcp: {
+    connect: (serverId: string, config: unknown) => ipcRenderer.invoke('mcp:connect', serverId, config),
+    disconnect: (serverId: string) => ipcRenderer.invoke('mcp:disconnect', serverId),
+    callTool: (serverId: string, toolName: string, input: unknown) =>
+      ipcRenderer.invoke('mcp:call-tool', serverId, toolName, input)
   }
 }
 

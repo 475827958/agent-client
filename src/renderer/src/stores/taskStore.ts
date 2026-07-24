@@ -3,6 +3,7 @@ import type { Task, Message } from '../types'
 import { createSession, CLIENT_TOOLS } from '../services/api'
 import { useModeStore } from './modeStore'
 import { useSettingsStore } from './settingsStore'
+import { useConfigStore } from './configStore'
 
 function genUUID(): string {
   return crypto.randomUUID()
@@ -69,8 +70,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         workspace: settings.workspacePath,
         model: settings.model,
         mode: modeStore.inputMode,
-        client_tools: CLIENT_TOOLS
+        client_tools: CLIENT_TOOLS,
+        mcp_servers: useConfigStore.getState().getMcpServersForSession()
       })
+
+      // Report all connected MCP tools to the newly created session
+      useConfigStore.getState().reportMcpToolsToSession(data.id)
 
       set((s) => ({
         tasks: s.tasks.map((t) =>

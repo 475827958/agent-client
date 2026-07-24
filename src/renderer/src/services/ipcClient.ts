@@ -23,6 +23,11 @@ function getAPI() {
           workspacePath: '',
           fullAccess: false
         } as Settings)
+      },
+      mcp: {
+        connect: async () => [],
+        disconnect: async () => {},
+        callTool: async () => { throw new Error('MCP not available') }
       }
     }
   }

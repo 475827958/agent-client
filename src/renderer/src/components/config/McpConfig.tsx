@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useConfigStore } from '../../stores/configStore'
-import type { CreateCustomMcpRequest } from '../../types'
+import type { CreateCustomMcpRequest, McpConnectionStatus } from '../../types'
 
 function Spinner() {
   return (
@@ -8,6 +8,20 @@ function Spinner() {
       <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="28" strokeDashoffset="8" />
     </svg>
   )
+}
+
+const connectionStatusColors: Record<McpConnectionStatus['status'], string> = {
+  disconnected: 'bg-[#f1f5f9] text-[#94a3b8]',
+  connecting: 'bg-[#fffbeb] text-[#b45309]',
+  connected: 'bg-[#f0fdf4] text-[#047857]',
+  error: 'bg-[#fef2f2] text-[#dc2626]'
+}
+
+const connectionStatusLabel: Record<McpConnectionStatus['status'], string> = {
+  disconnected: '未连接',
+  connecting: '连接中',
+  connected: '已连接',
+  error: '连接失败'
 }
 
 export function McpConfig() {
@@ -20,6 +34,7 @@ export function McpConfig() {
     mcpHub, mcpHubLoading, mcpHubError,
     installedMcps, installedLoading, installedError,
     customMcps, customLoading, customError,
+    installingMcpIds, mcpConnectionStatuses,
     loadAllMcps,
     installMcp, uninstallMcp, createCustomMcp, deleteCustomMcp
   } = useConfigStore()
@@ -110,25 +125,46 @@ export function McpConfig() {
             <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5">
               {filtered.map(s => {
                 const installed = installedIds.has(s.server_id)
+                const installing = installingMcpIds.has(s.server_id)
+                const connStatus = mcpConnectionStatuses[s.server_id]
                 return (
                   <div key={s.server_id} className="bg-white border border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5 hover:border-[#cbd5e1] hover:shadow-sm transition-all">
                     <div className="w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg">{s.icon}</div>
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-sm text-[#0f172a]">{s.server_name}</div>
                       <div className="text-xs text-[#94a3b8] mt-1">{s.description}</div>
-                      <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1.5 bg-[#fffbeb] text-[#b45309]">{s.category}</span>
+                      <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                        <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#fffbeb] text-[#b45309]">{s.category}</span>
+                        <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#f1f5f9] text-[#64748b]">{s.transport}</span>
+                        {connStatus?.status === 'connected' && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#f0fdf4] text-[#047857]">
+                            {connStatus.tool_count} tools
+                          </span>
+                        )}
+                        {connStatus?.status === 'error' && (
+                          <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#fef2f2] text-[#dc2626]" title={connStatus.error}>
+                            错误
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex-shrink-0 self-center">
-                      <button
-                        onClick={() => installed ? handleUninstall(s.server_id) : handleInstall(s.server_id)}
-                        className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors border cursor-pointer ${
-                          installed
-                            ? 'border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9]'
-                            : 'border-[#a7f3d0] text-[#047857] bg-[#f0fdf4] hover:bg-[#a7f3d0]'
-                        }`}
-                      >
-                        {installed ? '已安装' : '安装'}
-                      </button>
+                      {installing ? (
+                        <span className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9]">
+                          <Spinner /> 安装中
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => installed ? handleUninstall(s.server_id) : handleInstall(s.server_id)}
+                          className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors border cursor-pointer ${
+                            installed
+                              ? 'border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9]'
+                              : 'border-[#a7f3d0] text-[#047857] bg-[#f0fdf4] hover:bg-[#a7f3d0]'
+                          }`}
+                        >
+                          {installed ? '已安装' : '安装'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 )
@@ -147,22 +183,30 @@ export function McpConfig() {
           {!installedLoading && !installedError && (
             <div>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5">
-                {installedMcps.map(s => (
+                {installedMcps.map(s => {
+                  const connStatus = mcpConnectionStatuses[s.server_id]
+                  return (
                   <div key={s.server_id} className="bg-white border border-l-[3px] border-l-[#a7f3d0] border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5">
                     <div className="w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg">{s.icon}</div>
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-sm text-[#0f172a]">{s.server_name}</div>
                       <div className="text-xs text-[#94a3b8] mt-1">{s.description}</div>
-                      <div className="flex gap-1.5 mt-1.5">
+                      <div className="flex gap-1.5 mt-1.5 flex-wrap items-center">
                         <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#fffbeb] text-[#b45309]">{s.category}</span>
                         <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#f1f5f9] text-[#64748b]">{s.transport}</span>
+                        {connStatus && (
+                          <span className={`inline-block text-[10px] font-medium px-1.5 py-0.5 rounded ${connectionStatusColors[connStatus.status]}`}>
+                            {connectionStatusLabel[connStatus.status]}
+                            {connStatus.tool_count > 0 && ` · ${connStatus.tool_count} tools`}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex-shrink-0 self-center">
                       <button onClick={() => handleUninstall(s.server_id)} className="px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9] cursor-pointer">卸载</button>
                     </div>
                   </div>
-                ))}
+                )})}
                 {installedMcps.length === 0 && <div className="text-[#94a3b8] text-[13px] py-3">暂无已安装的 MCP，前往 Hub 安装</div>}
               </div>
             </div>

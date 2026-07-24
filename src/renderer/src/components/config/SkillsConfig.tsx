@@ -20,6 +20,7 @@ export function SkillsConfig() {
     hubSkills, hubSkillsLoading, hubSkillsError,
     installedSkills, installedSkillsLoading, installedSkillsError,
     customSkills, customSkillsLoading, customSkillsError,
+    installingSkillIds,
     loadAllSkills,
     installSkill, uninstallSkill, enableSkill, disableSkill,
     createCustomSkill, deleteCustomSkill
@@ -124,6 +125,7 @@ export function SkillsConfig() {
             <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5">
               {filtered.map(s => {
                 const installed = installedIds.has(s.skill_id)
+                const installing = installingSkillIds.has(s.skill_id)
                 return (
                   <div key={s.skill_id} className="bg-white border border-[#e2e8f0] rounded-[10px] p-[18px] flex gap-3.5 hover:border-[#cbd5e1] hover:shadow-sm transition-all">
                     <div className="w-[38px] h-[38px] rounded-md bg-[#f1f5f9] flex items-center justify-center flex-shrink-0 text-lg">{s.icon}</div>
@@ -136,16 +138,22 @@ export function SkillsConfig() {
                       </div>
                     </div>
                     <div className="flex-shrink-0 self-center">
-                      <button
-                        onClick={() => installed ? handleUninstall(s.skill_id) : handleInstall(s.skill_id)}
-                        className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors border cursor-pointer ${
-                          installed
-                            ? 'border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9]'
-                            : 'border-[#a7f3d0] text-[#047857] bg-[#f0fdf4] hover:bg-[#a7f3d0]'
-                        }`}
-                      >
-                        {installed ? '已安装' : '安装'}
-                      </button>
+                      {installing ? (
+                        <span className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-md text-xs font-medium border border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9]">
+                          <Spinner /> 安装中
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => installed ? handleUninstall(s.skill_id) : handleInstall(s.skill_id)}
+                          className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors border cursor-pointer ${
+                            installed
+                              ? 'border-[#e2e8f0] text-[#94a3b8] bg-[#f1f5f9]'
+                              : 'border-[#a7f3d0] text-[#047857] bg-[#f0fdf4] hover:bg-[#a7f3d0]'
+                          }`}
+                        >
+                          {installed ? '已安装' : '安装'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 )

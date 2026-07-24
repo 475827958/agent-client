@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'path'
 import { registerFileOps } from './fileOps'
 import { registerSettings } from './settings'
+import { registerMcpIpc } from './mcpIpc'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -44,6 +45,7 @@ app.whenReady().then(() => {
 
   const { get: getSettings } = registerSettings()
   registerFileOps(() => getSettings().workspacePath)
+  registerMcpIpc()
 
   createWindow()
 

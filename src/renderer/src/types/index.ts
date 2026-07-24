@@ -198,6 +198,42 @@ export interface InstallMcpRequest {
   server_id: string
 }
 
+/** MCP 安装响应 (POST /mcp/install — 新架构返回配置而非仅登记) */
+export interface McpInstallResponse {
+  server_id: string
+  server_name: string
+  transport: 'stdio' | 'sse' | 'streamable-http'
+  // stdio
+  command?: string
+  args?: string[]
+  env?: Record<string, string>
+  // streamable-http / sse
+  url?: string
+  headers?: Record<string, string>
+}
+
+/** 单个 MCP 工具定义 */
+export interface McpToolDef {
+  name: string
+  description: string
+  input_schema: Record<string, unknown>
+}
+
+/** MCP 连接状态（客户端维护） */
+export interface McpConnectionStatus {
+  server_id: string
+  status: 'disconnected' | 'connecting' | 'connected' | 'error'
+  tool_count: number
+  error?: string
+}
+
+/** Skill 安装结果（客户端本地安装后返回） */
+export interface SkillInstallResult {
+  skill_id: string
+  skill_name: string
+  extract_path: string
+}
+
 export interface MemoryItem {
   id: string
   text: string
@@ -234,6 +270,11 @@ export interface ElectronAPI {
   settings: {
     save: (settings: Settings) => Promise<void>
     load: () => Promise<Settings>
+  }
+  mcp: {
+    connect: (serverId: string, config: McpInstallResponse) => Promise<McpToolDef[]>
+    disconnect: (serverId: string) => Promise<void>
+    callTool: (serverId: string, toolName: string, input: Record<string, unknown>) => Promise<unknown>
   }
 }
 
